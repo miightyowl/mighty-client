@@ -28,6 +28,7 @@
 #include <game/teamscore.h>
 
 // components
+#include "components/ads.h"
 #include "components/background.h"
 #include "components/binds.h"
 #include "components/broadcast.h"
@@ -173,6 +174,7 @@ public:
 	CSpectator m_Spectator;
 
 	CPlayers m_Players;
+	CAds m_Ads;
 	CNamePlates m_NamePlates;
 	CFreezeBars m_FreezeBars;
 	CItems m_Items;

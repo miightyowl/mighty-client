@@ -1058,6 +1058,9 @@ endif()
 
 set(EXPECTED_DATA
   # tidy-alphabetical-start
+  ads/doubledipp.png
+  ads/maodie.png
+  ads/sockii.png
   announcement.txt
   arrow.png
   assets/entities/comfort/ddnet.png
@@ -2478,6 +2481,8 @@ if(CLIENT)
     animstate.h
     component.cpp
     component.h
+    components/ads.cpp
+    components/ads.h
     components/background.cpp
     components/background.h
     components/binds.cpp

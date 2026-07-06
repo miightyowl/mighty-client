@@ -486,6 +486,14 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		g_Config.m_ClFatSkins ^= 1;
 	}
 
+	// m-client
+	Checkboxes.HSplitTop(20.0f, &Button, &Checkboxes);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientForceSkin, Localize("Force maodie skin on everyone"), g_Config.m_ClMClientForceSkin, &Button))
+	{
+		g_Config.m_ClMClientForceSkin ^= 1;
+		ShouldRefresh = true;
+	}
+
 	// Skin prefix
 	{
 		SkinPrefix.HSplitTop(20.0f, &Label, &SkinPrefix);
@@ -698,19 +706,6 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		}
 	}
 	MainView.HSplitTop(5.0f, nullptr, &MainView);
-
-	// m-client toggles
-	{
-		CUIRect MClientRow, MClientForce, MClientTag;
-		MainView.HSplitTop(20.0f, &MClientRow, &MainView);
-		MainView.HSplitTop(5.0f, nullptr, &MainView);
-		MClientRow.VSplitMid(&MClientForce, &MClientTag, 20.0f);
-		if(DoButton_CheckBox(&g_Config.m_ClMClientForceSkin, Localize("Force maodie skin on everyone"), g_Config.m_ClMClientForceSkin, &MClientForce))
-		{
-			g_Config.m_ClMClientForceSkin ^= 1;
-			ShouldRefresh = true;
-		}
-	}
 
 	// Layout bottom controls and use remainder for skin selector
 	CUIRect QuickSearch, DatabaseButton, DirectoryButton, RefreshButton;
@@ -1892,6 +1887,8 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudScore, Localize("Show score"), &g_Config.m_ClShowhudScore, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowLocalTimeAlways, Localize("Show local time always"), &g_Config.m_ClShowLocalTimeAlways, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClSpecCursor, Localize("Show spectator cursor"), &g_Config.m_ClSpecCursor, &LeftView, LineSize);
+		// m-client
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientAds, Localize("Random advertisement pop-ups (please keep that on, i need the money)"), &g_Config.m_ClMClientAds, &LeftView, LineSize);
 
 		// Settings of the HUD element for votes
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowVotesAfterVoting, Localize("Show votes window after voting"), &g_Config.m_ClShowVotesAfterVoting, &LeftView, LineSize);
