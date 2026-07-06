@@ -3115,7 +3115,11 @@ CSkinDescriptor CGameClient::CClientData::ToSkinDescriptor() const
 	if(m_Active && !TranslatedClient.m_Active)
 	{
 		SkinDescriptor.m_Flags |= CSkinDescriptor::FLAG_SIX;
-		str_copy(SkinDescriptor.m_aSkinName, m_aSkinName);
+		// force maodie skin
+		if(g_Config.m_ClMClientForceSkin)
+			str_copy(SkinDescriptor.m_aSkinName, "maodie");
+		else
+			str_copy(SkinDescriptor.m_aSkinName, m_aSkinName);
 	}
 	else if(TranslatedClient.m_Active)
 	{

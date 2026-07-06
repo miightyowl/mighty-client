@@ -429,6 +429,11 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		pEmote = &g_Config.m_ClDummyDefaultEyes;
 	}
 
+	// force maodie skin
+	const bool maodieskin = g_Config.m_ClMClientForceSkin != 0;
+	if(maodieskin)
+		str_copy(pSkinName, "maodie", SkinNameSize);
+
 	const float EyeButtonSize = 40.0f;
 	const bool RenderEyesBelow = MainView.w < 750.0f;
 	CUIRect YourSkin, Checkboxes, SkinPrefix, Eyes, Button, Label;
@@ -597,15 +602,21 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	static char s_StatusTooltipId;
 	RenderSkinStatus(YourSkin, pOwnSkinContainer, &s_StatusTooltipId);
 
-	// Skin name
 	static CLineInput s_SkinInput;
-	s_SkinInput.SetBuffer(pSkinName, SkinNameSize);
-	s_SkinInput.SetEmptyText("default");
-	if(Ui()->DoClearableEditBox(&s_SkinInput, &Button, 14.0f))
+	if(maodieskin)
 	{
-		SetNeedSendInfo();
-		m_SkinListScrollToSelected = true;
-		SkinList.ForceRefresh();
+		Ui()->DoLabel(&Button, "maodie (locked)", 14.0f, TEXTALIGN_ML);
+	}
+	else
+	{
+		s_SkinInput.SetBuffer(pSkinName, SkinNameSize);
+		s_SkinInput.SetEmptyText("default");
+		if(Ui()->DoClearableEditBox(&s_SkinInput, &Button, 14.0f))
+		{
+			SetNeedSendInfo();
+			m_SkinListScrollToSelected = true;
+			SkinList.ForceRefresh();
+		}
 	}
 
 	// Random skin button
@@ -614,7 +625,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	static int s_CurrentDie = rand() % std::size(s_apDice);
 	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 	TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
-	if(DoButton_Menu(&s_RandomSkinButton, s_apDice[s_CurrentDie], 0, &RandomSkinButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, -0.2f))
+	if(DoButton_Menu(&s_RandomSkinButton, s_apDice[s_CurrentDie], 0, &RandomSkinButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, -0.2f) && !maodieskin)
 	{
 		GameClient()->m_Skins.RandomizeSkin(m_Dummy);
 		SetNeedSendInfo();
@@ -623,7 +634,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	}
 	TextRender()->SetRenderFlags(0);
 	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-	GameClient()->m_Tooltips.DoToolTip(&s_RandomSkinButton, &RandomSkinButton, Localize("Create a random skin"));
+	GameClient()->m_Tooltips.DoToolTip(&s_RandomSkinButton, &RandomSkinButton, maodieskin ? Localize("Skin is locked to \"maodie\"") : Localize("Create a random skin"));
 
 	// Custom colors button
 	if(DoButton_CheckBox(pUseCustomColor, Localize("Custom colors"), *pUseCustomColor, &CustomColorsButton))
@@ -687,6 +698,19 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		}
 	}
 	MainView.HSplitTop(5.0f, nullptr, &MainView);
+
+	// m-client toggles
+	{
+		CUIRect MClientRow, MClientForce, MClientTag;
+		MainView.HSplitTop(20.0f, &MClientRow, &MainView);
+		MainView.HSplitTop(5.0f, nullptr, &MainView);
+		MClientRow.VSplitMid(&MClientForce, &MClientTag, 20.0f);
+		if(DoButton_CheckBox(&g_Config.m_ClMClientForceSkin, Localize("Force maodie skin on everyone"), g_Config.m_ClMClientForceSkin, &MClientForce))
+		{
+			g_Config.m_ClMClientForceSkin ^= 1;
+			ShouldRefresh = true;
+		}
+	}
 
 	// Layout bottom controls and use remainder for skin selector
 	CUIRect QuickSearch, DatabaseButton, DirectoryButton, RefreshButton;
@@ -782,8 +806,9 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		RenderSkinStatus(Item.m_Rect, pSkinContainer, SkinListEntry.ErrorTooltipId());
 	}
 
+	// M-Client: while the skin is forced, selecting from the list is disabled.
 	const int NewSelected = s_ListBox.DoEnd();
-	if(OldSelected != NewSelected)
+	if(!maodieskin && OldSelected != NewSelected)
 	{
 		str_copy(pSkinName, vSkinList[NewSelected].SkinContainer()->Name(), SkinNameSize);
 		SkinList.ForceRefresh();
