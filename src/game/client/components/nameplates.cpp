@@ -350,6 +350,12 @@ protected:
 		if(!m_Visible)
 			return false;
 		m_Color = Data.m_Color;
+		// players named mighty get a golden name
+		if(str_comp(Data.m_aName, "mighty") == 0)
+		{
+			const float Shine = 0.5f + 0.5f * std::sin(This.Client()->LocalTime() * 4.0f);
+			m_Color = ColorRGBA(1.0f, 0.72f + 0.23f * Shine, 0.05f + 0.35f * Shine, Data.m_Color.a);
+		}
 		return m_FontSize != Data.m_FontSize || str_comp(m_aText, Data.m_aName) != 0;
 	}
 	void UpdateText(CGameClient &This, const CNamePlateData &Data) override
