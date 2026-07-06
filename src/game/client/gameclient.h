@@ -59,6 +59,7 @@
 #include "components/motd.h"
 #include "components/nameplates.h"
 #include "components/particles.h"
+#include "components/petting.h"
 #include "components/players.h"
 #include "components/race_demo.h"
 #include "components/scoreboard.h"
@@ -174,6 +175,7 @@ public:
 	CSpectator m_Spectator;
 
 	CPlayers m_Players;
+	CPetting m_Petting;
 	CAds m_Ads;
 	CNamePlates m_NamePlates;
 	CFreezeBars m_FreezeBars;

@@ -1889,6 +1889,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClSpecCursor, Localize("Show spectator cursor"), &g_Config.m_ClSpecCursor, &LeftView, LineSize);
 		// m-client
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientAds, Localize("Random advertisement pop-ups (please keep that on, i need the money)"), &g_Config.m_ClMClientAds, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPet, Localize("Show petting hand"), &g_Config.m_ClMClientPet, &LeftView, LineSize);
 
 		// Settings of the HUD element for votes
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowVotesAfterVoting, Localize("Show votes window after voting"), &g_Config.m_ClShowVotesAfterVoting, &LeftView, LineSize);

@@ -180,6 +180,7 @@ MACRO_CONFIG_INT(ClMClientForceSkin, cl_mclient_force_skin, 1, 0, 1, CFGFLAG_CLI
 MACRO_CONFIG_INT(ClMClientWalkSound, cl_mclient_walk_sound, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: play a walking sound while a maodie tee is moving on the ground")
 MACRO_CONFIG_INT(ClMClientAds, cl_mclient_ads, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: randomly show advertisement pop-ups while playing")
 MACRO_CONFIG_INT(ClMClientAdsInterval, cl_mclient_ads_interval, 120, 5, 3600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: average seconds between random advertisement pop-ups")
+MACRO_CONFIG_INT(ClMClientPet, cl_mclient_pet, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show a hand when a player is petting a nearby player")
 
 MACRO_CONFIG_COL(ClPlayer7ColorBody, player7_color_body, 0x1B6F74, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player body color")
 MACRO_CONFIG_COL(ClPlayer7ColorFeet, player7_color_feet, 0x1C873E, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player feet color")

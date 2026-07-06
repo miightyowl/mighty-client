@@ -1638,6 +1638,7 @@ set(EXPECTED_DATA
   menuimages/play_game.png
   menuimages/settings.png
   particles.png
+  pet.png
   race_flag.png
   shader/pipeline.frag
   shader/pipeline.vert
@@ -2559,6 +2560,8 @@ if(CLIENT)
     components/nameplates.h
     components/particles.cpp
     components/particles.h
+    components/petting.cpp
+    components/petting.h
     components/players.cpp
     components/players.h
     components/race_demo.cpp
