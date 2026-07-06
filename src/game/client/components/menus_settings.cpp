@@ -1315,6 +1315,10 @@ void CMenus::RenderSettingsSound(CUIRect MainView)
 	if(DoButton_CheckBox(&g_Config.m_SndHighlight, Localize("Enable highlighted chat sound"), g_Config.m_SndHighlight, &Button))
 		g_Config.m_SndHighlight ^= 1;
 
+	MainView.HSplitTop(20.0f, &Button, &MainView);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientWalkSound, Localize("Enable walking sound for maodie tees"), g_Config.m_ClMClientWalkSound, &Button))
+		g_Config.m_ClMClientWalkSound ^= 1;
+
 	// volume slider
 	{
 		MainView.HSplitTop(5.0f, nullptr, &MainView);

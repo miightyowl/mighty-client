@@ -1063,6 +1063,7 @@ set(EXPECTED_DATA
   assets/entities/comfort/ddnet.png
   assets/entities/license.txt
   assets/game/game_06.png
+  audio/catwalking.wv
   audio/foley_body_impact-01.wv
   audio/foley_body_impact-02.wv
   audio/foley_body_impact-03.wv

@@ -3,14 +3,19 @@
 
 #include "sounds.h"
 
+#include <base/math.h>
 #include <base/mem.h>
+#include <base/str.h>
 #include <base/time.h>
 
 #include <engine/engine.h>
 #include <engine/shared/config.h>
 #include <engine/sound.h>
+#include <engine/storage.h>
 
 #include <generated/client_data.h>
+
+#include <game/collision.h>
 
 #include <game/client/components/camera.h>
 #include <game/client/components/menus.h>
@@ -114,11 +119,82 @@ void CSounds::OnInit()
 		GameClient()->Engine()->AddJob(m_pSoundJob);
 		m_WaitForSoundJob = true;
 		GameClient()->m_Menus.RenderLoading(Localize("Loading DDNet Client"), Localize("Loading sound files"), 0);
+
+		m_MClientWaitForSounds = true;
 	}
 	else
 	{
 		CSoundLoading(GameClient(), true).Run();
 		m_WaitForSoundJob = false;
+
+		LoadMClientWalkSound();
+	}
+}
+
+void CSounds::LoadMClientWalkSound()
+{
+	// load the looping walking sound
+	m_MClientWalkSample = -1;
+	if(Storage()->FileExists("audio/catwalking.wv", IStorage::TYPE_ALL))
+		m_MClientWalkSample = Sound()->LoadWV("audio/catwalking.wv");
+}
+
+void CSounds::StopMClientWalkSounds()
+{
+	for(auto &Voice : m_aMClientWalkVoices)
+	{
+		if(Voice.IsValid())
+			Sound()->StopVoice(Voice);
+		Voice = ISound::CVoiceHandle();
+	}
+}
+
+void CSounds::UpdateMClientWalkSounds()
+{
+	// play looping walking sound at random point and stop it as soon as the tee stops
+	if(m_WaitForSoundJob || m_MClientWalkSample < 0 || !g_Config.m_SndEnable || !g_Config.m_SndGame || !Sound()->IsSoundEnabled() || !g_Config.m_ClMClientWalkSound)
+	{
+		StopMClientWalkSounds();
+		return;
+	}
+
+	const float SampleTime = Sound()->GetSampleTotalTime(m_MClientWalkSample);
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		bool ShouldPlay = false;
+		if(GameClient()->m_Snap.m_aCharacters[i].m_Active && GameClient()->m_aClients[i].m_Active)
+		{
+			// only play for maodie skins
+			const bool IsMaodie = g_Config.m_ClMClientForceSkin || str_comp(GameClient()->m_aClients[i].m_aSkinName, "maodie") == 0;
+			if(IsMaodie)
+			{
+				const CNetObj_Character &Cur = GameClient()->m_Snap.m_aCharacters[i].m_Cur;
+				const bool OnGround = Collision()->CheckPoint(Cur.m_X, Cur.m_Y + 16);
+				const bool Moving = absolute(Cur.m_VelX) > 200;
+				ShouldPlay = OnGround && Moving;
+			}
+		}
+
+		ISound::CVoiceHandle &Voice = m_aMClientWalkVoices[i];
+		const bool Playing = Voice.IsValid();
+		const vec2 Position = GameClient()->m_aClients[i].m_RenderPos;
+
+		if(ShouldPlay && !Playing)
+		{
+			Voice = Sound()->PlayAt(CHN_WORLD, m_MClientWalkSample, ISound::FLAG_LOOP | ISound::FLAG_POS, 1.0f, Position);
+			if(Voice.IsValid() && SampleTime > 0.0f)
+				Sound()->SetVoiceTimeOffset(Voice, random_float(SampleTime));
+		}
+		else if(!ShouldPlay && Playing)
+		{
+			Sound()->StopVoice(Voice);
+			Voice = ISound::CVoiceHandle();
+		}
+		else if(Playing)
+		{
+			Sound()->SetVoicePosition(Voice, Position);
+		}
 	}
 }
 
@@ -128,6 +204,8 @@ void CSounds::OnReset()
 	{
 		Sound()->StopAll();
 		ClearQueue();
+		for(auto &Voice : m_aMClientWalkVoices)
+			Voice = ISound::CVoiceHandle();
 	}
 }
 
@@ -148,8 +226,15 @@ void CSounds::OnRender()
 			return;
 	}
 
+	if(m_MClientWaitForSounds)
+	{
+		LoadMClientWalkSound();
+		m_MClientWaitForSounds = false;
+	}
+
 	Sound()->SetListenerPosition(GameClient()->m_Camera.m_Center);
 	UpdateChannels();
+	UpdateMClientWalkSounds();
 
 	// play sound from queue
 	if(m_QueuePos > 0)
