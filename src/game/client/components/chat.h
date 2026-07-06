@@ -16,7 +16,12 @@
 #include <game/client/lineinput.h>
 #include <game/client/render.h>
 
+#include <memory>
+#include <string>
+#include <unordered_map>
 #include <vector>
+
+class CHttpRequest;
 
 constexpr auto SAVES_FILE = "ddnet-saves.txt";
 
@@ -53,6 +58,10 @@ class CChat : public CComponent
 		bool m_Highlighted;
 		std::optional<ColorRGBA> m_CustomColor;
 
+		int m_Id;
+		std::optional<ColorRGBA> m_TranslatedTextColor;
+		char m_aLangTag[32];
+
 		STextContainerIndex m_TextContainerIndex;
 		int m_QuadContainerIndex;
 
@@ -69,6 +78,34 @@ class CChat : public CComponent
 	CLine m_aLines[MAX_LINES];
 	int m_CurrentLine;
 
+	// chat translation
+	struct CPendingTranslation
+	{
+		std::shared_ptr<CHttpRequest> m_pRequest;
+		bool m_Outgoing;
+		int m_LineId;
+		int m_PrefixLen = 0;
+		std::vector<std::string> m_vProtectedNames;
+		char m_aOriginal[MAX_LINE_LENGTH];
+	};
+	std::vector<CPendingTranslation> m_vPendingTranslations;
+	struct CCachedTranslation
+	{
+		std::string m_Text;
+		std::string m_Lang;
+	};
+	std::unordered_map<std::string, CCachedTranslation> m_TranslationCache;
+	int m_NextLineId = 0;
+
+	static bool IsTranslatableText(const char *pText);
+	int NameTagPrefixLength(const char *pText) const;
+	void ProtectPlayerNames(const char *pIn, char *pOut, int OutSize, std::vector<std::string> &vNames) const;
+	std::shared_ptr<CHttpRequest> CreateTranslateRequest(const char *pText, const char *pSourceLang, const char *pTargetLang);
+	void MaybeTranslateLine(CLine &Line);
+	void SendChatTranslated(const char *pLine);
+	void PollTranslations();
+	void ApplyTranslation(CLine &Line, const char *pTranslated, const char *pLangName = "");
+
 	enum
 	{
 		// client IDs for special messages
@@ -81,6 +118,7 @@ class CChat : public CComponent
 		MODE_NONE = 0,
 		MODE_ALL,
 		MODE_TEAM,
+		MODE_TRANSLATE,
 	};
 
 	enum
@@ -187,6 +225,7 @@ public:
 
 	void RebuildChat();
 	void ClearLines();
+	void ClearTranslationCache() { m_TranslationCache.clear(); }
 
 	void EnsureCoherentFontSize() const;
 	void EnsureCoherentWidth() const;

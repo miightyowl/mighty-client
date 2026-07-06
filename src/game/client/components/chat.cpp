@@ -11,6 +11,8 @@
 #include <engine/keys.h>
 #include <engine/shared/config.h>
 #include <engine/shared/csv.h>
+#include <engine/shared/http.h>
+#include <engine/shared/json.h>
 #include <engine/textrender.h>
 
 #include <generated/protocol.h>
@@ -43,6 +45,8 @@ void CChat::CLine::Reset(CChat &This)
 	m_Friend = false;
 	m_TimesRepeated = 0;
 	m_pManagedTeeRenderInfo = nullptr;
+	m_TranslatedTextColor = std::nullopt;
+	m_aLangTag[0] = '\0';
 }
 
 CChat::CChat()
@@ -129,6 +133,11 @@ void CChat::Reset()
 {
 	ClearLines();
 
+	for(CPendingTranslation &Pending : m_vPendingTranslations)
+		Pending.m_pRequest->Abort();
+	m_vPendingTranslations.clear();
+	m_TranslationCache.clear();
+
 	m_Show = false;
 	m_CompletionUsed = false;
 	m_CompletionChosen = -1;
@@ -179,8 +188,10 @@ void CChat::ConChat(IConsole::IResult *pResult, void *pUserData)
 		((CChat *)pUserData)->EnableMode(0);
 	else if(str_comp(pMode, "team") == 0)
 		((CChat *)pUserData)->EnableMode(1);
+	else if(str_comp(pMode, "translate") == 0)
+		((CChat *)pUserData)->EnableMode(2);
 	else
-		((CChat *)pUserData)->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", "expected all or team as mode");
+		((CChat *)pUserData)->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", "expected all, team or translate as mode");
 
 	if(pResult->GetString(1)[0] || g_Config.m_ClChatReset)
 		((CChat *)pUserData)->m_Input.Set(pResult->GetString(1));
@@ -232,7 +243,7 @@ void CChat::OnConsoleInit()
 {
 	Console()->Register("say", "r[message]", CFGFLAG_CLIENT, ConSay, this, "Say in chat");
 	Console()->Register("say_team", "r[message]", CFGFLAG_CLIENT, ConSayTeam, this, "Say in team chat");
-	Console()->Register("chat", "s['team'|'all'] ?r[message]", CFGFLAG_CLIENT, ConChat, this, "Enable chat with all/team mode");
+	Console()->Register("chat", "s['team'|'all'|'translate'] ?r[message]", CFGFLAG_CLIENT, ConChat, this, "Enable chat with all/team/translate mode");
 	Console()->Register("+show_chat", "", CFGFLAG_CLIENT, ConShowChat, this, "Show chat");
 	Console()->Register("echo", "r[message]", CFGFLAG_CLIENT | CFGFLAG_STORE, ConEcho, this, "Echo the text in chat window");
 	Console()->Register("clear_chat", "", CFGFLAG_CLIENT | CFGFLAG_STORE, ConClearChat, this, "Clear chat messages");
@@ -269,7 +280,11 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 			m_ServerCommandsNeedSorting = false;
 		}
 
-		SendChatQueued(m_Input.GetString());
+		// translate chat routes the message through the translator first
+		if(m_Mode == MODE_TRANSLATE)
+			SendChatTranslated(m_Input.GetString());
+		else
+			SendChatQueued(m_Input.GetString());
 		m_pHistoryEntry = nullptr;
 		DisableMode();
 		GameClient()->OnRelease();
@@ -521,8 +536,10 @@ void CChat::EnableMode(int Team)
 
 	if(m_Mode == MODE_NONE)
 	{
-		if(Team)
+		if(Team == 1)
 			m_Mode = MODE_TEAM;
+		else if(Team == 2)
+			m_Mode = MODE_TRANSLATE;
 		else
 			m_Mode = MODE_ALL;
 
@@ -772,6 +789,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 	CurrentLine.m_aYOffset[0] = -1.0f;
 	CurrentLine.m_aYOffset[1] = -1.0f;
 	CurrentLine.m_ClientId = ClientId;
+	CurrentLine.m_Id = m_NextLineId++;
 	CurrentLine.m_TeamNumber = Team;
 	CurrentLine.m_Team = Team == 1;
 	CurrentLine.m_Whisper = Team >= 2;
@@ -798,6 +816,8 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 	CurrentLine.m_Highlighted = Highlighted;
 
 	str_copy(CurrentLine.m_aText, pLine);
+
+	MaybeTranslateLine(CurrentLine);
 
 	if(CurrentLine.m_ClientId == SERVER_MSG)
 	{
@@ -917,6 +937,507 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 			}
 		}
 	}
+}
+
+// chat translation
+static bool IsNonLatinLetter(int Codepoint)
+{
+	return (Codepoint >= 0x0370 && Codepoint <= 0x03FF) || // greek
+	       (Codepoint >= 0x0400 && Codepoint <= 0x052F) || // cyrillic
+	       (Codepoint >= 0x0530 && Codepoint <= 0x05FF) || // armenian, hebrew
+	       (Codepoint >= 0x0600 && Codepoint <= 0x077F) || // arabic
+	       (Codepoint >= 0x0E00 && Codepoint <= 0x0E7F) || // thai
+	       (Codepoint >= 0x3040 && Codepoint <= 0x30FF) || // hiragana, katakana
+	       (Codepoint >= 0x3400 && Codepoint <= 0x9FFF) || // CJK
+	       (Codepoint >= 0xAC00 && Codepoint <= 0xD7A3) || // hangul syllables
+	       (Codepoint >= 0xF900 && Codepoint <= 0xFAFF) || // CJK compatibility
+	       (Codepoint >= 0x20000 && Codepoint <= 0x2FA1F); // CJK extensions
+}
+
+static bool StrHasNonLatinScript(const char *pText)
+{
+	const char *pCur = pText;
+	while(*pCur != '\0')
+	{
+		const int Codepoint = str_utf8_decode(&pCur);
+		if(Codepoint == 0)
+			break;
+		if(IsNonLatinLetter(Codepoint))
+			return true;
+	}
+	return false;
+}
+
+static bool IsEmojiCodepoint(int Cp)
+{
+	return (Cp >= 0x2190 && Cp <= 0x2BFF) || (Cp >= 0x1F000 && Cp <= 0x1FFFF) || (Cp >= 0xFE00 && Cp <= 0xFE0F) || Cp == 0x200D || Cp == 0x20E3;
+}
+
+static bool IsTranslatableWord(const char *pWord)
+{
+	char aAscii[32];
+	int AsciiLen = 0;
+	int NumLetters = 0;
+	bool NonAsciiLetter = false;
+	const char *pCur = pWord;
+	while(*pCur != '\0')
+	{
+		const int Cp = str_utf8_decode(&pCur);
+		if(Cp <= 0)
+			break;
+		char Lower = '\0';
+		if(Cp >= 'a' && Cp <= 'z')
+			Lower = (char)Cp;
+		else if(Cp >= 'A' && Cp <= 'Z')
+			Lower = (char)(Cp - 'A' + 'a');
+		else if(Cp < 0x80 || IsEmojiCodepoint(Cp))
+			continue;
+		else
+		{
+			NumLetters++;
+			NonAsciiLetter = true;
+			continue;
+		}
+		NumLetters++;
+		if(AsciiLen < (int)sizeof(aAscii) - 1)
+			aAscii[AsciiLen++] = Lower;
+	}
+	aAscii[AsciiLen] = '\0';
+
+	if(NumLetters == 0)
+		return false;
+	if(NonAsciiLetter)
+		return true;
+	if(NumLetters <= 1)
+		return false;
+
+	// common chat emotes that shouldn't trigger a translation
+	static const char *s_apEmoteWords[] = {
+		"xd", "xdd", "xddd", "lol", "lmao", "rofl", "gg", "ggs", "gl", "hf",
+		"glhf", "wp", "ez", "nt", "ns", "ok", "kk", "o7", "uwu", "owo", "afk",
+		"brb", "wtf", "omg"};
+	for(const char *pEmote : s_apEmoteWords)
+	{
+		if(str_comp(aAscii, pEmote) == 0)
+			return false;
+	}
+
+	// laugther ("hahaha", "hehe", "jajaja", "xaxaxa")
+	if(AsciiLen >= 4)
+	{
+		bool OnlyLaughLetters = true;
+		bool aSeen[26] = {false};
+		int NumDistinct = 0;
+		for(int i = 0; i < AsciiLen; i++)
+		{
+			const char c = aAscii[i];
+			if(c != 'h' && c != 'a' && c != 'e' && c != 'i' && c != 'j' && c != 'x')
+			{
+				OnlyLaughLetters = false;
+				break;
+			}
+			if(!aSeen[c - 'a'])
+			{
+				aSeen[c - 'a'] = true;
+				NumDistinct++;
+			}
+		}
+		if(OnlyLaughLetters && NumDistinct <= 2)
+			return false;
+	}
+
+	return true;
+}
+
+bool CChat::IsTranslatableText(const char *pText)
+{
+	// message is only translating if it contains at least one real word
+	const char *pCur = pText;
+	while(*pCur != '\0')
+	{
+		while(*pCur == ' ')
+			pCur++;
+		const char *pStart = pCur;
+		while(*pCur != '\0' && *pCur != ' ')
+			pCur++;
+		if(pCur != pStart)
+		{
+			char aToken[MAX_LINE_LENGTH];
+			str_copy(aToken, pStart, std::min((int)sizeof(aToken), (int)(pCur - pStart) + 1));
+			if(IsTranslatableWord(aToken))
+				return true;
+		}
+	}
+	return false;
+}
+
+// messages with usernames get replaced with numbers for translating
+static void NameToken(char *pOut, int OutSize, int Index)
+{
+	str_format(pOut, OutSize, "84%02d19", Index);
+}
+
+void CChat::ProtectPlayerNames(const char *pIn, char *pOut, int OutSize, std::vector<std::string> &vNames) const
+{
+	const auto IsWordChar = [](char c) {
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (unsigned char)c >= 0x80;
+	};
+
+	int OutLen = 0;
+	bool PrevIsWord = false;
+	const char *pCur = pIn;
+	while(*pCur != '\0' && OutLen < OutSize - 1)
+	{
+		const char *pBestName = nullptr;
+		int BestLen = 0;
+		if(!PrevIsWord)
+		{
+			for(const auto &Client : GameClient()->m_aClients)
+			{
+				if(!Client.m_Active)
+					continue;
+				const int NameLen = str_length(Client.m_aName);
+				if(NameLen < 3 || NameLen <= BestLen)
+					continue;
+				const char *pRest = str_startswith(pCur, Client.m_aName);
+				if(pRest != nullptr && !IsWordChar(pRest[0]))
+				{
+					pBestName = Client.m_aName;
+					BestLen = NameLen;
+				}
+			}
+		}
+
+		if(pBestName != nullptr && vNames.size() < 100)
+		{
+			int Index = -1;
+			for(size_t i = 0; i < vNames.size(); i++)
+			{
+				if(vNames[i] == pBestName)
+				{
+					Index = (int)i;
+					break;
+				}
+			}
+			if(Index < 0)
+			{
+				Index = (int)vNames.size();
+				vNames.emplace_back(pBestName);
+			}
+			char aToken[16];
+			NameToken(aToken, sizeof(aToken), Index);
+			for(const char *pToken = aToken; *pToken != '\0' && OutLen < OutSize - 1; pToken++)
+				pOut[OutLen++] = *pToken;
+			pCur += BestLen;
+			PrevIsWord = true;
+			continue;
+		}
+
+		PrevIsWord = IsWordChar(*pCur);
+		pOut[OutLen++] = *pCur++;
+	}
+	pOut[OutLen] = '\0';
+}
+
+static void RestorePlayerNames(char *pText, int TextSize, const std::vector<std::string> &vNames)
+{
+	std::string Result = pText;
+	for(size_t i = 0; i < vNames.size(); i++)
+	{
+		char aToken[16];
+		NameToken(aToken, sizeof(aToken), (int)i);
+		size_t Pos = 0;
+		while((Pos = Result.find(aToken, Pos)) != std::string::npos)
+		{
+			Result.replace(Pos, str_length(aToken), vNames[i]);
+			Pos += vNames[i].length();
+		}
+	}
+	str_copy(pText, Result.c_str(), TextSize);
+}
+
+int CChat::NameTagPrefixLength(const char *pText) const
+{
+	int Longest = 0;
+	for(const auto &Client : GameClient()->m_aClients)
+	{
+		if(!Client.m_Active || Client.m_aName[0] == '\0')
+			continue;
+		const char *pRest = str_startswith(pText, Client.m_aName);
+		if(pRest != nullptr && pRest[0] == ':' && pRest[1] == ' ' && pRest[2] != '\0')
+		{
+			const int Len = (int)(pRest - pText) + 2;
+			if(Len > Longest)
+				Longest = Len;
+		}
+	}
+	return Longest;
+}
+
+static void ComposeWithPrefix(char *pOut, int OutSize, const char *pPrefixSource, int PrefixLen, const char *pBody)
+{
+	str_copy(pOut, pPrefixSource, std::min(OutSize, PrefixLen + 1));
+	str_append(pOut, pBody, OutSize);
+}
+
+static bool IsIgnoredLanguage(const char *pCode)
+{
+	const char *pCur = g_Config.m_ClChatTranslateIgnore;
+	while(*pCur != '\0')
+	{
+		while(*pCur == ',' || *pCur == ' ')
+			pCur++;
+		const char *pStart = pCur;
+		while(*pCur != '\0' && *pCur != ',' && *pCur != ' ')
+			pCur++;
+		if(pCur != pStart)
+		{
+			char aToken[16];
+			str_copy(aToken, pStart, std::min((int)sizeof(aToken), (int)(pCur - pStart) + 1));
+			if(str_comp_nocase(pCode, aToken) == 0)
+				return true;
+		}
+	}
+	return false;
+}
+
+static const char *LanguageName(const char *pCode)
+{
+	static const struct
+	{
+		const char *m_pCode;
+		const char *m_pName;
+	} s_aLanguages[] = {
+		{"af", "Afrikaans"}, {"ar", "Arabic"}, {"az", "Azerbaijani"}, {"be", "Belarusian"},
+		{"bg", "Bulgarian"}, {"bn", "Bengali"}, {"bs", "Bosnian"}, {"ca", "Catalan"},
+		{"cs", "Czech"}, {"da", "Danish"}, {"de", "German"}, {"el", "Greek"},
+		{"en", "English"}, {"es", "Spanish"}, {"et", "Estonian"}, {"eu", "Basque"},
+		{"fa", "Persian"}, {"fi", "Finnish"}, {"fil", "Filipino"}, {"fr", "French"},
+		{"gl", "Galician"}, {"he", "Hebrew"}, {"hi", "Hindi"}, {"hr", "Croatian"},
+		{"hu", "Hungarian"}, {"hy", "Armenian"}, {"id", "Indonesian"}, {"is", "Icelandic"},
+		{"it", "Italian"}, {"iw", "Hebrew"}, {"ja", "Japanese"}, {"ka", "Georgian"},
+		{"kk", "Kazakh"}, {"ko", "Korean"}, {"lt", "Lithuanian"}, {"lv", "Latvian"},
+		{"mk", "Macedonian"}, {"ms", "Malay"}, {"nl", "Dutch"}, {"no", "Norwegian"},
+		{"pl", "Polish"}, {"pt", "Portuguese"}, {"ro", "Romanian"}, {"ru", "Russian"},
+		{"sk", "Slovak"}, {"sl", "Slovenian"}, {"sq", "Albanian"}, {"sr", "Serbian"},
+		{"sv", "Swedish"}, {"sw", "Swahili"}, {"ta", "Tamil"}, {"th", "Thai"},
+		{"tl", "Filipino"}, {"tr", "Turkish"}, {"uk", "Ukrainian"}, {"ur", "Urdu"},
+		{"vi", "Vietnamese"}, {"zh", "Chinese"}, {"zh-CN", "Chinese"}, {"zh-TW", "Chinese"}};
+	for(const auto &Language : s_aLanguages)
+	{
+		if(str_comp_nocase(pCode, Language.m_pCode) == 0)
+			return Language.m_pName;
+	}
+	return pCode;
+}
+
+void CChat::MaybeTranslateLine(CLine &Line)
+{
+	if(!g_Config.m_ClChatTranslate)
+		return;
+	if(Line.m_ClientId < 0)
+		return;
+	if(Client()->State() != IClient::STATE_ONLINE)
+		return;
+	if(Line.m_ClientId == GameClient()->m_aLocalIds[0] || Line.m_ClientId == GameClient()->m_aLocalIds[1])
+		return;
+
+	const int PrefixLen = NameTagPrefixLength(Line.m_aText);
+	const char *pBody = Line.m_aText + PrefixLen;
+
+	char aProtected[MAX_LINE_LENGTH];
+	std::vector<std::string> vProtectedNames;
+	ProtectPlayerNames(pBody, aProtected, sizeof(aProtected), vProtectedNames);
+
+	if(!IsTranslatableText(aProtected))
+		return;
+
+	const auto CacheHit = m_TranslationCache.find(pBody);
+	if(CacheHit != m_TranslationCache.end())
+	{
+		if(!CacheHit->second.m_Text.empty())
+		{
+			char aFull[MAX_LINE_LENGTH];
+			ComposeWithPrefix(aFull, sizeof(aFull), Line.m_aText, PrefixLen, CacheHit->second.m_Text.c_str());
+			ApplyTranslation(Line, aFull, CacheHit->second.m_Lang.c_str());
+		}
+		return;
+	}
+
+	// Language incoming chat is translated to (empty/legacy values fall back to English).
+	const char *pInTarget = g_Config.m_ClChatTranslateInTarget[0] != '\0' && str_comp(g_Config.m_ClChatTranslateInTarget, "cat") != 0 ? g_Config.m_ClChatTranslateInTarget : "en";
+
+	CPendingTranslation Pending;
+	Pending.m_pRequest = CreateTranslateRequest(aProtected, "auto", pInTarget);
+	Pending.m_Outgoing = false;
+	Pending.m_LineId = Line.m_Id;
+	Pending.m_PrefixLen = PrefixLen;
+	Pending.m_vProtectedNames = std::move(vProtectedNames);
+	str_copy(Pending.m_aOriginal, Line.m_aText);
+	m_vPendingTranslations.push_back(std::move(Pending));
+}
+
+std::shared_ptr<CHttpRequest> CChat::CreateTranslateRequest(const char *pText, const char *pSourceLang, const char *pTargetLang)
+{
+	char aEscaped[1024];
+	EscapeUrl(aEscaped, pText);
+
+	char aUrl[2048];
+	str_format(aUrl, sizeof(aUrl), "https://translate.googleapis.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=%s", pSourceLang, pTargetLang, aEscaped);
+
+	std::shared_ptr<CHttpRequest> pRequest = HttpGet(aUrl);
+	pRequest->Timeout(CTimeout{4000, 8000, 500, 5});
+	pRequest->LogProgress(HTTPLOG::FAILURE);
+	pRequest->HeaderString("User-Agent", "Mozilla/5.0 (compatible; DDNet)");
+	Http()->Run(pRequest);
+	return pRequest;
+}
+
+void CChat::SendChatTranslated(const char *pLine)
+{
+	if(pLine == nullptr || str_length(pLine) < 1)
+		return;
+
+	const int Length = str_length(pLine);
+	CHistoryEntry *pEntry = m_History.Allocate(sizeof(CHistoryEntry) + Length);
+	pEntry->m_Team = 0;
+	str_copy(pEntry->m_aText, pLine, Length + 1);
+
+	const int PrefixLen = NameTagPrefixLength(pLine);
+	const char *pBody = pLine + PrefixLen;
+
+	// protect player names in the body with placeholders
+	char aProtected[MAX_LINE_LENGTH];
+	std::vector<std::string> vProtectedNames;
+	ProtectPlayerNames(pBody, aProtected, sizeof(aProtected), vProtectedNames);
+
+	// nothing to translate
+	if(!IsTranslatableText(aProtected))
+	{
+		SendChat(0, pLine);
+		return;
+	}
+
+	CPendingTranslation Pending;
+	Pending.m_pRequest = CreateTranslateRequest(aProtected, g_Config.m_ClChatTranslateOutSource, g_Config.m_ClChatTranslateOutTarget);
+	Pending.m_Outgoing = true;
+	Pending.m_LineId = -1;
+	Pending.m_PrefixLen = PrefixLen;
+	Pending.m_vProtectedNames = std::move(vProtectedNames);
+	str_copy(Pending.m_aOriginal, pLine);
+	m_vPendingTranslations.push_back(std::move(Pending));
+}
+
+void CChat::PollTranslations()
+{
+	for(size_t i = 0; i < m_vPendingTranslations.size();)
+	{
+		CPendingTranslation &Pending = m_vPendingTranslations[i];
+		if(!Pending.m_pRequest->Done())
+		{
+			++i;
+			continue;
+		}
+
+		if(Pending.m_pRequest->State() == EHttpState::DONE)
+		{
+			// googles endpoint returns
+			json_value *pJson = Pending.m_pRequest->ResultJson();
+
+			char aTranslated[MAX_LINE_LENGTH];
+			aTranslated[0] = '\0';
+			const char *pDetectedLang = "";
+
+			if(pJson != nullptr && pJson->type == json_array)
+			{
+				const json_value *pLang = json_array_get(pJson, 2);
+				if(pLang->type == json_string)
+					pDetectedLang = json_string_get(pLang);
+
+				const json_value *pSegments = json_array_get(pJson, 0);
+				if(pSegments->type == json_array)
+				{
+					const int NumSegments = json_array_length(pSegments);
+					for(int Segment = 0; Segment < NumSegments; ++Segment)
+					{
+						const json_value *pChunk = json_array_get(json_array_get(pSegments, Segment), 0);
+						if(pChunk->type == json_string)
+							str_append(aTranslated, json_string_get(pChunk), sizeof(aTranslated));
+					}
+				}
+			}
+
+			// swap the numeric placeholders back for the usernames
+			if(aTranslated[0] != '\0' && !Pending.m_vProtectedNames.empty())
+				RestorePlayerNames(aTranslated, sizeof(aTranslated), Pending.m_vProtectedNames);
+
+			const char *pOriginalBody = Pending.m_aOriginal + Pending.m_PrefixLen;
+
+			if(Pending.m_Outgoing)
+			{
+				// send translated message
+				if(aTranslated[0] != '\0')
+				{
+					char aFull[MAX_LINE_LENGTH];
+					ComposeWithPrefix(aFull, sizeof(aFull), Pending.m_aOriginal, Pending.m_PrefixLen, aTranslated);
+					SendChat(0, aFull);
+				}
+				else
+					SendChat(0, Pending.m_aOriginal);
+			}
+			else
+			{
+				const bool ForeignScript = StrHasNonLatinScript(pOriginalBody);
+				const bool Misdetected = ForeignScript && (pDetectedLang[0] == '\0' || str_comp_nocase(pDetectedLang, "en") == 0);
+
+				const bool KeepOriginal =
+					aTranslated[0] == '\0' ||
+					str_comp(aTranslated, pOriginalBody) == 0 ||
+					(!Misdetected && (pDetectedLang[0] == '\0' || IsIgnoredLanguage(pDetectedLang)));
+
+				const char *pLangName = !KeepOriginal && pDetectedLang[0] != '\0' ? LanguageName(pDetectedLang) : "";
+
+				if(m_TranslationCache.size() < 4096)
+					m_TranslationCache[pOriginalBody] = {KeepOriginal ? std::string() : std::string(aTranslated), std::string(pLangName)};
+
+				if(!KeepOriginal)
+				{
+					for(CLine &Line : m_aLines)
+					{
+						if(Line.m_Initialized && Line.m_Id == Pending.m_LineId)
+						{
+							char aFull[MAX_LINE_LENGTH];
+							ComposeWithPrefix(aFull, sizeof(aFull), Pending.m_aOriginal, Pending.m_PrefixLen, aTranslated);
+							ApplyTranslation(Line, aFull, pLangName);
+							break;
+						}
+					}
+				}
+			}
+
+			if(pJson != nullptr)
+				json_value_free(pJson);
+		}
+		else if(Pending.m_Outgoing && Client()->State() == IClient::STATE_ONLINE)
+		{
+			SendChat(0, Pending.m_aOriginal);
+		}
+
+		if(i != m_vPendingTranslations.size() - 1)
+			m_vPendingTranslations[i] = std::move(m_vPendingTranslations.back());
+		m_vPendingTranslations.pop_back();
+	}
+}
+
+void CChat::ApplyTranslation(CLine &Line, const char *pTranslated, const char *pLangName)
+{
+	str_copy(Line.m_aText, pTranslated);
+	str_copy(Line.m_aLangTag, pLangName);
+	Line.m_TranslatedTextColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageTranslatedColor));
+	TextRender()->DeleteTextContainer(Line.m_TextContainerIndex);
+	Graphics()->DeleteQuadContainer(Line.m_QuadContainerIndex);
+	Line.m_aYOffset[0] = -1.0f;
+	Line.m_aYOffset[1] = -1.0f;
 }
 
 void CChat::OnPrepareLines(float y)
@@ -1103,7 +1624,9 @@ void CChat::OnPrepareLines(float y)
 		}
 
 		ColorRGBA Color;
-		if(Line.m_CustomColor)
+		if(Line.m_TranslatedTextColor)
+			Color = *Line.m_TranslatedTextColor;
+		else if(Line.m_CustomColor)
 			Color = *Line.m_CustomColor;
 		else if(Line.m_ClientId == SERVER_MSG)
 			Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageSystemColor));
@@ -1126,6 +1649,15 @@ void CChat::OnPrepareLines(float y)
 		}
 
 		TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, pText);
+
+		// detected source language in a different color
+		if(Line.m_aLangTag[0] != '\0' && g_Config.m_ClChatTranslateShowLang)
+		{
+			char aLangTag[48];
+			str_format(aLangTag, sizeof(aLangTag), " (%s)", Line.m_aLangTag);
+			TextRender()->TextColor(0.6f, 0.6f, 0.6f, 0.8f);
+			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, aLangTag);
+		}
 
 		if(!g_Config.m_ClChatOld && (Line.m_aText[0] != '\0' || Line.m_aName[0] != '\0'))
 		{
@@ -1152,6 +1684,8 @@ void CChat::OnPrepareLines(float y)
 
 void CChat::OnRender()
 {
+	PollTranslations();
+
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
@@ -1189,6 +1723,12 @@ void CChat::OnRender()
 			TextRender()->TextEx(&InputCursor, Localize("All"));
 		else if(m_Mode == MODE_TEAM)
 			TextRender()->TextEx(&InputCursor, Localize("Team"));
+		else if(m_Mode == MODE_TRANSLATE)
+		{
+			char aTranslateLabel[64];
+			str_format(aTranslateLabel, sizeof(aTranslateLabel), "%s \xE2\x86\x92 %s", Localize("Translate"), g_Config.m_ClChatTranslateOutTarget);
+			TextRender()->TextEx(&InputCursor, aTranslateLabel);
+		}
 		else
 			TextRender()->TextEx(&InputCursor, Localize("Chat"));
 

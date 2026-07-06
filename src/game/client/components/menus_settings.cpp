@@ -1945,7 +1945,8 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 	{
 		CChat &Chat = GameClient()->m_Chat;
 		CUIRect TopView, PreviewView;
-		MainView.HSplitBottom(220.0f, &TopView, &PreviewView);
+		// m-client: slightly smaller preview so the added translation settings fit above
+		MainView.HSplitBottom(160.0f, &TopView, &PreviewView);
 		TopView.HSplitBottom(MarginBetweenViews, &TopView, nullptr);
 		TopView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
 
@@ -1971,6 +1972,56 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTeamColors, Localize("Show names in chat in team colors"), &g_Config.m_ClChatTeamColors, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowChatFriends, Localize("Show only chat messages from friends"), &g_Config.m_ClShowChatFriends, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowChatTeamMembersOnly, Localize("Show only chat messages from team members"), &g_Config.m_ClShowChatTeamMembersOnly, &LeftView, LineSize);
+
+		// chat translation
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslate, Localize("Translate incoming chat"), &g_Config.m_ClChatTranslate, &LeftView, LineSize);
+
+		static const char *s_apTranslateLangCodes[] = {
+			"en", "de", "es", "fr", "pt", "it", "nl", "pl", "ru", "uk", "tr", "ar",
+			"zh-CN", "ja", "ko", "vi", "id", "th", "sv", "cs", "el", "hu", "ro", "fi", "da", "no", "sl", "sk", "hr", "sr", "bg"};
+		static const char *s_apTranslateLangNames[] = {
+			"English", "German", "Spanish", "French", "Portuguese", "Italian", "Dutch", "Polish", "Russian", "Ukrainian", "Turkish", "Arabic",
+			"Chinese", "Japanese", "Korean", "Vietnamese", "Indonesian", "Thai", "Swedish", "Czech", "Greek", "Hungarian", "Romanian", "Finnish", "Danish", "Norwegian", "Slovenian", "Slovak", "Croatian", "Serbian", "Bulgarian"};
+		static const int s_NumTranslateLang = std::size(s_apTranslateLangCodes);
+		const auto FindTranslateLang = [&](const char *pCode) {
+			for(int i = 0; i < s_NumTranslateLang; ++i)
+				if(str_comp(pCode, s_apTranslateLangCodes[i]) == 0)
+					return i;
+			return 0;
+		};
+
+		CUIRect TranslateRow, TranslateLabel, TranslateDropDown;
+
+		// language incoming chat is translated to
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+		LeftView.HSplitTop(LineSize, &TranslateRow, &LeftView);
+		TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
+		Ui()->DoLabel(&TranslateLabel, Localize("Translate incoming to"), ColorPickerLabelSize, TEXTALIGN_ML);
+		static CUi::SDropDownState s_InTargetDropDownState;
+		static CScrollRegion s_InTargetScrollRegion;
+		s_InTargetDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_InTargetScrollRegion;
+		const int OldInTarget = FindTranslateLang(g_Config.m_ClChatTranslateInTarget);
+		const int NewInTarget = Ui()->DoDropDown(&TranslateDropDown, OldInTarget, s_apTranslateLangNames, s_NumTranslateLang, s_InTargetDropDownState);
+		if(NewInTarget != OldInTarget)
+		{
+			str_copy(g_Config.m_ClChatTranslateInTarget, s_apTranslateLangCodes[NewInTarget]);
+			GameClient()->m_Chat.ClearTranslationCache();
+		}
+
+		// languages that are never translated
+		{
+			CUIRect IgnoreRow, IgnoreLabel, IgnoreEditBox;
+			LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+			LeftView.HSplitTop(LineSize, &IgnoreRow, &LeftView);
+			IgnoreRow.VSplitMid(&IgnoreLabel, &IgnoreEditBox, MarginSmall);
+			Ui()->DoLabel(&IgnoreLabel, Localize("Ignored languages (e.g. \"en,de\")"), ColorPickerLabelSize, TEXTALIGN_ML);
+			static CLineInput s_IgnoreInput(g_Config.m_ClChatTranslateIgnore, sizeof(g_Config.m_ClChatTranslateIgnore));
+			if(Ui()->DoClearableEditBox(&s_IgnoreInput, &IgnoreEditBox, 14.0f))
+				GameClient()->m_Chat.ClearTranslationCache();
+		}
+
+		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslateShowLang, Localize("Show detected language after translated messages"), &g_Config.m_ClChatTranslateShowLang, &LeftView, LineSize))
+			GameClient()->m_Chat.RebuildChat();
 
 		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatOld, Localize("Use old chat style"), &g_Config.m_ClChatOld, &LeftView, LineSize))
 			GameClient()->m_Chat.RebuildChat();
@@ -2010,10 +2061,37 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		DoLine_ColorPicker(&s_FriendMessageColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, Localize("Friend message"), &g_Config.m_ClMessageFriendColor, ColorRGBA(1.0f, 0.137f, 0.137f), true, &g_Config.m_ClMessageFriend);
 		static CButtonContainer s_NormalMessageColor;
 		DoLine_ColorPicker(&s_NormalMessageColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, Localize("Normal message"), &g_Config.m_ClMessageColor, ColorRGBA(1.0f, 1.0f, 1.0f));
+		static CButtonContainer s_TranslatedMessageColor;
+		DoLine_ColorPicker(&s_TranslatedMessageColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, Localize("Translated message"), &g_Config.m_ClMessageTranslatedColor, ColorRGBA(0.31f, 0.64f, 1.0f), true, &g_Config.m_ClChatTranslate);
 
 		str_format(aBuf, sizeof(aBuf), "%s (echo)", Localize("Client message"));
 		static CButtonContainer s_ClientMessageColor;
 		DoLine_ColorPicker(&s_ClientMessageColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, aBuf, &g_Config.m_ClMessageClientColor, ColorRGBA(0.5f, 0.78f, 1.0f));
+
+		// language selectors for the outgoing translate chat
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+		RightView.HSplitTop(LineSize, &TranslateRow, &RightView);
+		TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
+		Ui()->DoLabel(&TranslateLabel, Localize("Translate chat: your language"), ColorPickerLabelSize, TEXTALIGN_ML);
+		static CUi::SDropDownState s_SourceLangDropDownState;
+		static CScrollRegion s_SourceLangScrollRegion;
+		s_SourceLangDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_SourceLangScrollRegion;
+		const int OldSourceLang = FindTranslateLang(g_Config.m_ClChatTranslateOutSource);
+		const int NewSourceLang = Ui()->DoDropDown(&TranslateDropDown, OldSourceLang, s_apTranslateLangNames, s_NumTranslateLang, s_SourceLangDropDownState);
+		if(NewSourceLang != OldSourceLang)
+			str_copy(g_Config.m_ClChatTranslateOutSource, s_apTranslateLangCodes[NewSourceLang]);
+
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+		RightView.HSplitTop(LineSize, &TranslateRow, &RightView);
+		TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
+		Ui()->DoLabel(&TranslateLabel, Localize("Translate chat: send as"), ColorPickerLabelSize, TEXTALIGN_ML);
+		static CUi::SDropDownState s_TargetLangDropDownState;
+		static CScrollRegion s_TargetLangScrollRegion;
+		s_TargetLangDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_TargetLangScrollRegion;
+		const int OldTargetLang = FindTranslateLang(g_Config.m_ClChatTranslateOutTarget);
+		const int NewTargetLang = Ui()->DoDropDown(&TranslateDropDown, OldTargetLang, s_apTranslateLangNames, s_NumTranslateLang, s_TargetLangDropDownState);
+		if(NewTargetLang != OldTargetLang)
+			str_copy(g_Config.m_ClChatTranslateOutTarget, s_apTranslateLangCodes[NewTargetLang]);
 
 		// ***** Chat Preview ***** //
 		Ui()->DoLabel_AutoLineSize(Localize("Preview"), HeadlineFontSize,
@@ -2030,6 +2108,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		ColorRGBA FriendColor = color_cast<ColorRGBA, ColorHSLA>(ColorHSLA(g_Config.m_ClMessageFriendColor));
 		ColorRGBA NormalColor = color_cast<ColorRGBA, ColorHSLA>(ColorHSLA(g_Config.m_ClMessageColor));
 		ColorRGBA ClientColor = color_cast<ColorRGBA, ColorHSLA>(ColorHSLA(g_Config.m_ClMessageClientColor));
+		ColorRGBA TranslatedColor = color_cast<ColorRGBA, ColorHSLA>(ColorHSLA(g_Config.m_ClMessageTranslatedColor));
 		ColorRGBA DefaultNameColor(0.8f, 0.8f, 0.8f, 1.0f);
 
 		const float RealFontSize = Chat.FontSize() * 2;
@@ -2061,6 +2140,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 			bool m_Player;
 			bool m_Client;
 			bool m_Highlighted;
+			bool m_Translated;
 			int m_TimesRepeated;
 
 			CTeeRenderInfo m_RenderInfo;
@@ -2073,7 +2153,8 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 			FLAG_TEAM = 1 << 0,
 			FLAG_FRIEND = 1 << 1,
 			FLAG_HIGHLIGHT = 1 << 2,
-			FLAG_CLIENT = 1 << 3
+			FLAG_CLIENT = 1 << 3,
+			FLAG_TRANSLATED = 1 << 4
 		};
 		enum
 		{
@@ -2082,6 +2163,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 			PREVIEW_TEAM,
 			PREVIEW_FRIEND,
 			PREVIEW_SPAMMER,
+			PREVIEW_TRANSLATED,
 			PREVIEW_CLIENT
 		};
 		auto &&SetPreviewLine = [](int Index, int ClientId, const char *pName, const char *pText, int Flag, int Repeats) {
@@ -2101,6 +2183,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 			pLine->m_Player = ClientId >= 0;
 			pLine->m_Highlighted = Flag & FLAG_HIGHLIGHT;
 			pLine->m_Client = Flag & FLAG_CLIENT;
+			pLine->m_Translated = Flag & FLAG_TRANSLATED;
 			pLine->m_TimesRepeated = Repeats;
 			str_copy(pLine->m_aName, pName);
 			str_copy(pLine->m_aText, pText);
@@ -2186,7 +2269,9 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 
 			if(Render)
 			{
-				if(Line.m_Highlighted)
+				if(Line.m_Translated)
+					TextRender()->TextColor(TranslatedColor);
+				else if(Line.m_Highlighted)
 					TextRender()->TextColor(HighlightedColor);
 				else if(Line.m_Team)
 					TextRender()->TextColor(TeamColor);
@@ -2195,6 +2280,14 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 			}
 
 			TextRender()->TextEx(&AppendCursor, Line.m_aText, -1);
+
+			if(Line.m_Translated && g_Config.m_ClChatTranslateShowLang)
+			{
+				if(Render)
+					TextRender()->TextColor(0.6f, 0.6f, 0.6f, 0.8f);
+				TextRender()->TextEx(&AppendCursor, " (Spanish)", -1);
+			}
+
 			if(Render)
 				TextRender()->TextColor(TextRender()->DefaultTextColor());
 
@@ -2214,6 +2307,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 			SetPreviewLine(PREVIEW_TEAM, 11, "Your Teammate", "Let's speedrun this!", FLAG_TEAM, 0);
 			SetPreviewLine(PREVIEW_FRIEND, 8, "Friend", "Hello there", FLAG_FRIEND, 0);
 			SetPreviewLine(PREVIEW_SPAMMER, 9, "Spammer", "Hey fools, I'm spamming here!", 0, 5);
+			SetPreviewLine(PREVIEW_TRANSLATED, 10, "Foreigner", "how do I hammerfly?", FLAG_TRANSLATED, 0);
 			SetPreviewLine(PREVIEW_CLIENT, -1, "— ", "Echo command executed", FLAG_CLIENT, 0);
 		}
 
@@ -2221,6 +2315,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		SetLineSkin(2, GameClient()->m_Skins.Find("default"));
 		SetLineSkin(3, GameClient()->m_Skins.Find("cammostripes"));
 		SetLineSkin(4, GameClient()->m_Skins.Find("beast"));
+		SetLineSkin(PREVIEW_TRANSLATED, GameClient()->m_Skins.Find("bluekitty"));
 
 		// Backgrounds first
 		if(!g_Config.m_ClChatOld)
@@ -2256,6 +2351,12 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 			if(!g_Config.m_ClShowChatFriends && !g_Config.m_ClShowChatTeamMembersOnly)
 			{
 				TempY += RenderMessageBackground(PREVIEW_SPAMMER);
+			}
+
+			// translated message
+			if(g_Config.m_ClChatTranslate && !g_Config.m_ClShowChatFriends && !g_Config.m_ClShowChatTeamMembersOnly)
+			{
+				TempY += RenderMessageBackground(PREVIEW_TRANSLATED);
 			}
 
 			TempY += RenderMessageBackground(PREVIEW_CLIENT);
@@ -2296,6 +2397,15 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 				RenderTools()->RenderTee(pIdleState, &s_vLines[PREVIEW_SPAMMER].m_RenderInfo, EMOTE_NORMAL, vec2(1, 0.1f), vec2(X + RealTeeSizeHalved, Y + OffsetTeeY + FullHeightMinusTee / 2.0f + TWSkinUnreliableOffset));
 			Y += RenderPreview(PREVIEW_SPAMMER, X, Y).y;
 		}
+
+		// translated message
+		if(g_Config.m_ClChatTranslate && !g_Config.m_ClShowChatFriends && !g_Config.m_ClShowChatTeamMembersOnly)
+		{
+			if(!g_Config.m_ClChatOld)
+				RenderTools()->RenderTee(pIdleState, &s_vLines[PREVIEW_TRANSLATED].m_RenderInfo, EMOTE_NORMAL, vec2(1, 0.1f), vec2(X + RealTeeSizeHalved, Y + OffsetTeeY + FullHeightMinusTee / 2.0f + TWSkinUnreliableOffset));
+			Y += RenderPreview(PREVIEW_TRANSLATED, X, Y).y;
+		}
+
 		// Client
 		RenderPreview(PREVIEW_CLIENT, X, Y);
 

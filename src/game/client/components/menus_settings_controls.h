@@ -19,6 +19,7 @@ enum class EBindOptionGroup
 	CHAT,
 	DUMMY,
 	MISCELLANEOUS,
+	MCLIENT,
 	CUSTOM,
 	NUM,
 };
