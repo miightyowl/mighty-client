@@ -181,6 +181,13 @@ MACRO_CONFIG_INT(ClMClientWalkSound, cl_mclient_walk_sound, 1, 0, 1, CFGFLAG_CLI
 MACRO_CONFIG_INT(ClMClientAds, cl_mclient_ads, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: randomly show advertisement pop-ups while playing")
 MACRO_CONFIG_INT(ClMClientAdsInterval, cl_mclient_ads_interval, 120, 5, 3600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: average seconds between random advertisement pop-ups")
 MACRO_CONFIG_INT(ClMClientPet, cl_mclient_pet, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show a hand when a player is petting a nearby player")
+MACRO_CONFIG_INT(ClMClientFrozenText, cl_mclient_frozen_tees_text, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show how many tees in your team are frozen (0 - off, 1 - show alive, 2 - show frozen)")
+MACRO_CONFIG_INT(ClMClientFrozenHud, cl_mclient_frozen_tees_hud, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show frozen tees of your team on the HUD")
+MACRO_CONFIG_INT(ClMClientFrozenHudSkins, cl_mclient_frozen_tees_hud_skins, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: use darkened player skins (1) or a ninja skin (0) for frozen tees on the HUD")
+MACRO_CONFIG_INT(ClMClientFrozenHudTeeSize, cl_mclient_frozen_tees_size, 15, 8, 20, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: size of tees in the frozen tee HUD (default: 15)")
+MACRO_CONFIG_INT(ClMClientFrozenMaxRows, cl_mclient_frozen_tees_max_rows, 1, 1, 6, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: maximum number of rows in the frozen tee HUD")
+MACRO_CONFIG_INT(ClMClientFrozenHudTeamOnly, cl_mclient_frozen_tees_only_inteam, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: only show the frozen tee HUD while you are in a team")
+MACRO_CONFIG_INT(ClMClientFrozenNearDistance, cl_mclient_frozen_tees_near_distance, 1000, 100, 5000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: when not in a team, only show tees within this distance on the frozen tee HUD")
 
 MACRO_CONFIG_COL(ClPlayer7ColorBody, player7_color_body, 0x1B6F74, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player body color")
 MACRO_CONFIG_COL(ClPlayer7ColorFeet, player7_color_feet, 0x1C873E, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player feet color")

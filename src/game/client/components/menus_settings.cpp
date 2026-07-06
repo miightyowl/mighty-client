@@ -1940,6 +1940,20 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		{
 			Ui()->DoScrollbarOption(&g_Config.m_ClFreezeBarsAlphaInsideFreeze, &g_Config.m_ClFreezeBarsAlphaInsideFreeze, &Button, Localize("Opacity of freeze bars inside freeze"), 0, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
 		}
+
+		// frozen teammates HUD
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHud, Localize("Show frozen teammates on HUD"), &g_Config.m_ClMClientFrozenHud, &RightView, LineSize);
+		if(g_Config.m_ClMClientFrozenHud)
+		{
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHudSkins, Localize("Use player skins for frozen tees"), &g_Config.m_ClMClientFrozenHudSkins, &RightView, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHudTeamOnly, Localize("Only show frozen tees while in a team"), &g_Config.m_ClMClientFrozenHudTeamOnly, &RightView, LineSize);
+			RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
+			Ui()->DoScrollbarOption(&g_Config.m_ClMClientFrozenHudTeeSize, &g_Config.m_ClMClientFrozenHudTeeSize, &Button, Localize("Frozen tee size"), 8, 20, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE);
+			RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
+			Ui()->DoScrollbarOption(&g_Config.m_ClMClientFrozenMaxRows, &g_Config.m_ClMClientFrozenMaxRows, &Button, Localize("Max frozen tee rows"), 1, 6, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE);
+			RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
+			Ui()->DoScrollbarOption(&g_Config.m_ClMClientFrozenNearDistance, &g_Config.m_ClMClientFrozenNearDistance, &Button, Localize("Nearby range when not in a team"), 100, 5000, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE);
+		}
 	}
 	else if(s_CurTab == APPEARANCE_TAB_CHAT)
 	{
