@@ -1455,6 +1455,10 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 		if(pEntry->m_FriendState == IFriends::FRIEND_NO)
 			continue;
 
+		// only show friends in same community
+		if(ServerBrowser()->CommunitiesFilter().Filtered(pEntry->m_aCommunityId))
+			continue;
+
 		for(int ClientIndex = 0; ClientIndex < pEntry->m_NumClients; ++ClientIndex)
 		{
 			const CServerInfo::CClient &CurrentClient = pEntry->m_aClients[ClientIndex];

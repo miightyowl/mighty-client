@@ -188,6 +188,10 @@ MACRO_CONFIG_INT(ClMClientFrozenHudTeeSize, cl_mclient_frozen_tees_size, 15, 8, 
 MACRO_CONFIG_INT(ClMClientFrozenMaxRows, cl_mclient_frozen_tees_max_rows, 1, 1, 6, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: maximum number of rows in the frozen tee HUD")
 MACRO_CONFIG_INT(ClMClientFrozenHudTeamOnly, cl_mclient_frozen_tees_only_inteam, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: only show the frozen tee HUD while you are in a team")
 MACRO_CONFIG_INT(ClMClientFrozenNearDistance, cl_mclient_frozen_tees_near_distance, 1000, 100, 5000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: when not in a team, only show tees within this distance on the frozen tee HUD")
+MACRO_CONFIG_INT(ClMClientPetTee, cl_mclient_pet_tee, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show a companion tee that floats near you")
+MACRO_CONFIG_STR(ClMClientPetTeeSkin, cl_mclient_pet_tee_skin, 24, "twinbop", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_INSENSITIVE, "M-Client: skin used for the companion tee")
+MACRO_CONFIG_INT(ClMClientPetTeeSize, cl_mclient_pet_tee_size, 60, 10, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: size of the companion tee as a percentage of a normal player")
+MACRO_CONFIG_INT(ClMClientPetTeeAlpha, cl_mclient_pet_tee_alpha, 90, 10, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: opacity of the companion tee")
 
 MACRO_CONFIG_COL(ClPlayer7ColorBody, player7_color_body, 0x1B6F74, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player body color")
 MACRO_CONFIG_COL(ClPlayer7ColorFeet, player7_color_feet, 0x1C873E, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player feet color")

@@ -59,6 +59,7 @@
 #include "components/motd.h"
 #include "components/nameplates.h"
 #include "components/particles.h"
+#include "components/pet_tee.h"
 #include "components/petting.h"
 #include "components/players.h"
 #include "components/race_demo.h"
@@ -176,6 +177,7 @@ public:
 
 	CPlayers m_Players;
 	CPetting m_Petting;
+	CPetTee m_PetTee;
 	CAds m_Ads;
 	CNamePlates m_NamePlates;
 	CFreezeBars m_FreezeBars;

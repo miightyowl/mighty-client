@@ -366,24 +366,41 @@ void CMenus::RenderSettingsPlayer(CUIRect MainView)
 
 void CMenus::RenderSettingsTee(CUIRect MainView)
 {
-	CUIRect TabBar, PlayerTab, DummyTab, ChangeInfo;
+	CUIRect TabBar, PlayerTab, DummyTab, CompanionTab, ChangeInfo;
 	MainView.HSplitTop(20.0f, &TabBar, &MainView);
 	TabBar.VSplitMid(&TabBar, &ChangeInfo, 20.f);
-	TabBar.VSplitMid(&PlayerTab, &DummyTab);
+	TabBar.VSplitLeft(TabBar.w / 3.0f, &PlayerTab, &TabBar);
+	TabBar.VSplitMid(&DummyTab, &CompanionTab);
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
 	static CButtonContainer s_PlayerTabButton;
-	if(DoButton_MenuTab(&s_PlayerTabButton, Localize("Player"), !m_Dummy, &PlayerTab, IGraphics::CORNER_L, nullptr, nullptr, nullptr, nullptr, 4.0f))
+	if(DoButton_MenuTab(&s_PlayerTabButton, Localize("Player"), !m_Dummy && !m_CompanionTeeTab, &PlayerTab, IGraphics::CORNER_L, nullptr, nullptr, nullptr, nullptr, 4.0f))
 	{
 		m_Dummy = false;
+		m_CompanionTeeTab = false;
 		m_SkinListScrollToSelected = true;
 	}
 
 	static CButtonContainer s_DummyTabButton;
-	if(DoButton_MenuTab(&s_DummyTabButton, Localize("Dummy"), m_Dummy, &DummyTab, IGraphics::CORNER_R, nullptr, nullptr, nullptr, nullptr, 4.0f))
+	if(DoButton_MenuTab(&s_DummyTabButton, Localize("Dummy"), m_Dummy && !m_CompanionTeeTab, &DummyTab, IGraphics::CORNER_NONE, nullptr, nullptr, nullptr, nullptr, 4.0f))
 	{
 		m_Dummy = true;
+		m_CompanionTeeTab = false;
 		m_SkinListScrollToSelected = true;
+	}
+
+	static CButtonContainer s_CompanionTabButton;
+	if(DoButton_MenuTab(&s_CompanionTabButton, Localize("Companion"), m_CompanionTeeTab, &CompanionTab, IGraphics::CORNER_R, nullptr, nullptr, nullptr, nullptr, 4.0f))
+	{
+		m_CompanionTeeTab = true;
+		m_SkinListScrollToSelected = true;
+	}
+
+	// companion tab
+	if(m_CompanionTeeTab)
+	{
+		RenderSettingsTeeCompanion(MainView);
+		return;
 	}
 
 	if(Client()->State() == IClient::STATE_ONLINE &&
@@ -861,6 +878,148 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	{
 		GameClient()->RefreshSkins(CSkinDescriptor::FLAG_SIX);
 	}
+}
+
+// M-Client: dedicated skin picker for the companion (pet) tee.
+void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
+{
+	CUIRect Label, Button;
+
+	// Enable toggle
+	MainView.HSplitTop(20.0f, &Button, &MainView);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientPetTee, Localize("Show companion tee (pet)"), g_Config.m_ClMClientPetTee, &Button))
+	{
+		g_Config.m_ClMClientPetTee ^= 1;
+	}
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+
+	char *pSkinName = g_Config.m_ClMClientPetTeeSkin;
+	const size_t SkinNameSize = sizeof(g_Config.m_ClMClientPetTeeSkin);
+
+	CSkins::CSkinList &SkinList = GameClient()->m_Skins.SkinList();
+	const CSkin *pDefaultSkin = GameClient()->m_Skins.Find("default");
+	const CSkins::CSkinContainer *pOwnSkinContainer = GameClient()->m_Skins.FindContainerOrNullptr(pSkinName[0] == '\0' ? "default" : pSkinName);
+	if(pOwnSkinContainer != nullptr && pOwnSkinContainer->IsSpecial())
+	{
+		pOwnSkinContainer = nullptr;
+	}
+
+	CTeeRenderInfo OwnSkinInfo;
+	OwnSkinInfo.Apply(pOwnSkinContainer == nullptr || pOwnSkinContainer->Skin() == nullptr ? pDefaultSkin : pOwnSkinContainer->Skin().get());
+	OwnSkinInfo.m_Size = 50.0f;
+
+	// Preview tee + skin name edit box
+	CUIRect SkinArea, TeeRect, EditArea;
+	MainView.HSplitTop(50.0f, &SkinArea, &MainView);
+	SkinArea.VSplitLeft(65.0f, &TeeRect, &EditArea);
+	EditArea.VSplitRight(20.0f, &EditArea, nullptr);
+	EditArea.HSplitTop(15.0f, &Label, &EditArea);
+	Ui()->DoLabel(&Label, Localize("Companion skin"), 14.0f, TEXTALIGN_ML);
+	EditArea.HSplitTop(20.0f, &EditArea, nullptr);
+
+	{
+		vec2 OffsetToMid;
+		CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &OwnSkinInfo, OffsetToMid);
+		const vec2 TeeRenderPos = vec2(TeeRect.x + TeeRect.w / 2.0f, TeeRect.y + TeeRect.h / 2.0f + OffsetToMid.y);
+		const vec2 DeltaPosition = Ui()->MousePos() - TeeRenderPos;
+		const float Distance = length(DeltaPosition);
+		const vec2 TeeDirection = Distance < 20.0f ? normalize(vec2(DeltaPosition.x, std::max(DeltaPosition.y, 0.5f))) : normalize(DeltaPosition);
+		const int TeeEmote = Distance < 20.0f ? EMOTE_HAPPY : EMOTE_NORMAL;
+		RenderTools()->RenderTee(CAnimState::GetIdle(), &OwnSkinInfo, TeeEmote, TeeDirection, TeeRenderPos);
+	}
+
+	static CLineInput s_SkinInput;
+	s_SkinInput.SetBuffer(pSkinName, SkinNameSize);
+	s_SkinInput.SetEmptyText("default");
+	if(Ui()->DoClearableEditBox(&s_SkinInput, &EditArea, 14.0f))
+	{
+		m_SkinListScrollToSelected = true;
+		SkinList.ForceRefresh();
+	}
+
+	MainView.HSplitTop(5.0f, nullptr, &MainView);
+
+	// Bottom controls
+	CUIRect QuickSearch, DirectoryButton, RefreshButton;
+	MainView.HSplitBottom(20.0f, &MainView, &QuickSearch);
+	MainView.HSplitBottom(5.0f, &MainView, nullptr);
+	QuickSearch.VSplitLeft(220.0f, &QuickSearch, &DirectoryButton);
+	DirectoryButton.VSplitRight(25.0f, &DirectoryButton, &RefreshButton);
+	DirectoryButton.VSplitRight(10.0f, &DirectoryButton, nullptr);
+	DirectoryButton.VSplitRight(150.0f, nullptr, &DirectoryButton);
+
+	// Skin selector, highlighting the current companion skin
+	static CListBox s_ListBox;
+	std::vector<CSkins::CSkinListEntry> &vSkinList = SkinList.Skins();
+	int OldSelected = -1;
+	s_ListBox.DoStart(50.0f, vSkinList.size(), 4, 2, OldSelected, &MainView);
+	for(size_t i = 0; i < vSkinList.size(); ++i)
+	{
+		CSkins::CSkinListEntry &SkinListEntry = vSkinList[i];
+		const CSkins::CSkinContainer *pSkinContainer = vSkinList[i].SkinContainer();
+
+		if(str_comp_nocase(pSkinContainer->Name(), pSkinName) == 0)
+		{
+			OldSelected = i;
+			if(m_SkinListScrollToSelected)
+			{
+				s_ListBox.ScrollToSelected();
+				m_SkinListScrollToSelected = false;
+			}
+		}
+
+		const CListboxItem Item = s_ListBox.DoNextItem(SkinListEntry.ListItemId(), OldSelected >= 0 && (size_t)OldSelected == i);
+		if(!Item.m_Visible)
+		{
+			continue;
+		}
+
+		SkinListEntry.RequestLoad();
+		const CSkin *pSkin = pSkinContainer->State() == CSkins::CSkinContainer::EState::LOADED ? pSkinContainer->Skin().get() : pDefaultSkin;
+
+		Item.m_Rect.VSplitLeft(60.0f, &Button, &Label);
+		{
+			CTeeRenderInfo Info = OwnSkinInfo;
+			Info.Apply(pSkin);
+			vec2 OffsetToMid;
+			CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &Info, OffsetToMid);
+			const vec2 TeeRenderPos = vec2(Button.x + Button.w / 2.0f, Button.y + Button.h / 2.0f + OffsetToMid.y);
+			RenderTools()->RenderTee(CAnimState::GetIdle(), &Info, EMOTE_NORMAL, vec2(1.0f, 0.0f), TeeRenderPos);
+		}
+		Ui()->DoLabel(&Label, pSkinContainer->Name(), 12.0f, TEXTALIGN_ML);
+	}
+	const int NewSelected = s_ListBox.DoEnd();
+	if(OldSelected != NewSelected)
+	{
+		str_copy(pSkinName, vSkinList[NewSelected].SkinContainer()->Name(), SkinNameSize);
+		SkinList.ForceRefresh();
+	}
+
+	static CLineInput s_SkinFilterInput(g_Config.m_ClSkinFilterString, sizeof(g_Config.m_ClSkinFilterString));
+	if(Ui()->DoEditBox_Search(&s_SkinFilterInput, &QuickSearch, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive()))
+	{
+		SkinList.ForceRefresh();
+	}
+
+	static CButtonContainer s_DirectoryButton;
+	if(DoButton_Menu(&s_DirectoryButton, Localize("Skins directory"), 0, &DirectoryButton))
+	{
+		char aBuf[IO_MAX_PATH_LENGTH];
+		Storage()->GetCompletePath(IStorage::TYPE_SAVE, "skins", aBuf, sizeof(aBuf));
+		Storage()->CreateFolder("skins", IStorage::TYPE_SAVE);
+		Client()->ViewFile(aBuf);
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_DirectoryButton, &DirectoryButton, Localize("Open the directory to add custom skins"));
+
+	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+	TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+	static CButtonContainer s_SkinRefreshButton;
+	if(DoButton_Menu(&s_SkinRefreshButton, FontIcon::ARROW_ROTATE_RIGHT, 0, &RefreshButton) || Input()->KeyPress(KEY_F5) || (Input()->KeyPress(KEY_R) && Input()->ModifierIsPressed()))
+	{
+		GameClient()->RefreshSkins(CSkinDescriptor::FLAG_SIX);
+	}
+	TextRender()->SetRenderFlags(0);
+	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 }
 
 void CMenus::RenderSettingsGraphics(CUIRect MainView)
@@ -1890,6 +2049,14 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		// m-client
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientAds, Localize("Random advertisement pop-ups (please keep that on, i need the money)"), &g_Config.m_ClMClientAds, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPet, Localize("Show petting hand"), &g_Config.m_ClMClientPet, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPetTee, Localize("Show companion tee (pet)"), &g_Config.m_ClMClientPetTee, &LeftView, LineSize);
+		if(g_Config.m_ClMClientPetTee)
+		{
+			LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+			Ui()->DoScrollbarOption(&g_Config.m_ClMClientPetTeeSize, &g_Config.m_ClMClientPetTeeSize, &Button, Localize("Companion tee size"), 10, 500, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+			LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+			Ui()->DoScrollbarOption(&g_Config.m_ClMClientPetTeeAlpha, &g_Config.m_ClMClientPetTeeAlpha, &Button, Localize("Companion tee opacity"), 10, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+		}
 
 		// Settings of the HUD element for votes
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowVotesAfterVoting, Localize("Show votes window after voting"), &g_Config.m_ClShowVotesAfterVoting, &LeftView, LineSize);

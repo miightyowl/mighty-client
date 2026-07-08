@@ -143,6 +143,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Ghost,
 					      &m_Players,
 					      &m_Petting,
+					      &m_PetTee,
 					      &m_MapLayersForeground,
 					      &m_Particles.m_RenderExplosions,
 					      &m_NamePlates,
