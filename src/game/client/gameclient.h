@@ -71,6 +71,7 @@
 #include "components/statboard.h"
 #include "components/tooltips.h"
 #include "components/touch_controls.h"
+#include "components/unfinished_map_vote.h"
 #include "components/voting.h"
 
 #include <memory>
@@ -173,6 +174,7 @@ public:
 	CDamageInd m_DamageInd;
 	CTouchControls m_TouchControls;
 	CVoting m_Voting;
+	CUnfinishedMapVote m_UnfinishedMapVote;
 	CSpectator m_Spectator;
 
 	CPlayers m_Players;

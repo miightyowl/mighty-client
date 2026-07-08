@@ -2584,6 +2584,8 @@ if(CLIENT)
     components/tooltips.h
     components/touch_controls.cpp
     components/touch_controls.h
+    components/unfinished_map_vote.cpp
+    components/unfinished_map_vote.h
     components/voting.cpp
     components/voting.h
     gameclient.cpp

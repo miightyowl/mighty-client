@@ -263,6 +263,11 @@ protected:
 	CLineInput m_PasswordInput;
 
 	// for call vote
+	enum
+	{
+		CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL = -2,
+		CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_SELECTED = -3,
+	};
 	int m_CallvoteSelectedOption;
 	int m_CallvoteSelectedPlayer;
 	CLineInputBuffered<VOTE_REASON_LENGTH> m_CallvoteReasonInput;
@@ -521,6 +526,7 @@ protected:
 	void RenderServerControl(CUIRect MainView);
 	bool RenderServerControlKick(CUIRect MainView, bool FilterSpectators, bool UpdateScroll);
 	bool RenderServerControlServer(CUIRect MainView, bool UpdateScroll);
+	void RenderUnfinishedVoteTeeSelection(CUIRect *pMainView);
 	void RenderIngameHint();
 
 	// found in menus_browser.cpp

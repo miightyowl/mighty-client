@@ -850,30 +850,191 @@ void CMenus::RenderServerInfoMotd(CUIRect Motd)
 	s_ScrollRegion.End();
 }
 
+void CMenus::RenderUnfinishedVoteTeeSelection(CUIRect *pMainView)
+{
+	CUnfinishedMapVote &UnfinishedVote = GameClient()->m_UnfinishedMapVote;
+	UnfinishedVote.EnsureLocalPlayerSelected();
+
+	// player first, then friends, then the rest (sorted by name)
+	int aPlayerIds[MAX_CLIENTS];
+	int NumPlayers = 0;
+	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
+	if(LocalId >= 0 && GameClient()->m_Snap.m_apPlayerInfos[LocalId])
+		aPlayerIds[NumPlayers++] = LocalId;
+	for(int Pass = 0; Pass < 2; Pass++)
+	{
+		for(const auto &pInfoByName : GameClient()->m_Snap.m_apInfoByName)
+		{
+			if(!pInfoByName || pInfoByName->m_ClientId == LocalId)
+				continue;
+			if(GameClient()->m_aClients[pInfoByName->m_ClientId].m_Friend != (Pass == 0))
+				continue;
+			aPlayerIds[NumPlayers++] = pInfoByName->m_ClientId;
+		}
+	}
+	if(NumPlayers == 0)
+		return;
+
+	const float CellWidth = 60.0f;
+	const float CellHeight = 44.0f;
+	CScrollRegionParams ScrollParams;
+	ScrollParams.m_ScrollUnit = CellHeight;
+
+	const int PerRow = std::max(1, (int)((pMainView->w - ScrollParams.m_ScrollbarThickness) / CellWidth));
+	const int NumRows = (NumPlayers + PerRow - 1) / PerRow;
+
+	CUIRect Grid;
+	pMainView->HSplitTop(std::min(NumRows, 2) * CellHeight, &Grid, pMainView);
+	pMainView->HSplitTop(6.0f, nullptr, pMainView);
+
+	static CScrollRegion s_ScrollRegion;
+	s_ScrollRegion.Begin(&Grid, &ScrollParams);
+
+	static char s_aTeeButtonIds[MAX_CLIENTS];
+	CUIRect Row = {};
+	for(int i = 0; i < NumPlayers; i++)
+	{
+		if(i % PerRow == 0)
+		{
+			Grid.HSplitTop(CellHeight, &Row, &Grid);
+			s_ScrollRegion.AddRect(Row);
+		}
+
+		CUIRect Cell;
+		Row.VSplitLeft(CellWidth, &Cell, &Row);
+
+		const int ClientId = aPlayerIds[i];
+		const char *pName = GameClient()->m_aClients[ClientId].m_aName;
+		if(Ui()->DoButtonLogic(&s_aTeeButtonIds[ClientId], 0, &Cell, BUTTONFLAG_LEFT))
+			UnfinishedVote.TogglePlayerSelection(pName);
+
+		const bool Selected = UnfinishedVote.IsPlayerSelected(pName);
+		if(Selected)
+			Cell.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_ALL, 4.0f);
+		else if(Ui()->HotItem() == &s_aTeeButtonIds[ClientId])
+			Cell.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.1f), IGraphics::CORNER_ALL, 4.0f);
+
+		CUIRect TeeArea, NameArea;
+		Cell.HSplitBottom(11.0f, &TeeArea, &NameArea);
+
+		const float Alpha = Selected ? 1.0f : 0.35f;
+		CTeeRenderInfo TeeInfo = GameClient()->m_aClients[ClientId].m_RenderInfo;
+		TeeInfo.m_Size = std::min(TeeArea.h, 32.0f);
+
+		const CAnimState *pIdleState = CAnimState::GetIdle();
+		vec2 OffsetToMid;
+		CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdleState, &TeeInfo, OffsetToMid);
+		vec2 TeeRenderPos(TeeArea.x + TeeArea.w / 2, TeeArea.y + TeeArea.h / 2 + OffsetToMid.y);
+		RenderTools()->RenderTee(pIdleState, &TeeInfo, EMOTE_NORMAL, vec2(1.0f, 0.0f), TeeRenderPos, Alpha);
+
+		SLabelProperties Props;
+		Props.m_MaxWidth = NameArea.w - 2.0f;
+		Props.m_EllipsisAtEnd = true;
+		if(!Selected)
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.4f);
+		Ui()->DoLabel(&NameArea, pName, 8.0f, TEXTALIGN_MC, Props);
+		if(!Selected)
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+
+	s_ScrollRegion.End();
+}
+
 bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 {
-	CUIRect List = MainView;
-	int NumVoteOptions = 0;
-	int aIndices[MAX_VOTE_OPTIONS];
-	int Selected = -1;
-	int TotalShown = 0;
+	CServerInfo ServerInfo;
+	Client()->GetServerInfo(&ServerInfo);
+	const bool DDNetCommunity = str_comp(ServerInfo.m_aCommunityId, IServerBrowser::COMMUNITY_DDNET) == 0;
 
+	if(DDNetCommunity)
+		RenderUnfinishedVoteTeeSelection(&MainView);
+
+	static const char *s_apClientOptionLabels[] = {
+		"Random Map Unfinished by All Players in Server (Reason=Stars)",
+		"Random Map Unfinished by Selected Players (Reason=Stars)",
+	};
+	static const int s_aClientOptionIds[] = {
+		CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL,
+		CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_SELECTED,
+	};
+	const int NumClientOptions = std::size(s_aClientOptionIds);
+	bool aShowClientOption[NumClientOptions];
+	for(int Option = 0; Option < NumClientOptions; Option++)
+		aShowClientOption[Option] = DDNetCommunity && (m_FilterInput.IsEmpty() || str_utf8_find_nocase(s_apClientOptionLabels[Option], m_FilterInput.GetString()) != nullptr);
+
+	int InsertClientOptionsAfter = -1;
 	int i = 0;
 	for(const CVoteOptionClient *pOption = GameClient()->m_Voting.FirstOption(); pOption; pOption = pOption->m_pNext, i++)
 	{
+		if(str_find_nocase(pOption->m_aDescription, "unfinished") && str_find_nocase(pOption->m_aDescription, "vote caller"))
+			InsertClientOptionsAfter = i;
+	}
+
+	CUIRect List = MainView;
+	int NumVoteOptions = 0;
+	int aIndices[MAX_VOTE_OPTIONS + NumClientOptions];
+	int Selected = -1;
+	int TotalShown = 0;
+
+	auto CountClientOptions = [&]() {
+		for(int Option = 0; Option < NumClientOptions; Option++)
+		{
+			if(!aShowClientOption[Option])
+				continue;
+			if(m_CallvoteSelectedOption == s_aClientOptionIds[Option])
+				Selected = TotalShown;
+			TotalShown++;
+		}
+	};
+
+	i = 0;
+	bool ClientOptionsCounted = false;
+	for(const CVoteOptionClient *pOption = GameClient()->m_Voting.FirstOption(); pOption; pOption = pOption->m_pNext, i++)
+	{
+		if(!ClientOptionsCounted && i > InsertClientOptionsAfter)
+		{
+			CountClientOptions();
+			ClientOptionsCounted = true;
+		}
 		if(!m_FilterInput.IsEmpty() && !str_utf8_find_nocase(pOption->m_aDescription, m_FilterInput.GetString()))
 			continue;
 		if(i == m_CallvoteSelectedOption)
 			Selected = TotalShown;
 		TotalShown++;
 	}
+	if(!ClientOptionsCounted)
+		CountClientOptions();
 
 	static CListBox s_ListBox;
 	s_ListBox.DoStart(19.0f, TotalShown, 1, 3, Selected, &List);
 
+	auto RenderClientOptions = [&]() {
+		for(int Option = 0; Option < NumClientOptions; Option++)
+		{
+			if(!aShowClientOption[Option])
+				continue;
+			aIndices[NumVoteOptions] = s_aClientOptionIds[Option];
+			NumVoteOptions++;
+
+			const CListboxItem Item = s_ListBox.DoNextItem(&s_apClientOptionLabels[Option]);
+			if(Item.m_Visible)
+			{
+				CUIRect Label;
+				Item.m_Rect.VMargin(2.0f, &Label);
+				Ui()->DoLabel(&Label, s_apClientOptionLabels[Option], 13.0f, TEXTALIGN_ML);
+			}
+		}
+	};
+
 	i = 0;
+	bool ClientOptionsRendered = false;
 	for(const CVoteOptionClient *pOption = GameClient()->m_Voting.FirstOption(); pOption; pOption = pOption->m_pNext, i++)
 	{
+		if(!ClientOptionsRendered && i > InsertClientOptionsAfter)
+		{
+			RenderClientOptions();
+			ClientOptionsRendered = true;
+		}
 		if(!m_FilterInput.IsEmpty() && !str_utf8_find_nocase(pOption->m_aDescription, m_FilterInput.GetString()))
 			continue;
 		aIndices[NumVoteOptions] = i;
@@ -887,6 +1048,8 @@ bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 		Item.m_Rect.VMargin(2.0f, &Label);
 		Ui()->DoLabel(&Label, pOption->m_aDescription, 13.0f, TEXTALIGN_ML);
 	}
+	if(!ClientOptionsRendered)
+		RenderClientOptions();
 
 	Selected = s_ListBox.DoEnd();
 	if(UpdateScroll)
@@ -1021,7 +1184,16 @@ void CMenus::RenderServerControl(CUIRect MainView)
 	{
 		if(s_ControlPage == EServerControlTab::SETTINGS)
 		{
-			if(0 <= m_CallvoteSelectedOption && m_CallvoteSelectedOption < GameClient()->m_Voting.NumOptions())
+			if(m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL || m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_SELECTED)
+			{
+				if(m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL)
+					GameClient()->m_UnfinishedMapVote.Start(m_CallvoteReasonInput.GetString());
+				else
+					GameClient()->m_UnfinishedMapVote.StartSelected(m_CallvoteReasonInput.GetString());
+				if(g_Config.m_UiCloseWindowAfterChangingSetting)
+					SetActive(false);
+			}
+			else if(0 <= m_CallvoteSelectedOption && m_CallvoteSelectedOption < GameClient()->m_Voting.NumOptions())
 			{
 				GameClient()->m_Voting.CallvoteOption(m_CallvoteSelectedOption, m_CallvoteReasonInput.GetString());
 				if(g_Config.m_UiCloseWindowAfterChangingSetting)
