@@ -1067,6 +1067,8 @@ set(EXPECTED_DATA
   assets/entities/license.txt
   assets/game/game_06.png
   audio/catwalking.wv
+  audio/firework_explode.wv
+  audio/firework_launch.wv
   audio/foley_body_impact-01.wv
   audio/foley_body_impact-02.wv
   audio/foley_body_impact-03.wv
@@ -2514,6 +2516,8 @@ if(CLIENT)
     components/emoticon.h
     components/envelope_state.cpp
     components/envelope_state.h
+    components/finish_fireworks.cpp
+    components/finish_fireworks.h
     components/flow.cpp
     components/flow.h
     components/freezebars.cpp

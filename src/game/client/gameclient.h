@@ -42,6 +42,7 @@
 #include "components/debughud.h"
 #include "components/effects.h"
 #include "components/emoticon.h"
+#include "components/finish_fireworks.h"
 #include "components/flow.h"
 #include "components/freezebars.h"
 #include "components/ghost.h"
@@ -195,6 +196,7 @@ public:
 
 	CRaceDemo m_RaceDemo;
 	CGhost m_Ghost;
+	CFinishFireworks m_FinishFireworks;
 
 	CTooltips m_Tooltips;
 
