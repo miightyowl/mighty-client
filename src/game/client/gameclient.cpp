@@ -1812,7 +1812,9 @@ void CGameClient::OnNewSnapshot(bool DummySwapped)
 					{
 						str_copy(pClient->m_aName, "nameless tee");
 					}
+					str_copy(pClient->m_aRealName, pClient->m_aName);
 					IntsToStr(pInfo->m_aClan, std::size(pInfo->m_aClan), pClient->m_aClan, std::size(pClient->m_aClan));
+					str_copy(pClient->m_aRealClan, pClient->m_aClan);
 					pClient->m_Country = pInfo->m_Country;
 					if(!in_range(pClient->m_Country, CountryCode::MINIMUM, CountryCode::MAXIMUM))
 					{
@@ -1829,6 +1831,8 @@ void CGameClient::OnNewSnapshot(bool DummySwapped)
 					pClient->m_UseCustomColor = pInfo->m_UseCustomColor;
 					pClient->m_ColorBody = pInfo->m_ColorBody;
 					pClient->m_ColorFeet = pInfo->m_ColorFeet;
+
+					UpdateFoeAlias(ClientId);
 				}
 			}
 			else if(Item.m_Type == NETOBJTYPE_PLAYERINFO)
@@ -2207,10 +2211,10 @@ void CGameClient::OnNewSnapshot(bool DummySwapped)
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
 		// update friend state
-		m_aClients[i].m_Friend = !(i == m_Snap.m_LocalClientId || !m_Snap.m_apPlayerInfos[i] || !Friends()->IsFriend(m_aClients[i].m_aName, m_aClients[i].m_aClan, true));
+		m_aClients[i].m_Friend = !(i == m_Snap.m_LocalClientId || !m_Snap.m_apPlayerInfos[i] || !Friends()->IsFriend(m_aClients[i].m_aRealName, m_aClients[i].m_aRealClan, true));
 
 		// update foe state
-		m_aClients[i].m_Foe = !(i == m_Snap.m_LocalClientId || !m_Snap.m_apPlayerInfos[i] || !Foes()->IsFriend(m_aClients[i].m_aName, m_aClients[i].m_aClan, true));
+		m_aClients[i].m_Foe = !(i == m_Snap.m_LocalClientId || !m_Snap.m_apPlayerInfos[i] || !Foes()->IsFriend(m_aClients[i].m_aRealName, m_aClients[i].m_aRealClan, true));
 	}
 
 	// check if we received all finish times
@@ -3036,7 +3040,9 @@ void CGameClient::CClientData::Reset()
 	m_ColorFeet = 0;
 
 	m_aName[0] = '\0';
+	m_aRealName[0] = '\0';
 	m_aClan[0] = '\0';
+	m_aRealClan[0] = '\0';
 	m_Country = CountryCode::DEFAULT;
 	str_copy(m_aSkinName, "default");
 
@@ -3081,6 +3087,7 @@ void CGameClient::CClientData::Reset()
 	m_EmoticonIgnore = false;
 	m_Friend = false;
 	m_Foe = false;
+	m_FoeAliasIndex = 0;
 
 	m_AuthLevel = AUTHED_NO;
 	m_Afk = false;
@@ -4017,6 +4024,121 @@ vec2 CGameClient::GetSmoothPos(int ClientId)
 void CGameClient::Echo(const char *pString)
 {
 	m_Chat.Echo(pString);
+}
+
+void CGameClient::UpdateFoeAlias(int ClientId)
+{
+	CClientData *pClient = &m_aClients[ClientId];
+	const bool IsLocal = ClientId == m_aLocalIds[0] || ClientId == m_aLocalIds[1];
+	if(!g_Config.m_ClFoeAnonymize || IsLocal || !Foes()->IsFriend(pClient->m_aRealName, pClient->m_aRealClan, true))
+	{
+		pClient->m_FoeAliasIndex = 0;
+		return;
+	}
+
+	if(pClient->m_FoeAliasIndex == 0 || FoeAliasIndexTaken(pClient->m_FoeAliasIndex, ClientId))
+		pClient->m_FoeAliasIndex = NextFreeFoeAliasIndex(ClientId);
+
+	FoeAliasName(pClient->m_FoeAliasIndex, pClient->m_aName, sizeof(pClient->m_aName));
+	pClient->m_aClan[0] = '\0';
+	pClient->m_Country = CountryCode::DEFAULT;
+	str_copy(pClient->m_aSkinName, "default");
+	pClient->m_UseCustomColor = 0;
+}
+
+void CGameClient::FoeAliasName(int Index, char *pBuffer, int BufferSize)
+{
+	if(Index <= 1)
+		str_copy(pBuffer, "nameless tee", BufferSize);
+	else if(Index <= 10)
+		str_format(pBuffer, BufferSize, "(%d)nameless tee", Index - 1);
+	else
+		str_format(pBuffer, BufferSize, "(%d)nameless", Index - 1);
+}
+
+bool CGameClient::FoeAliasIndexTaken(int Index, int ExcludeClientId) const
+{
+	char aAlias[MAX_NAME_LENGTH];
+	FoeAliasName(Index, aAlias, sizeof(aAlias));
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(i == ExcludeClientId)
+			continue;
+		if(m_aClients[i].m_FoeAliasIndex == Index)
+			return true;
+		if(m_aClients[i].m_aRealName[0] != '\0' && str_comp(m_aClients[i].m_aRealName, aAlias) == 0)
+			return true;
+	}
+	return false;
+}
+
+int CGameClient::NextFreeFoeAliasIndex(int ExcludeClientId) const
+{
+	int Index = 1;
+	while(FoeAliasIndexTaken(Index, ExcludeClientId))
+		Index++;
+	return Index;
+}
+
+bool CGameClient::ReplaceFoeNames(const char *pText, char *pBuffer, int BufferSize, bool AliasToReal)
+{
+	if(!g_Config.m_ClFoeAnonymize)
+		return false;
+
+	char aPredictedAlias[MAX_NAME_LENGTH];
+	if(!AliasToReal)
+		FoeAliasName(NextFreeFoeAliasIndex(-1), aPredictedAlias, sizeof(aPredictedAlias));
+
+	int Written = 0;
+	bool Changed = false;
+	const char *pRead = pText;
+	while(*pRead && Written < BufferSize - 1)
+	{
+		const char *pBestTo = nullptr;
+		int BestLength = 0;
+		for(const CClientData &Client : m_aClients)
+		{
+			if(!Client.m_Active || Client.m_FoeAliasIndex < 1)
+				continue;
+			const char *pFrom = AliasToReal ? Client.m_aName : Client.m_aRealName;
+			const int FromLength = str_length(pFrom);
+			if(FromLength > BestLength && str_startswith(pRead, pFrom) != nullptr)
+			{
+				pBestTo = AliasToReal ? Client.m_aRealName : Client.m_aName;
+				BestLength = FromLength;
+			}
+		}
+		if(!AliasToReal)
+		{
+			for(int Foe = 0; Foe < Foes()->NumFriends(); Foe++)
+			{
+				const char *pFoeName = Foes()->GetFriend(Foe)->m_aName;
+				const int FromLength = str_length(pFoeName);
+				if(FromLength > BestLength && str_startswith(pRead, pFoeName) != nullptr)
+				{
+					pBestTo = aPredictedAlias;
+					BestLength = FromLength;
+				}
+			}
+		}
+		if(BestLength > 0)
+		{
+			const int ToLength = str_length(pBestTo);
+			if(Written + ToLength >= BufferSize)
+				break;
+			mem_copy(pBuffer + Written, pBestTo, ToLength);
+			Written += ToLength;
+			pRead += BestLength;
+			Changed = true;
+		}
+		else
+		{
+			pBuffer[Written++] = *pRead++;
+		}
+	}
+	pBuffer[Written] = '\0';
+	str_utf8_fix_truncation(pBuffer);
+	return Changed;
 }
 
 bool CGameClient::IsOtherTeam(int ClientId) const

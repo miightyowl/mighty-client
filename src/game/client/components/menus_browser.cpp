@@ -1280,9 +1280,26 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 	s_ListBox.SetScrollbarMargin(5.0f);
 	s_ListBox.DoStart(25.0f, pSelectedServer->m_NumReceivedClients, 1, 3, -1, &View, false, IGraphics::CORNER_NONE, true);
 
+	int NumFoeAliases = 0;
 	for(int i = 0; i < pSelectedServer->m_NumReceivedClients; i++)
 	{
 		const CServerInfo::CClient &CurrentClient = pSelectedServer->m_aClients[i];
+
+		char aFoeAlias[MAX_NAME_LENGTH];
+		const bool IsFoe = g_Config.m_ClFoeAnonymize && GameClient()->Foes()->IsFriend(CurrentClient.m_aName, CurrentClient.m_aClan, true);
+		if(IsFoe)
+		{
+			bool Taken;
+			do
+			{
+				NumFoeAliases++;
+				CGameClient::FoeAliasName(NumFoeAliases, aFoeAlias, sizeof(aFoeAlias));
+				Taken = false;
+				for(int j = 0; j < pSelectedServer->m_NumReceivedClients && !Taken; j++)
+					Taken = str_comp(pSelectedServer->m_aClients[j].m_aName, aFoeAlias) == 0;
+			} while(Taken);
+		}
+
 		const CListboxItem Item = s_ListBox.DoNextItem(&CurrentClient);
 		if(!Item.m_Visible)
 			continue;
@@ -1339,7 +1356,16 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 		Ui()->DoLabel(&Score, aTemp, FontSize, TEXTALIGN_ML);
 
 		// render tee if available
-		if(CurrentClient.m_aSkin[0] != '\0')
+		if(IsFoe)
+		{
+			const CTeeRenderInfo TeeInfo = GetTeeRenderInfo(vec2(Skin.w, Skin.h), "default", false, 0, 0);
+			const CAnimState *pIdleState = CAnimState::GetIdle();
+			vec2 OffsetToMid;
+			CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdleState, &TeeInfo, OffsetToMid);
+			const vec2 TeeRenderPos = vec2(Skin.x + TeeInfo.m_Size / 2.0f, Skin.y + Skin.h / 2.0f + OffsetToMid.y);
+			RenderTools()->RenderTee(pIdleState, &TeeInfo, CurrentClient.m_Afk ? EMOTE_BLINK : EMOTE_NORMAL, vec2(1.0f, 0.0f), TeeRenderPos);
+		}
+		else if(CurrentClient.m_aSkin[0] != '\0')
 		{
 			const CTeeRenderInfo TeeInfo = GetTeeRenderInfo(vec2(Skin.w, Skin.h), CurrentClient.m_aSkin, CurrentClient.m_CustomSkinColors, CurrentClient.m_CustomSkinColorBody, CurrentClient.m_CustomSkinColorFeet);
 			const CAnimState *pIdleState = CAnimState::GetIdle();
@@ -1372,7 +1398,7 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 		NameCursor.m_FontSize = FontSize - 1.0f;
 		NameCursor.m_Flags |= TEXTFLAG_STOP_AT_END;
 		NameCursor.m_LineWidth = Name.w;
-		const char *pName = CurrentClient.m_aName;
+		const char *pName = IsFoe ? aFoeAlias : CurrentClient.m_aName;
 		bool Printed = false;
 		if(g_Config.m_BrFilterString[0])
 			Printed = PrintHighlighted(pName, [&](const char *pFilteredStr, const int FilterLen) {
@@ -1391,7 +1417,7 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 		ClanCursor.m_FontSize = FontSize - 2.0f;
 		ClanCursor.m_Flags |= TEXTFLAG_STOP_AT_END;
 		ClanCursor.m_LineWidth = Clan.w;
-		const char *pClan = CurrentClient.m_aClan;
+		const char *pClan = IsFoe ? "" : CurrentClient.m_aClan;
 		Printed = false;
 		if(g_Config.m_BrFilterString[0])
 			Printed = PrintHighlighted(pClan, [&](const char *pFilteredStr, const int FilterLen) {
@@ -1405,19 +1431,22 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 			TextRender()->TextEx(&ClanCursor, pClan, -1);
 
 		// flag
-		GameClient()->m_CountryFlags.Render(CurrentClient.m_Country, ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f), Flag.x, Flag.y, Flag.w, Flag.h);
+		GameClient()->m_CountryFlags.Render(IsFoe ? CountryCode::DEFAULT : CurrentClient.m_Country, ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f), Flag.x, Flag.y, Flag.w, Flag.h);
 	}
 
 	const int NewSelected = s_ListBox.DoEnd();
 	if(s_ListBox.WasItemSelected())
 	{
 		const CServerInfo::CClient &SelectedClient = pSelectedServer->m_aClients[NewSelected];
-		if(SelectedClient.m_FriendState == IFriends::FRIEND_PLAYER)
-			GameClient()->Friends()->RemoveFriend(SelectedClient.m_aName, SelectedClient.m_aClan);
-		else
-			GameClient()->Friends()->AddFriend(SelectedClient.m_aName, SelectedClient.m_aClan);
-		FriendlistOnUpdate();
-		Client()->ServerBrowserUpdate();
+		if(!g_Config.m_ClFoeAnonymize || !GameClient()->Foes()->IsFriend(SelectedClient.m_aName, SelectedClient.m_aClan, true))
+		{
+			if(SelectedClient.m_FriendState == IFriends::FRIEND_PLAYER)
+				GameClient()->Friends()->RemoveFriend(SelectedClient.m_aName, SelectedClient.m_aClan);
+			else
+				GameClient()->Friends()->AddFriend(SelectedClient.m_aName, SelectedClient.m_aClan);
+			FriendlistOnUpdate();
+			Client()->ServerBrowserUpdate();
+		}
 	}
 }
 

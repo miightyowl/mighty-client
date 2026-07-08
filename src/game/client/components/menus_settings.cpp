@@ -53,7 +53,7 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 		Game.HSplitTop(30.0f, &Label, &Game);
 		Ui()->DoLabel(&Label, Localize("Game"), 20.0f, TEXTALIGN_ML);
 		Game.HSplitTop(5.0f, nullptr, &Game);
-		Game.VSplitMid(&Left, nullptr, 20.0f);
+		Game.VSplitMid(&Left, &Right, 20.0f);
 
 		// dynamic camera
 		Left.HSplitTop(20.0f, &Button, &Left);
@@ -101,6 +101,11 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 		Left.HSplitTop(20.0f, &Button, &Left);
 		if(DoButton_CheckBox(&g_Config.m_ClAutoswitchWeaponsOutOfAmmo, Localize("Switch weapon when out of ammo"), g_Config.m_ClAutoswitchWeaponsOutOfAmmo, &Button))
 			g_Config.m_ClAutoswitchWeaponsOutOfAmmo ^= 1;
+
+		// foe anonymization
+		Right.HSplitTop(20.0f, &Button, &Right);
+		if(DoButton_CheckBox(&g_Config.m_ClFoeAnonymize, Localize("Fully anonymize tees on your foe list"), g_Config.m_ClFoeAnonymize, &Button))
+			g_Config.m_ClFoeAnonymize ^= 1;
 	}
 
 	// client

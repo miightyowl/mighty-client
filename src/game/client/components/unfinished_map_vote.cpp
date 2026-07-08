@@ -128,7 +128,7 @@ void CUnfinishedMapVote::EnsureLocalPlayerSelected()
 	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
 	if(LocalId < 0)
 		return;
-	const char *pName = GameClient()->m_aClients[LocalId].m_aName;
+	const char *pName = GameClient()->m_aClients[LocalId].m_aRealName;
 	if(!pName[0])
 		return;
 	m_SelectedPlayers.emplace(pName);
@@ -166,7 +166,7 @@ void CUnfinishedMapVote::Start(const char *pReason)
 	{
 		if(!GameClient()->m_Snap.m_apPlayerInfos[i])
 			continue;
-		const char *pName = GameClient()->m_aClients[i].m_aName;
+		const char *pName = GameClient()->m_aClients[i].m_aRealName;
 		if(!pName[0])
 			continue;
 		if(std::find(m_vPlayerNames.begin(), m_vPlayerNames.end(), pName) == m_vPlayerNames.end())
@@ -187,7 +187,7 @@ void CUnfinishedMapVote::StartSelected(const char *pReason)
 	{
 		if(!GameClient()->m_Snap.m_apPlayerInfos[i])
 			continue;
-		const char *pName = GameClient()->m_aClients[i].m_aName;
+		const char *pName = GameClient()->m_aClients[i].m_aRealName;
 		if(!pName[0] || !IsPlayerSelected(pName))
 			continue;
 		if(std::find(m_vPlayerNames.begin(), m_vPlayerNames.end(), pName) == m_vPlayerNames.end())

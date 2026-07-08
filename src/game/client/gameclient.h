@@ -466,7 +466,9 @@ public:
 		int m_ColorFeet;
 
 		char m_aName[MAX_NAME_LENGTH];
+		char m_aRealName[MAX_NAME_LENGTH];
 		char m_aClan[MAX_CLAN_LENGTH];
+		char m_aRealClan[MAX_CLAN_LENGTH];
 		/**
 		 * Country code in ISO 3166-1 numeric.
 		 */
@@ -508,6 +510,7 @@ public:
 		bool m_EmoticonIgnore;
 		bool m_Friend;
 		bool m_Foe;
+		int m_FoeAliasIndex;
 
 		int m_AuthLevel;
 		bool m_Afk;
@@ -728,6 +731,11 @@ public:
 
 	void DummyResetInput() override;
 	void Echo(const char *pString) override;
+	void UpdateFoeAlias(int ClientId);
+	static void FoeAliasName(int Index, char *pBuffer, int BufferSize);
+	bool FoeAliasIndexTaken(int Index, int ExcludeClientId) const;
+	int NextFreeFoeAliasIndex(int ExcludeClientId) const;
+	bool ReplaceFoeNames(const char *pText, char *pBuffer, int BufferSize, bool AliasToReal);
 	bool IsOtherTeam(int ClientId) const;
 	int SwitchStateTeam() const;
 	bool IsLocalCharSuper() const;

@@ -611,9 +611,9 @@ void CMenus::RenderPlayers(CUIRect MainView)
 		if(DoButton_Toggle(&s_aPlayerIds[Index][2], CurrentClient.m_Friend, &Button, true))
 		{
 			if(CurrentClient.m_Friend)
-				GameClient()->Friends()->RemoveFriend(CurrentClient.m_aName, CurrentClient.m_aClan);
+				GameClient()->Friends()->RemoveFriend(CurrentClient.m_aRealName, CurrentClient.m_aRealClan);
 			else
-				GameClient()->Friends()->AddFriend(CurrentClient.m_aName, CurrentClient.m_aClan);
+				GameClient()->Friends()->AddFriend(CurrentClient.m_aRealName, CurrentClient.m_aRealClan);
 
 			GameClient()->Client()->ServerBrowserUpdate();
 		}
@@ -905,10 +905,11 @@ void CMenus::RenderUnfinishedVoteTeeSelection(CUIRect *pMainView)
 
 		const int ClientId = aPlayerIds[i];
 		const char *pName = GameClient()->m_aClients[ClientId].m_aName;
+		const char *pRealName = GameClient()->m_aClients[ClientId].m_aRealName;
 		if(Ui()->DoButtonLogic(&s_aTeeButtonIds[ClientId], 0, &Cell, BUTTONFLAG_LEFT))
-			UnfinishedVote.TogglePlayerSelection(pName);
+			UnfinishedVote.TogglePlayerSelection(pRealName);
 
-		const bool Selected = UnfinishedVote.IsPlayerSelected(pName);
+		const bool Selected = UnfinishedVote.IsPlayerSelected(pRealName);
 		if(Selected)
 			Cell.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_ALL, 4.0f);
 		else if(Ui()->HotItem() == &s_aTeeButtonIds[ClientId])
