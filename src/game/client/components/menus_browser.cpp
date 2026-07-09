@@ -28,16 +28,20 @@ static constexpr ColorRGBA HIGHLIGHTED_TEXT_COLOR = ColorRGBA(0.4f, 0.4f, 1.0f, 
 
 static ColorRGBA PlayerBackgroundColor(bool Friend, bool Clan, bool Afk, bool InSelectedServer, bool Inside)
 {
-	static const ColorRGBA COLORS[] = {ColorRGBA(0.5f, 1.0f, 0.5f), ColorRGBA(0.4f, 0.4f, 1.0f), ColorRGBA(0.75f, 0.75f, 0.75f)};
-	static const ColorRGBA COLORS_AFK[] = {ColorRGBA(1.0f, 1.0f, 0.5f), ColorRGBA(0.4f, 0.75f, 1.0f), ColorRGBA(0.6f, 0.6f, 0.6f)};
-	int i;
+	ColorRGBA Base;
 	if(Friend)
-		i = 0;
+		Base = Afk ? ColorRGBA(0.50f, 0.62f, 0.28f, 1.0f) : ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f);
 	else if(Clan)
-		i = 1;
+		Base = Afk ? ColorRGBA(0.35f, 0.58f, 0.85f, 1.0f) : ColorRGBA(0.38f, 0.52f, 1.0f, 1.0f);
 	else
-		i = 2;
-	return (Afk ? COLORS_AFK[i] : COLORS[i]).WithAlpha(0.3f + (Inside ? 0.15f : 0.0f) + (InSelectedServer ? 0.12f : 0.0f));
+		Base = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+
+	float Alpha = (Friend || Clan) ? 0.16f : ((Afk ? 0.04f : 0.06f));
+	if(Inside)
+		Alpha += 0.06f;
+	if(InSelectedServer)
+		Alpha += 0.10f;
+	return Base.WithAlpha(Alpha);
 }
 
 template<size_t N>
@@ -73,9 +77,10 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 
 	CUIRect Headers;
 	View.HSplitTop(ms_ListheaderHeight, &Headers, &View);
-	Headers.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_T, 5.0f);
 	Headers.VSplitRight(s_ListBox.ScrollbarWidthMax(), &Headers, nullptr);
-	View.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_NONE, 0.0f);
+	CUIRect HeaderDivider;
+	View.HSplitTop(1.0f, &HeaderDivider, nullptr);
+	HeaderDivider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_NONE, 0.0f);
 
 	struct SColumn
 	{
@@ -168,14 +173,42 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 
 	const bool PlayersOrPing = (g_Config.m_BrSort == IServerBrowser::SORT_NUMPLAYERS || g_Config.m_BrSort == IServerBrowser::SORT_PING);
 
-	// do headers
 	for(const auto &Col : s_aCols)
 	{
 		int Checked = g_Config.m_BrSort == Col.m_Sort;
 		if(PlayersOrPing && g_Config.m_BrSortOrder == 2 && (Col.m_Sort == IServerBrowser::SORT_NUMPLAYERS || Col.m_Sort == IServerBrowser::SORT_PING))
 			Checked = 2;
 
-		if(DoButton_GridHeader(&Col.m_Id, Localize(Col.m_pCaption), Checked, &Col.m_Rect))
+		const bool ActiveSort = Col.m_Sort != -1 && Checked;
+		const ColorRGBA CaptionColor = ActiveSort ? ColorRGBA(0.45f, 0.80f, 0.35f, 1.0f) : ColorRGBA(0.45f, 0.45f, 0.45f, 1.0f);
+
+		if(Col.m_Id == COL_FRIENDS || Col.m_Id == COL_FLAG_FAV)
+		{
+			SLabelProperties Props;
+			Props.SetColor(CaptionColor);
+			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+			Ui()->DoLabel(&Col.m_Rect, Col.m_Id == COL_FRIENDS ? FontIcon::HEART : FontIcon::STAR, 11.0f, TEXTALIGN_MC, Props);
+			TextRender()->SetRenderFlags(0);
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		}
+		else if(Col.m_pCaption[0] != '\0')
+		{
+			char aCaption[32];
+			str_copy(aCaption, Localize(Col.m_pCaption));
+			for(char *pChar = aCaption; *pChar != '\0'; ++pChar)
+			{
+				if(*pChar >= 'a' && *pChar <= 'z')
+					*pChar -= 'a' - 'A';
+			}
+			CUIRect Caption;
+			Col.m_Rect.VMargin(5.0f, &Caption);
+			SLabelProperties Props;
+			Props.SetColor(CaptionColor);
+			Ui()->DoLabel(&Caption, aCaption, 8.0f, Col.m_Direction == 1 ? TEXTALIGN_MR : TEXTALIGN_ML, Props);
+		}
+
+		if(Ui()->DoButtonLogic(&Col.m_Id, 0, &Col.m_Rect, BUTTONFLAG_LEFT))
 		{
 			if(Col.m_Sort != -1)
 			{
@@ -185,23 +218,6 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 					g_Config.m_BrSortOrder = 0;
 				g_Config.m_BrSort = Col.m_Sort;
 			}
-		}
-
-		if(Col.m_Id == COL_FRIENDS)
-		{
-			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
-			Ui()->DoLabel(&Col.m_Rect, FontIcon::HEART, 14.0f, TEXTALIGN_MC);
-			TextRender()->SetRenderFlags(0);
-			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-		}
-		else if(Col.m_Id == COL_FLAG_FAV)
-		{
-			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
-			Ui()->DoLabel(&Col.m_Rect, FontIcon::STAR, 14.0f, TEXTALIGN_MC);
-			TextRender()->SetRenderFlags(0);
-			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		}
 	}
 
@@ -266,6 +282,10 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 	}
 
 	s_ListBox.SetActive(!Ui()->IsPopupOpen());
+	s_ListBox.SetRowColors(
+		ColorRGBA(0.33f, 0.71f, 0.24f, 0.20f),
+		ColorRGBA(0.33f, 0.71f, 0.24f, 0.14f),
+		ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f));
 	s_ListBox.DoStart(ms_ListheaderHeight, NumServers, 1, 3, -1, &View, false);
 
 	if(m_ServerBrowserShouldRevealSelection)
@@ -484,7 +504,7 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 	// Render bar that shows the loading progression.
 	// The bar is only shown while loading and fades out when it's done.
 	CUIRect RefreshBar;
-	StatusBox.HSplitTop(5.0f, &RefreshBar, &StatusBox);
+	StatusBox.HSplitTop(3.0f, &RefreshBar, &StatusBox);
 	static float s_LoadingProgressionFadeEnd = 0.0f;
 	if(ServerBrowser()->IsRefreshing() && ServerBrowser()->LoadingProgression() < 100)
 	{
@@ -499,157 +519,126 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 		RefreshBar.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, RefreshBarAlpha), IGraphics::CORNER_NONE, 0.0f);
 	}
 
-	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-	TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
-	const float SearchExcludeAddrStrMax = 130.0f;
-	const float SearchIconWidth = TextRender()->TextWidth(16.0f, FontIcon::MAGNIFYING_GLASS);
-	const float ExcludeIconWidth = TextRender()->TextWidth(16.0f, FontIcon::BAN);
-	const float ExcludeSearchIconMax = std::max(SearchIconWidth, ExcludeIconWidth);
-	TextRender()->SetRenderFlags(0);
-	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+	CUIRect Row;
+	StatusBox.HMargin((StatusBox.h - 27.0f) / 2.0f, &Row);
 
-	CUIRect SearchInfoAndAddr, ServersAndConnect, ServersPlayersOnline, SearchAndInfo, ServerAddr, ConnectButtons;
-	StatusBox.VSplitRight(135.0f, &SearchInfoAndAddr, &ServersAndConnect);
-	if(SearchInfoAndAddr.w > 350.0f)
-		SearchInfoAndAddr.VSplitLeft(350.0f, &SearchInfoAndAddr, nullptr);
-	SearchInfoAndAddr.HSplitTop(40.0f, &SearchAndInfo, &ServerAddr);
-	ServersAndConnect.HSplitTop(35.0f, &ServersPlayersOnline, &ConnectButtons);
-	ConnectButtons.HSplitTop(5.0f, nullptr, &ConnectButtons);
-
-	CUIRect QuickSearch, QuickExclude;
-	SearchAndInfo.HSplitTop(20.0f, &QuickSearch, &QuickExclude);
-	QuickSearch.Margin(2.0f, &QuickSearch);
-	QuickExclude.Margin(2.0f, &QuickExclude);
-
-	// render quick search
-	{
+	const auto &&IconField = [&](CLineInput &Input, const CUIRect &Rect, const char *pIcon, const char *pPlaceholder) -> bool {
+		Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f), IGraphics::CORNER_ALL, 6.0f);
+		CUIRect Inner, IconRect, Field;
+		Rect.VMargin(11.0f, &Inner);
+		Inner.VSplitLeft(15.0f, &IconRect, &Field);
+		Field.VSplitLeft(6.0f, nullptr, &Field);
+		SLabelProperties IconProps;
+		IconProps.SetColor(ColorRGBA(0.5f, 0.5f, 0.5f, 1.0f));
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
-		Ui()->DoLabel(&QuickSearch, FontIcon::MAGNIFYING_GLASS, 16.0f, TEXTALIGN_ML);
+		Ui()->DoLabel(&IconRect, pIcon, 12.0f, TEXTALIGN_ML, IconProps);
 		TextRender()->SetRenderFlags(0);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-		QuickSearch.VSplitLeft(ExcludeSearchIconMax, nullptr, &QuickSearch);
-		QuickSearch.VSplitLeft(5.0f, nullptr, &QuickSearch);
+		Input.SetEmptyText(pPlaceholder);
+		static const ColorRGBA s_Transparent(0.0f, 0.0f, 0.0f, 0.0f);
+		return Ui()->DoEditBox(&Input, &Field, 12.0f, IGraphics::CORNER_NONE, {}, &s_Transparent);
+	};
 
-		char aBufSearch[64];
-		str_format(aBufSearch, sizeof(aBufSearch), "%s:", Localize("Search"));
-		Ui()->DoLabel(&QuickSearch, aBufSearch, 14.0f, TEXTALIGN_ML);
-		QuickSearch.VSplitLeft(SearchExcludeAddrStrMax, nullptr, &QuickSearch);
-		QuickSearch.VSplitLeft(5.0f, nullptr, &QuickSearch);
+	// helper: square icon button
+	const auto &&IconButton = [&](CButtonContainer *pId, const CUIRect &Rect, const char *pIcon, ColorRGBA Base, ColorRGBA Hover, ColorRGBA IconCol) -> bool {
+		Rect.Draw(Ui()->HotItem() == pId ? Hover : Base, IGraphics::CORNER_ALL, 6.0f);
+		SLabelProperties Props;
+		Props.SetColor(IconCol);
+		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+		CUIRect IconRect = Rect;
+		Ui()->DoLabel(&IconRect, pIcon, 14.0f, TEXTALIGN_MC, Props);
+		TextRender()->SetRenderFlags(0);
+		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		return Ui()->DoButtonLogic(pId, 0, &Rect, BUTTONFLAG_LEFT);
+	};
 
+	// carve out the right-hand controls first
+	CUIRect ConnectButton, RefreshButton, Stats;
+	Row.VSplitRight(44.0f, &Row, &ConnectButton);
+	Row.VSplitRight(8.0f, &Row, nullptr);
+	Row.VSplitRight(40.0f, &Row, &RefreshButton);
+	Row.VSplitRight(14.0f, &Row, nullptr);
+	Row.VSplitRight(190.0f, &Row, &Stats);
+	Row.VSplitRight(14.0f, &Row, nullptr);
+
+	// search, exclude, address
+	const float Gap = 8.0f;
+	const float AddrWidth = std::max(140.0f, Row.w * 0.42f);
+	const float FieldWidth = (Row.w - AddrWidth - 2.0f * Gap) / 2.0f;
+	CUIRect Search, Exclude, Address;
+	Row.VSplitLeft(FieldWidth, &Search, &Row);
+	Row.VSplitLeft(Gap, nullptr, &Row);
+	Row.VSplitLeft(FieldWidth, &Exclude, &Row);
+	Row.VSplitLeft(Gap, nullptr, &Row);
+	Address = Row;
+
+	// search field
+	{
 		static CLineInput s_FilterInput(g_Config.m_BrFilterString, sizeof(g_Config.m_BrFilterString));
-		static char s_aTooltipText[64];
-		str_format(s_aTooltipText, sizeof(s_aTooltipText), "%s: \"solo; nameless tee; kobra 2\"", Localize("Example of usage"));
-		GameClient()->m_Tooltips.DoToolTip(&s_FilterInput, &QuickSearch, s_aTooltipText);
 		if(!Ui()->IsPopupOpen() && Input()->KeyPress(KEY_F) && Input()->ModifierIsPressed())
 		{
 			Ui()->SetActiveItem(&s_FilterInput);
 			s_FilterInput.SelectAll();
 		}
-		if(Ui()->DoClearableEditBox(&s_FilterInput, &QuickSearch, 12.0f))
+		if(IconField(s_FilterInput, Search, FontIcon::MAGNIFYING_GLASS, Localize("Search")))
 			Client()->ServerBrowserUpdate();
 	}
 
-	// render quick exclude
+	// exclude field
 	{
-		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
-		Ui()->DoLabel(&QuickExclude, FontIcon::BAN, 16.0f, TEXTALIGN_ML);
-		TextRender()->SetRenderFlags(0);
-		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-		QuickExclude.VSplitLeft(ExcludeSearchIconMax, nullptr, &QuickExclude);
-		QuickExclude.VSplitLeft(5.0f, nullptr, &QuickExclude);
-
-		char aBufExclude[64];
-		str_format(aBufExclude, sizeof(aBufExclude), "%s:", Localize("Exclude"));
-		Ui()->DoLabel(&QuickExclude, aBufExclude, 14.0f, TEXTALIGN_ML);
-		QuickExclude.VSplitLeft(SearchExcludeAddrStrMax, nullptr, &QuickExclude);
-		QuickExclude.VSplitLeft(5.0f, nullptr, &QuickExclude);
-
 		static CLineInput s_ExcludeInput(g_Config.m_BrExcludeString, sizeof(g_Config.m_BrExcludeString));
-		static char s_aTooltipText[64];
-		str_format(s_aTooltipText, sizeof(s_aTooltipText), "%s: \"CHN; [A]\"", Localize("Example of usage"));
-		GameClient()->m_Tooltips.DoToolTip(&s_ExcludeInput, &QuickSearch, s_aTooltipText);
 		if(!Ui()->IsPopupOpen() && Input()->KeyPress(KEY_X) && Input()->ShiftIsPressed() && Input()->ModifierIsPressed())
 		{
 			Ui()->SetActiveItem(&s_ExcludeInput);
 			s_ExcludeInput.SelectAll();
 		}
-		if(Ui()->DoClearableEditBox(&s_ExcludeInput, &QuickExclude, 12.0f))
+		if(IconField(s_ExcludeInput, Exclude, FontIcon::BAN, Localize("Exclude")))
 			Client()->ServerBrowserUpdate();
 	}
 
-	// render status
+	// server address field
 	{
-		CUIRect ServersOnline, PlayersOnline;
-		ServersPlayersOnline.HSplitMid(&PlayersOnline, &ServersOnline);
-
-		char aBuf[128];
-		if(ServerBrowser()->NumServers() != 1)
-			str_format(aBuf, sizeof(aBuf), Localize("%d of %d servers"), ServerBrowser()->NumSortedServers(), ServerBrowser()->NumServers());
-		else
-			str_format(aBuf, sizeof(aBuf), Localize("%d of %d server"), ServerBrowser()->NumSortedServers(), ServerBrowser()->NumServers());
-		Ui()->DoLabel(&ServersOnline, aBuf, 12.0f, TEXTALIGN_MR);
-
-		if(ServerBrowser()->NumSortedPlayers() != 1)
-			str_format(aBuf, sizeof(aBuf), Localize("%d players"), ServerBrowser()->NumSortedPlayers());
-		else
-			str_format(aBuf, sizeof(aBuf), Localize("%d player"), ServerBrowser()->NumSortedPlayers());
-		Ui()->DoLabel(&PlayersOnline, aBuf, 12.0f, TEXTALIGN_MR);
-	}
-
-	// address info
-	{
-		CUIRect ServerAddrLabel, ServerAddrEditBox;
-		ServerAddr.Margin(2.0f, &ServerAddr);
-		ServerAddr.VSplitLeft(SearchExcludeAddrStrMax + 5.0f + ExcludeSearchIconMax + 5.0f, &ServerAddrLabel, &ServerAddrEditBox);
-
-		Ui()->DoLabel(&ServerAddrLabel, Localize("Server address:"), 14.0f, TEXTALIGN_ML);
 		static CLineInput s_ServerAddressInput(g_Config.m_UiServerAddress, sizeof(g_Config.m_UiServerAddress));
-		if(Ui()->DoClearableEditBox(&s_ServerAddressInput, &ServerAddrEditBox, 12.0f))
+		if(IconField(s_ServerAddressInput, Address, FontIcon::EARTH_AMERICAS, Localize("Server address")))
 			m_ServerBrowserShouldRevealSelection = true;
 	}
 
-	// buttons
 	{
-		CUIRect ButtonRefresh, ButtonConnect;
-		ConnectButtons.VSplitMid(&ButtonRefresh, &ButtonConnect, 5.0f);
+		char aPlayers[64], aServers[64], aStats[160];
+		if(ServerBrowser()->NumSortedPlayers() != 1)
+			str_format(aPlayers, sizeof(aPlayers), Localize("%d players"), ServerBrowser()->NumSortedPlayers());
+		else
+			str_format(aPlayers, sizeof(aPlayers), Localize("%d player"), ServerBrowser()->NumSortedPlayers());
+		if(ServerBrowser()->NumServers() != 1)
+			str_format(aServers, sizeof(aServers), Localize("%d of %d servers"), ServerBrowser()->NumSortedServers(), ServerBrowser()->NumServers());
+		else
+			str_format(aServers, sizeof(aServers), Localize("%d of %d server"), ServerBrowser()->NumSortedServers(), ServerBrowser()->NumServers());
+		str_format(aStats, sizeof(aStats), "%s · %s", aPlayers, aServers);
+		SLabelProperties Props;
+		Props.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+		Ui()->DoLabel(&Stats, aStats, 10.0f, TEXTALIGN_MR, Props);
+	}
 
-		// refresh button
+	// refresh button
+	{
+		static CButtonContainer s_RefreshButton;
+		const char *pRefreshIcon = (ServerBrowser()->IsRefreshing() || ServerBrowser()->IsGettingServerlist()) ? FontIcon::ELLIPSIS : FontIcon::ARROW_ROTATE_RIGHT;
+		if(IconButton(&s_RefreshButton, RefreshButton, pRefreshIcon, ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f), ColorRGBA(1.0f, 1.0f, 1.0f, 0.12f), ColorRGBA(0.85f, 0.85f, 0.85f, 1.0f)) ||
+			(!Ui()->IsPopupOpen() && (Input()->KeyPress(KEY_F5) || (Input()->KeyPress(KEY_R) && Input()->ModifierIsPressed()))))
 		{
-			char aLabelBuf[32] = {0};
-			const auto &&RefreshLabelFunc = [this, aLabelBuf]() mutable {
-				if(ServerBrowser()->IsRefreshing() || ServerBrowser()->IsGettingServerlist())
-					str_format(aLabelBuf, sizeof(aLabelBuf), "%s%s", FontIcon::ARROW_ROTATE_RIGHT, FontIcon::ELLIPSIS);
-				else
-					str_copy(aLabelBuf, FontIcon::ARROW_ROTATE_RIGHT);
-				return aLabelBuf;
-			};
-
-			SMenuButtonProperties Props;
-			Props.m_HintRequiresStringCheck = true;
-			Props.m_UseIconFont = true;
-
-			static CButtonContainer s_RefreshButton;
-			if(Ui()->DoButton_Menu(m_RefreshButton, &s_RefreshButton, RefreshLabelFunc, &ButtonRefresh, Props) || (!Ui()->IsPopupOpen() && (Input()->KeyPress(KEY_F5) || (Input()->KeyPress(KEY_R) && Input()->ModifierIsPressed()))))
-			{
-				RefreshBrowserTab(true);
-			}
+			RefreshBrowserTab(true);
 		}
+	}
 
-		// connect button
+	// connect button
+	{
+		static CButtonContainer s_ConnectButton;
+		if(IconButton(&s_ConnectButton, ConnectButton, FontIcon::RIGHT_TO_BRACKET, ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f), ColorRGBA(0.40f, 0.79f, 0.30f, 1.0f), ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f)) ||
+			WasListboxItemActivated || (!Ui()->IsPopupOpen() && Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER)))
 		{
-			const auto &&ConnectLabelFunc = []() { return FontIcon::RIGHT_TO_BRACKET; };
-
-			SMenuButtonProperties Props;
-			Props.m_UseIconFont = true;
-			Props.m_Color = ColorRGBA(0.5f, 1.0f, 0.5f, 0.5f);
-
-			static CButtonContainer s_ConnectButton;
-			if(Ui()->DoButton_Menu(m_ConnectButton, &s_ConnectButton, ConnectLabelFunc, &ButtonConnect, Props) || WasListboxItemActivated || (!Ui()->IsPopupOpen() && Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER)))
-			{
-				Connect(g_Config.m_UiServerAddress);
-			}
+			Connect(g_Config.m_UiServerAddress);
 		}
 	}
 }
@@ -716,7 +705,8 @@ void CMenus::RenderServerbrowserFilters(CUIRect View)
 	Ui()->DoLabel(&Button, Localize("Game types:"), FontSize, TEXTALIGN_ML);
 	Button.VSplitRight(60.0f, nullptr, &Button);
 	static CLineInput s_GametypeInput(g_Config.m_BrFilterGametype, sizeof(g_Config.m_BrFilterGametype));
-	if(Ui()->DoEditBox(&s_GametypeInput, &Button, FontSize))
+	static const ColorRGBA s_FilterFieldColor(1.0f, 1.0f, 1.0f, 0.06f);
+	if(Ui()->DoEditBox(&s_GametypeInput, &Button, FontSize, IGraphics::CORNER_ALL, {}, &s_FilterFieldColor))
 		Client()->ServerBrowserUpdate();
 
 	// server address
@@ -726,7 +716,7 @@ void CMenus::RenderServerbrowserFilters(CUIRect View)
 	Ui()->DoLabel(&Button, Localize("Server address:"), FontSize, TEXTALIGN_ML);
 	Button.VSplitRight(60.0f, nullptr, &Button);
 	static CLineInput s_FilterServerAddressInput(g_Config.m_BrFilterServerAddress, sizeof(g_Config.m_BrFilterServerAddress));
-	if(Ui()->DoEditBox(&s_FilterServerAddressInput, &Button, FontSize))
+	if(Ui()->DoEditBox(&s_FilterServerAddressInput, &Button, FontSize, IGraphics::CORNER_ALL, {}, &s_FilterFieldColor))
 		Client()->ServerBrowserUpdate();
 
 	// player country
@@ -823,7 +813,7 @@ void CMenus::RenderServerbrowserFilters(CUIRect View)
 	}
 
 	static CButtonContainer s_ResetButton;
-	if(DoButton_Menu(&s_ResetButton, Localize("Reset filter"), 0, &ResetButton))
+	if(DoButton_Menu(&s_ResetButton, Localize("Reset filter"), 0, &ResetButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f)))
 	{
 		ResetServerbrowserFilters();
 	}
@@ -1179,7 +1169,7 @@ void CMenus::RenderServerbrowserInfo(CUIRect View)
 			CUIRect Button;
 			ServerDetails.HSplitBottom(15.0f, &ServerDetails, &Button);
 			static CButtonContainer s_CopyButton;
-			if(DoButton_Menu(&s_CopyButton, Localize("Copy info"), 0, &Button))
+			if(DoButton_Menu(&s_CopyButton, Localize("Copy info"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f)))
 			{
 				char aInfo[256];
 				str_format(
@@ -1521,7 +1511,7 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 		CUIRect Header, GroupIcon, GroupLabel;
 		List.HSplitTop(ms_ListheaderHeight, &Header, &List);
 		s_ScrollRegion.AddRect(Header);
-		Header.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_aListExtended[FriendType] ? 0.4f : 0.25f), IGraphics::CORNER_ALL, 5.0f);
+		Header.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_aListExtended[FriendType] ? 0.12f : 0.06f), IGraphics::CORNER_ALL, 5.0f);
 		Header.VSplitLeft(Header.h, &GroupIcon, &GroupLabel);
 		GroupIcon.Margin(2.0f, &GroupIcon);
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
@@ -1739,7 +1729,8 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 		Ui()->DoLabel(&Button, aBuf, FontSize + 2.0f, TEXTALIGN_ML);
 		Button.VSplitLeft(80.0f, nullptr, &Button);
 		static CLineInputBuffered<MAX_NAME_LENGTH> s_NameInput;
-		Ui()->DoEditBox(&s_NameInput, &Button, FontSize + 2.0f);
+		static const ColorRGBA s_FriendFieldColor(1.0f, 1.0f, 1.0f, 0.06f);
+		Ui()->DoEditBox(&s_NameInput, &Button, FontSize + 2.0f, IGraphics::CORNER_ALL, {}, &s_FriendFieldColor);
 
 		ServerFriends.HSplitTop(3.0f, nullptr, &ServerFriends);
 		ServerFriends.HSplitTop(18.0f, &Button, &ServerFriends);
@@ -1747,12 +1738,12 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 		Ui()->DoLabel(&Button, aBuf, FontSize + 2.0f, TEXTALIGN_ML);
 		Button.VSplitLeft(80.0f, nullptr, &Button);
 		static CLineInputBuffered<MAX_CLAN_LENGTH> s_ClanInput;
-		Ui()->DoEditBox(&s_ClanInput, &Button, FontSize + 2.0f);
+		Ui()->DoEditBox(&s_ClanInput, &Button, FontSize + 2.0f, IGraphics::CORNER_ALL, {}, &s_FriendFieldColor);
 
 		ServerFriends.HSplitTop(3.0f, nullptr, &ServerFriends);
 		ServerFriends.HSplitTop(18.0f, &Button, &ServerFriends);
 		static CButtonContainer s_AddButton;
-		if(DoButton_Menu(&s_AddButton, s_NameInput.IsEmpty() && !s_ClanInput.IsEmpty() ? Localize("Add clan") : Localize("Add friend"), 0, &Button))
+		if(DoButton_Menu(&s_AddButton, s_NameInput.IsEmpty() && !s_ClanInput.IsEmpty() ? Localize("Add clan") : Localize("Add friend"), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f)))
 		{
 			GameClient()->Friends()->AddFriend(s_NameInput.GetString(), s_ClanInput.GetString());
 			s_NameInput.Clear();
@@ -1891,11 +1882,20 @@ void CMenus::RenderServerbrowser(CUIRect MainView)
 	*/
 	// clang-format on
 
-	CUIRect ServerList, StatusBox, ToolBox, TabBar;
-	MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
+	CUIRect ServerList, StatusBox, ToolBox, TabBar, Content;
+	Ui()->Screen()->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f), IGraphics::CORNER_NONE, 0.0f);
 	MainView.Margin(10.0f, &MainView);
-	MainView.VSplitRight(205.0f, &ServerList, &ToolBox);
-	ServerList.VSplitRight(5.0f, &ServerList, nullptr);
+
+	MainView.HSplitBottom(30.0f, &Content, &StatusBox);
+	Content.HSplitBottom(8.0f, &Content, nullptr);
+
+	Content.VSplitRight(205.0f, &ServerList, &ToolBox);
+	CUIRect PanelDivider;
+	ServerList.VSplitRight(1.0f, &ServerList, &PanelDivider);
+	PanelDivider.HMargin(2.0f, &PanelDivider);
+	PanelDivider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f), IGraphics::CORNER_NONE, 0.0f);
+	ServerList.VSplitRight(9.0f, &ServerList, nullptr);
+	ToolBox.VSplitLeft(9.0f, nullptr, &ToolBox);
 
 	if(g_Config.m_UiPage == PAGE_INTERNET || g_Config.m_UiPage == PAGE_FAVORITES)
 	{
@@ -1906,7 +1906,6 @@ void CMenus::RenderServerbrowser(CUIRect MainView)
 	}
 
 	ToolBox.HSplitTop(24.0f, &TabBar, &ToolBox);
-	ServerList.HSplitBottom(65.0f, &ServerList, &StatusBox);
 
 	bool WasListboxItemActivated;
 	RenderServerbrowserServerList(ServerList, WasListboxItemActivated);

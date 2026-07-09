@@ -166,11 +166,11 @@ CListboxItem CListBox::DoNextItem(const void *pId, bool Selected, float CornerRa
 			}
 		}
 
-		Item.m_Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, m_Active ? 0.5f : 0.33f), IGraphics::CORNER_ALL, CornerRadius);
+		Item.m_Rect.Draw(m_Active ? m_SelectionColorActive : m_SelectionColorInactive, IGraphics::CORNER_ALL, CornerRadius);
 	}
 	if(Ui()->HotItem() == pId && !m_ScrollRegion.Animating())
 	{
-		Item.m_Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.33f), IGraphics::CORNER_ALL, CornerRadius);
+		Item.m_Rect.Draw(m_HoverColor, IGraphics::CORNER_ALL, CornerRadius);
 	}
 
 	return Item;

@@ -6,6 +6,10 @@
 #include <game/client/component.h>
 #include <game/client/ui_rect.h>
 
+#include <memory>
+
+class CHttpRequest;
+
 class CMenusStart : public CComponentInterfaces
 {
 public:
@@ -13,6 +17,13 @@ public:
 
 private:
 	bool CheckHotKey(int Key) const;
+
+	void UpdateLatestRelease();
+	std::shared_ptr<CHttpRequest> m_pReleaseTask = nullptr;
+	bool m_ReleaseRequested = false;
+	bool m_ReleaseLoaded = false;
+	char m_aReleaseTitle[128] = "";
+	char m_aReleaseDesc[256] = "";
 };
 
 #endif

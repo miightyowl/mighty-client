@@ -37,6 +37,10 @@ private:
 	bool m_HasHeader;
 	bool m_Active;
 
+	ColorRGBA m_SelectionColorActive = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
+	ColorRGBA m_SelectionColorInactive = ColorRGBA(1.0f, 1.0f, 1.0f, 0.33f);
+	ColorRGBA m_HoverColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.33f);
+
 protected:
 	CListboxItem DoNextRow();
 
@@ -56,6 +60,13 @@ public:
 	// Active state must be set before calling DoStart.
 	bool Active() const { return m_Active; }
 	void SetActive(bool Active) { m_Active = Active; }
+
+	void SetRowColors(ColorRGBA SelectionActive, ColorRGBA SelectionInactive, ColorRGBA Hover)
+	{
+		m_SelectionColorActive = SelectionActive;
+		m_SelectionColorInactive = SelectionInactive;
+		m_HoverColor = Hover;
+	}
 
 	bool WasItemSelected() const { return m_ListBoxItemSelected; }
 	bool WasItemActivated() const { return m_ListBoxItemActivated; }

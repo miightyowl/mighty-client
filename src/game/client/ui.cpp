@@ -914,7 +914,7 @@ CLabelResult CUi::DoLabel_AutoLineSize(const char *pText, float FontSize, int Al
 	return DoLabel(&LabelRect, pText, FontSize, Align);
 }
 
-bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners, const std::vector<STextColorSplit> &vColorSplits)
+bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners, const std::vector<STextColorSplit> &vColorSplits, const ColorRGBA *pBackgroundColor)
 {
 	const bool Inside = MouseHovered(pRect);
 	const bool Active = m_pLastActiveItem == pLineInput;
@@ -997,7 +997,7 @@ bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize
 	}
 
 	// Render
-	pRect->Draw(ms_LightButtonColorFunction.GetColor(Active, HotItem() == pLineInput), Corners, 3.0f);
+	pRect->Draw(pBackgroundColor != nullptr ? *pBackgroundColor : ms_LightButtonColorFunction.GetColor(Active, HotItem() == pLineInput), Corners, 3.0f);
 	ClipEnable(pRect);
 	Textbox.x -= ScrollOffset;
 	const STextBoundingBox BoundingBox = pLineInput->Render(&Textbox, FontSize, TEXTALIGN_ML, Changed || CursorChanged, -1.0f, 0.0f, vColorSplits);
