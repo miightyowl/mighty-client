@@ -789,35 +789,45 @@ void CMenus::RenderLoading(const char *pCaption, const char *pContent, int Incre
 		// the menu background is not loaded yet.
 		return;
 	}
-	if(!GameClient()->m_MenuBackground.Render())
-	{
-		RenderBackground();
-	}
-
 	m_LoadingState.m_LastRender = Now;
 
-	CUIRect Box;
-	Ui()->Screen()->Margin(160.0f, &Box);
-
 	Graphics()->TextureClear();
-	Box.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f), IGraphics::CORNER_ALL, 15.0f);
-	Box.Margin(20.0f, &Box);
+	Ui()->Screen()->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f), IGraphics::CORNER_NONE, 0.0f);
+
+	CUIRect Screen = *Ui()->Screen();
+
+	CUIRect Block;
+	Screen.HMargin((Screen.h - 80.0f) / 2.0f, &Block);
 
 	CUIRect Label;
-	Box.HSplitTop(24.0f, &Label, &Box);
-	Ui()->DoLabel(&Label, pCaption, 24.0f, TEXTALIGN_MC);
+	Block.HSplitTop(30.0f, &Label, &Block);
+	{
+		SLabelProperties Props;
+		Props.SetColor(ColorRGBA(0.96f, 0.96f, 0.96f, 1.0f));
+		Ui()->DoLabel(&Label, pCaption, 22.0f, TEXTALIGN_MC, Props);
+	}
 
-	Box.HSplitTop(20.0f, nullptr, &Box);
-	Box.HSplitTop(24.0f, &Label, &Box);
-	Ui()->DoLabel(&Label, pContent, 20.0f, TEXTALIGN_MC);
+	Block.HSplitTop(6.0f, nullptr, &Block);
+	Block.HSplitTop(16.0f, &Label, &Block);
+	{
+		SLabelProperties Props;
+		Props.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+		Ui()->DoLabel(&Label, pContent, 12.0f, TEXTALIGN_MC, Props);
+	}
 
 	if(m_LoadingState.m_Total > 0)
 	{
+		Block.HSplitTop(20.0f, nullptr, &Block);
 		CUIRect ProgressBar;
-		Box.HSplitBottom(30.0f, &Box, nullptr);
-		Box.HSplitBottom(25.0f, &Box, &ProgressBar);
-		ProgressBar.VMargin(20.0f, &ProgressBar);
-		Ui()->RenderProgressBar(ProgressBar, CurLoadRenderCount / (float)m_LoadingState.m_Total);
+		Block.HSplitTop(6.0f, &ProgressBar, &Block);
+		const float TrackWidth = std::min(360.0f, Screen.w - 120.0f);
+		ProgressBar.VMargin((ProgressBar.w - TrackWidth) / 2.0f, &ProgressBar);
+
+		ProgressBar.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_ALL, ProgressBar.h / 2.0f);
+		CUIRect Fill = ProgressBar;
+		Fill.w *= std::clamp(CurLoadRenderCount / (float)m_LoadingState.m_Total, 0.0f, 1.0f);
+		if(Fill.w >= ProgressBar.h)
+			Fill.Draw(ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f), IGraphics::CORNER_ALL, ProgressBar.h / 2.0f);
 	}
 
 	Graphics()->SetColor(1.0, 1.0, 1.0, 1.0);
