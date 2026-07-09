@@ -286,18 +286,16 @@ int CMenus::DoButton_CheckBox_Common(const void *pId, const char *pText, const c
 	Label.VSplitLeft(5.0f, nullptr, &Label);
 
 	Box.Margin(2.0f, &Box);
-	Box.Draw(ColorRGBA(1, 1, 1, 0.14f * Ui()->ButtonColorMul(pId)), IGraphics::CORNER_ALL, 3.0f);
 
 	const bool Checkable = *pBoxText == 'X';
 	if(Checkable)
 	{
-		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT);
-		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-		Ui()->DoLabel(&Box, FontIcon::XMARK, Box.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
-		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		const float Mul = Ui()->ButtonColorMul(pId);
+		Box.Draw(ColorRGBA(0.33f * Mul, 0.71f * Mul, 0.24f * Mul, 1.0f), IGraphics::CORNER_ALL, 3.0f);
 	}
 	else
 	{
+		Box.Draw(ColorRGBA(1, 1, 1, 0.14f * Ui()->ButtonColorMul(pId)), IGraphics::CORNER_ALL, 3.0f);
 		Ui()->DoLabel(&Box, pBoxText, Box.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
 	}
 

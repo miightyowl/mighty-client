@@ -1623,10 +1623,18 @@ bool CMenus::RenderLanguageSelection(CUIRect MainView)
 
 void CMenus::RenderSettings(CUIRect MainView)
 {
-	// render background
+	Ui()->Screen()->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f), IGraphics::CORNER_NONE, 0.0f);
+
 	CUIRect Button, TabBar, RestartBar;
-	MainView.VSplitRight(120.0f, &MainView, &TabBar);
-	MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
+	MainView.VSplitRight(150.0f, &MainView, &TabBar);
+
+	CUIRect TabDivider;
+	TabBar.VSplitLeft(1.0f, &TabDivider, &TabBar);
+	TabDivider.HMargin(8.0f, &TabDivider);
+	TabDivider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f), IGraphics::CORNER_NONE, 0.0f);
+	TabBar.VSplitLeft(14.0f, nullptr, &TabBar);
+	TabBar.VSplitRight(10.0f, &TabBar, nullptr);
+
 	MainView.Margin(20.0f, &MainView);
 
 	const bool NeedRestart = m_NeedRestartGraphics || m_NeedRestartSound || m_NeedRestartUpdate;
@@ -1635,9 +1643,6 @@ void CMenus::RenderSettings(CUIRect MainView)
 		MainView.HSplitBottom(20.0f, &MainView, &RestartBar);
 		MainView.HSplitBottom(10.0f, &MainView, nullptr);
 	}
-
-	TabBar.HSplitTop(50.0f, &Button, &TabBar);
-	Button.Draw(ms_ColorTabbarActive, IGraphics::CORNER_BR, 10.0f);
 
 	const char *apTabs[SETTINGS_LENGTH] = {
 		Localize("Language"),
@@ -1652,11 +1657,23 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("Assets")};
 	static CButtonContainer s_aTabButtons[SETTINGS_LENGTH];
 
+	TabBar.HSplitTop(52.0f, nullptr, &TabBar);
 	for(int i = 0; i < SETTINGS_LENGTH; i++)
 	{
-		TabBar.HSplitTop(10.0f, nullptr, &TabBar);
-		TabBar.HSplitTop(26.0f, &Button, &TabBar);
-		if(DoButton_MenuTab(&s_aTabButtons[i], apTabs[i], g_Config.m_UiSettingsPage == i, &Button, IGraphics::CORNER_R, &m_aAnimatorsSettingsTab[i]))
+		TabBar.HSplitTop(30.0f, &Button, &TabBar);
+		TabBar.HSplitTop(4.0f, nullptr, &TabBar);
+		const bool Active = g_Config.m_UiSettingsPage == i;
+		const bool Hovered = Ui()->HotItem() == &s_aTabButtons[i];
+		if(Active)
+			Button.Draw(ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f), IGraphics::CORNER_ALL, 6.0f);
+		else if(Hovered)
+			Button.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f), IGraphics::CORNER_ALL, 6.0f);
+		CUIRect TabLabel;
+		Button.VMargin(12.0f, &TabLabel);
+		SLabelProperties Props;
+		Props.SetColor(Active ? ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f) : (Hovered ? ColorRGBA(0.92f, 0.92f, 0.92f, 1.0f) : ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f)));
+		Ui()->DoLabel(&TabLabel, apTabs[i], 12.0f, TEXTALIGN_ML, Props);
+		if(Ui()->DoButtonLogic(&s_aTabButtons[i], 0, &Button, BUTTONFLAG_LEFT))
 			g_Config.m_UiSettingsPage = i;
 	}
 
@@ -1735,7 +1752,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 		}
 
 		static CButtonContainer s_RestartButton;
-		if(DoButton_Menu(&s_RestartButton, Localize("Restart"), 0, &RestartButton))
+		if(DoButton_Menu(&s_RestartButton, Localize("Restart"), 0, &RestartButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.33f, 0.71f, 0.24f, 0.7f)))
 		{
 			if(Client()->State() == IClient::STATE_ONLINE || GameClient()->Editor()->HasUnsavedData())
 			{
@@ -2019,8 +2036,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 
 	CUIRect TabBar, LeftView, RightView, Button;
 
-	MainView.HSplitTop(20.0f, &TabBar, &MainView);
-	const float TabWidth = TabBar.w / (float)NUMBER_OF_APPEARANCE_TABS;
+	MainView.HSplitTop(24.0f, &TabBar, &MainView);
 	static CButtonContainer s_aPageTabs[NUMBER_OF_APPEARANCE_TABS] = {};
 	const char *apTabNames[NUMBER_OF_APPEARANCE_TABS] = {
 		Localize("HUD"),
@@ -2030,15 +2046,27 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		Localize("Info Messages"),
 		Localize("Laser")};
 
+	CUIRect TabRow = TabBar;
 	for(int Tab = APPEARANCE_TAB_HUD; Tab < NUMBER_OF_APPEARANCE_TABS; ++Tab)
 	{
-		TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
-		const int Corners = Tab == APPEARANCE_TAB_HUD ? IGraphics::CORNER_L : (Tab == NUMBER_OF_APPEARANCE_TABS - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
-		if(DoButton_MenuTab(&s_aPageTabs[Tab], apTabNames[Tab], s_CurTab == Tab, &Button, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
-		{
+		const float LabelW = TextRender()->TextWidth(12.0f, apTabNames[Tab]);
+		TabRow.VSplitLeft(LabelW + 22.0f, &Button, &TabRow);
+		const bool Active = s_CurTab == Tab;
+		const bool Hovered = Ui()->HotItem() == &s_aPageTabs[Tab];
+		CUIRect TabLabel, Underline;
+		Button.HSplitBottom(2.0f, &TabLabel, &Underline);
+		SLabelProperties Props;
+		Props.SetColor(Active ? ColorRGBA(0.96f, 0.96f, 0.96f, 1.0f) : (Hovered ? ColorRGBA(0.80f, 0.80f, 0.80f, 1.0f) : ColorRGBA(0.50f, 0.50f, 0.50f, 1.0f)));
+		Ui()->DoLabel(&TabLabel, apTabNames[Tab], 12.0f, TEXTALIGN_MC, Props);
+		if(Active)
+			Underline.Draw(ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f), IGraphics::CORNER_T, 1.0f);
+		if(Ui()->DoButtonLogic(&s_aPageTabs[Tab], 0, &Button, BUTTONFLAG_LEFT))
 			s_CurTab = Tab;
-		}
 	}
+
+	CUIRect SubTabDivider;
+	MainView.HSplitTop(1.0f, &SubTabDivider, &MainView);
+	SubTabDivider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f), IGraphics::CORNER_NONE, 0.0f);
 
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
