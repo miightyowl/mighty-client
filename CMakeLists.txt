@@ -2518,6 +2518,8 @@ if(CLIENT)
     components/envelope_state.h
     components/finish_fireworks.cpp
     components/finish_fireworks.h
+    components/finish_rename.cpp
+    components/finish_rename.h
     components/flow.cpp
     components/flow.h
     components/freezebars.cpp

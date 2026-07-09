@@ -106,6 +106,24 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 		Right.HSplitTop(20.0f, &Button, &Right);
 		if(DoButton_CheckBox(&g_Config.m_ClFoeAnonymize, Localize("Fully anonymize tees on your foe list"), g_Config.m_ClFoeAnonymize, &Button))
 			g_Config.m_ClFoeAnonymize ^= 1;
+
+		// rename near finish when the current name already finished the map
+		Right.HSplitTop(5.0f, nullptr, &Right);
+		Right.HSplitTop(20.0f, &Button, &Right);
+		if(DoButton_CheckBox(&g_Config.m_ClFinishRename, Localize("Rename near finish if name has finished"), g_Config.m_ClFinishRename, &Button))
+			g_Config.m_ClFinishRename ^= 1;
+		if(g_Config.m_ClFinishRename)
+		{
+			Right.HSplitTop(2.0f, nullptr, &Right);
+			Right.HSplitTop(20.0f, &Button, &Right);
+			CUIRect NamesLabel;
+			Button.VSplitLeft(140.0f, &NamesLabel, &Button);
+			Ui()->DoLabel(&NamesLabel, Localize("Alternative names:"), 13.0f, TEXTALIGN_ML);
+			static CLineInput s_FinishRenameNamesInput;
+			s_FinishRenameNamesInput.SetBuffer(g_Config.m_ClFinishRenameNames, sizeof(g_Config.m_ClFinishRenameNames));
+			s_FinishRenameNamesInput.SetEmptyText("name1, name2, …");
+			Ui()->DoEditBox(&s_FinishRenameNamesInput, &Button, 12.0f);
+		}
 	}
 
 	// client

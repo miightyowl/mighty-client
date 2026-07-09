@@ -132,6 +132,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Sounds,
 					      &m_Voting,
 					      &m_UnfinishedMapVote,
+					      &m_FinishRename,
 					      &m_Particles, // doesn't render anything, just updates all the particles
 					      &m_FinishFireworks,
 					      &m_RaceDemo,

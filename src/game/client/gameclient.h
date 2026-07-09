@@ -43,6 +43,7 @@
 #include "components/effects.h"
 #include "components/emoticon.h"
 #include "components/finish_fireworks.h"
+#include "components/finish_rename.h"
 #include "components/flow.h"
 #include "components/freezebars.h"
 #include "components/ghost.h"
@@ -176,6 +177,7 @@ public:
 	CTouchControls m_TouchControls;
 	CVoting m_Voting;
 	CUnfinishedMapVote m_UnfinishedMapVote;
+	CFinishRename m_FinishRename;
 	CSpectator m_Spectator;
 
 	CPlayers m_Players;
