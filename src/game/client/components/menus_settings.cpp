@@ -1618,7 +1618,6 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientForceSkin, Localize("Force maodie skin on everyone"), &g_Config.m_ClMClientForceSkin, &LeftView, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPet, Localize("Show petting hand"), &g_Config.m_ClMClientPet, &LeftView, LineSize);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientWalkSound, Localize("Enable walking sound for maodie tees"), &g_Config.m_ClMClientWalkSound, &LeftView, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientAds, Localize("Random advertisement pop-ups (please keep that on, i need the money)"), &g_Config.m_ClMClientAds, &LeftView, LineSize);
 
 	// companion pet

@@ -42,14 +42,6 @@ class CSounds : public CComponent
 	void UpdateChannels();
 	int GetSampleId(int SetId);
 
-	bool m_MClientWaitForSounds = false;
-
-	int m_MClientWalkSample = -1;
-	ISound::CVoiceHandle m_aMClientWalkVoices[MAX_CLIENTS];
-	void LoadMClientWalkSound();
-	void UpdateMClientWalkSounds();
-	void StopMClientWalkSounds();
-
 	float m_GuiSoundVolume = -1.0f;
 	float m_GameSoundVolume = -1.0f;
 	float m_MapSoundVolume = -1.0f;
