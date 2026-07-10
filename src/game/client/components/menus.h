@@ -473,6 +473,7 @@ protected:
 	// found in menus.cpp
 	void Render();
 	void RenderPopupFullscreen(CUIRect Screen);
+	void RenderPopupMClientSetup(CUIRect Box);
 	void RenderPopupConnecting(CUIRect Screen);
 	void RenderPopupLoading(CUIRect Screen);
 #if defined(CONF_VIDEORECORDER)
@@ -827,6 +828,9 @@ public:
 		POPUP_RESTART,
 		POPUP_WARNING,
 		POPUP_SAVE_SKIN,
+		POPUP_MCLIENT_INTRO, // M-Client: first-launch greeting
+		POPUP_MCLIENT_SETUP, // M-Client: first-launch feature setup (accent, HUD, translation)
+		POPUP_MCLIENT_FUNNY, // M-Client: first-launch feature toggles
 	};
 
 	enum

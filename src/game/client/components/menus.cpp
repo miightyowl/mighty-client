@@ -910,6 +910,11 @@ void CMenus::OnInit()
 		m_Popup = POPUP_LANGUAGE;
 		m_CreateDefaultFavoriteCommunities = true;
 	}
+	else if(g_Config.m_ClMClientIntro)
+	{
+		// show the mighty client intro
+		m_Popup = POPUP_MCLIENT_INTRO;
+	}
 
 	if(g_Config.m_UiPage >= PAGE_FAVORITE_COMMUNITY_1 && g_Config.m_UiPage <= PAGE_FAVORITE_COMMUNITY_5 &&
 		(size_t)(g_Config.m_UiPage - PAGE_FAVORITE_COMMUNITY_1) >= ServerBrowser()->FavoriteCommunities().size())
@@ -1266,6 +1271,147 @@ void CMenus::Render()
 	}
 }
 
+// mighty client first launch setup page
+void CMenus::RenderPopupMClientSetup(CUIRect Box)
+{
+	CUIRect Part, LeftView, RightView, Row, Label, Field;
+	const float RowH = 24.0f;
+	const float Spacing = 6.0f;
+
+	Box.HSplitTop(34.0f, nullptr, &Box);
+
+	Box.HSplitBottom(20.0f, &Box, nullptr);
+	Box.HSplitBottom(RowH, &Box, &Part);
+	Part.VMargin(120.0f, &Part);
+	static CButtonContainer s_NextButton;
+	if(DoButton_Menu(&s_NextButton, Localize("Next"), 0, &Part))
+		m_Popup = POPUP_MCLIENT_FUNNY;
+
+	Box.HSplitBottom(10.0f, &Box, nullptr);
+	Box.VMargin(10.0f, &Box);
+	Box.VSplitMid(&LeftView, &RightView, 30.0f);
+
+	const auto Hint = [&](CUIRect *pView, const char *pText) {
+		CUIRect HintRect;
+		pView->HSplitTop(14.0f, &HintRect, pView);
+		TextRender()->TextColor(0.6f, 0.6f, 0.6f, 1.0f);
+		Ui()->DoLabel(&HintRect, pText, 11.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	};
+
+	static CButtonContainer s_AccentReset;
+	DoLine_ColorPicker(&s_AccentReset, 25.0f, 13.0f, 2.0f, &LeftView, Localize("Menu accent color"), &g_Config.m_ClMClientColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientColor, false)), false, nullptr, false);
+	Hint(&LeftView, Localize("Pick your favorite color here"));
+
+	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
+	LeftView.HSplitTop(RowH, &Row, &LeftView);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientFrozenHud, Localize("Show frozen teammates on the HUD"), g_Config.m_ClMClientFrozenHud, &Row))
+		g_Config.m_ClMClientFrozenHud ^= 1;
+	Hint(&LeftView, Localize("Shows frozen teammates on your screen"));
+
+	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
+	LeftView.HSplitTop(RowH, &Row, &LeftView);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientPetTee, Localize("Show companion pet"), g_Config.m_ClMClientPetTee, &Row))
+		g_Config.m_ClMClientPetTee ^= 1;
+	Hint(&LeftView, Localize("A pet tee that follows you around in-game"));
+
+	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
+	LeftView.HSplitTop(RowH, &Row, &LeftView);
+	if(DoButton_CheckBox(&g_Config.m_ClFinishRename, Localize("Rename near finish if name has finished"), g_Config.m_ClFinishRename, &Row))
+		g_Config.m_ClFinishRename ^= 1;
+	Hint(&LeftView, Localize("Uses another name if yours already finished"));
+	if(g_Config.m_ClFinishRename)
+	{
+		CUIRect NamesLabel;
+		LeftView.HSplitTop(Spacing, nullptr, &LeftView);
+		LeftView.HSplitTop(RowH, &Row, &LeftView);
+		Row.VSplitLeft(110.0f, &NamesLabel, &Row);
+		Ui()->DoLabel(&NamesLabel, Localize("Alternative names:"), 13.0f, TEXTALIGN_ML);
+		static CLineInput s_FinishRenameNamesInput;
+		s_FinishRenameNamesInput.SetBuffer(g_Config.m_ClFinishRenameNames, sizeof(g_Config.m_ClFinishRenameNames));
+		s_FinishRenameNamesInput.SetEmptyText("name1, name2, …");
+		Ui()->DoEditBox(&s_FinishRenameNamesInput, &Row, 12.0f);
+	}
+
+	RightView.HSplitTop(RowH, &Row, &RightView);
+	if(DoButton_CheckBox(&g_Config.m_ClChatTranslate, Localize("Enable chat translation"), g_Config.m_ClChatTranslate, &Row))
+		g_Config.m_ClChatTranslate ^= 1;
+	Hint(&RightView, Localize("Foreign chat is auto-translated into your language"));
+
+	RightView.HSplitTop(Spacing, nullptr, &RightView);
+	RightView.HSplitTop(RowH, &Row, &RightView);
+	Row.VSplitMid(&Label, &Field, Spacing);
+	Ui()->DoLabel(&Label, Localize("Translate key"), 14.0f, TEXTALIGN_ML);
+	{
+		const char *pTranslateCmd = "+show_chat; chat translate";
+		CBindSlot CurrentBind = EMPTY_BIND_SLOT;
+		for(int Mod = 0; Mod < KeyModifier::COMBINATION_COUNT && CurrentBind.m_Key == KEY_UNKNOWN; Mod++)
+		{
+			for(int Key = 0; Key < KEY_LAST; Key++)
+			{
+				const char *pCmd = GameClient()->m_Binds.Get(Key, Mod);
+				if(pCmd[0] != '\0' && str_comp(pCmd, pTranslateCmd) == 0)
+				{
+					CurrentBind = CBindSlot(Key, Mod);
+					break;
+				}
+			}
+		}
+		static CButtonContainer s_KeyReader, s_KeyReset;
+		const CKeyBinder::CKeyReaderResult Result = GameClient()->m_KeyBinder.DoKeyReader(&s_KeyReader, &s_KeyReset, &Field, CurrentBind, false);
+		if(!Result.m_Aborted && Result.m_Bind != CurrentBind)
+		{
+			if(CurrentBind.m_Key != KEY_UNKNOWN)
+				GameClient()->m_Binds.Bind(CurrentBind.m_Key, "", false, CurrentBind.m_ModifierMask);
+			if(Result.m_Bind.m_Key != KEY_UNKNOWN)
+				GameClient()->m_Binds.Bind(Result.m_Bind.m_Key, pTranslateCmd, false, Result.m_Bind.m_ModifierMask);
+		}
+	}
+	Hint(&RightView, Localize("Press this key to send a translated message"));
+
+	static const char *s_apLangCodes[] = {
+		"en", "de", "es", "fr", "pt", "it", "nl", "pl", "ru", "uk", "tr", "ar",
+		"zh-CN", "ja", "ko", "vi", "id", "th", "sv", "cs", "el", "hu", "ro", "fi", "da", "no", "sl", "sk", "hr", "sr", "bg"};
+	static const char *s_apLangNames[] = {
+		"English", "German", "Spanish", "French", "Portuguese", "Italian", "Dutch", "Polish", "Russian", "Ukrainian", "Turkish", "Arabic",
+		"Chinese", "Japanese", "Korean", "Vietnamese", "Indonesian", "Thai", "Swedish", "Czech", "Greek", "Hungarian", "Romanian", "Finnish", "Danish", "Norwegian", "Slovenian", "Slovak", "Croatian", "Serbian", "Bulgarian"};
+	const int NumLang = std::size(s_apLangCodes);
+	const auto FindLang = [&](const char *pCode) {
+		for(int i = 0; i < NumLang; ++i)
+			if(str_comp(pCode, s_apLangCodes[i]) == 0)
+				return i;
+		return 0;
+	};
+
+	// your language
+	RightView.HSplitTop(Spacing, nullptr, &RightView);
+	RightView.HSplitTop(RowH, &Row, &RightView);
+	Row.VSplitMid(&Label, &Field, Spacing);
+	Ui()->DoLabel(&Label, Localize("Your language"), 14.0f, TEXTALIGN_ML);
+	static CUi::SDropDownState s_SourceState;
+	static CScrollRegion s_SourceScroll;
+	s_SourceState.m_SelectionPopupContext.m_pScrollRegion = &s_SourceScroll;
+	const int OldSource = FindLang(g_Config.m_ClChatTranslateOutSource);
+	const int NewSource = Ui()->DoDropDown(&Field, OldSource, s_apLangNames, NumLang, s_SourceState);
+	if(NewSource != OldSource)
+		str_copy(g_Config.m_ClChatTranslateOutSource, s_apLangCodes[NewSource]);
+	Hint(&RightView, Localize("The language you type in"));
+
+	// send as language
+	RightView.HSplitTop(Spacing, nullptr, &RightView);
+	RightView.HSplitTop(RowH, &Row, &RightView);
+	Row.VSplitMid(&Label, &Field, Spacing);
+	Ui()->DoLabel(&Label, Localize("Send as language"), 14.0f, TEXTALIGN_ML);
+	static CUi::SDropDownState s_TargetState;
+	static CScrollRegion s_TargetScroll;
+	s_TargetState.m_SelectionPopupContext.m_pScrollRegion = &s_TargetScroll;
+	const int OldTarget = FindLang(g_Config.m_ClChatTranslateOutTarget);
+	const int NewTarget = Ui()->DoDropDown(&Field, OldTarget, s_apLangNames, NumLang, s_TargetState);
+	if(NewTarget != OldTarget)
+		str_copy(g_Config.m_ClChatTranslateOutTarget, s_apLangCodes[NewTarget]);
+	Hint(&RightView, Localize("Your message is sent translated into this language"));
+}
+
 void CMenus::RenderPopupFullscreen(CUIRect Screen)
 {
 	char aBuf[1536];
@@ -1367,10 +1513,38 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		pTitle = Localize("Save skin");
 		pExtraText = Localize("Are you sure you want to save your skin? If a skin with this name already exists, it will be replaced.");
 	}
+	else if(m_Popup == POPUP_MCLIENT_INTRO)
+	{
+		pTitle = Localize("Welcome to my client");
+		str_format(aBuf, sizeof(aBuf), "%s\n\n%s",
+			Localize("Hey, thanks for downloading the mighty client!"),
+			Localize("This client reflects my personal preferences, which makes it perfect for me and maybe for you too!"));
+		pExtraText = aBuf;
+		TopAlign = true;
+	}
+	else if(m_Popup == POPUP_MCLIENT_SETUP)
+	{
+		pTitle = Localize("Set up the client");
+		pExtraText = Localize("A few handy features you may want to configure now. You can change all of this later in the settings under the \"M-Client\" tab.");
+		TopAlign = true;
+	}
+	else if(m_Popup == POPUP_MCLIENT_FUNNY)
+	{
+		pTitle = Localize("Fun features");
+		pExtraText = Localize("These are the most important features, you definitely have to enable them!");
+		TopAlign = true;
+	}
 
 	CUIRect Box, Part;
 	Box = Screen;
-	if(m_Popup != POPUP_FIRST_LAUNCH)
+	if(m_Popup == POPUP_FIRST_LAUNCH)
+	{
+	}
+	else if(m_Popup == POPUP_MCLIENT_SETUP)
+	{
+		Box.Margin(60.0f, &Box);
+	}
+	else
 	{
 		Box.Margin(150.0f, &Box);
 	}
@@ -1827,7 +2001,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		if(DoButton_Menu(&s_SkipTutorialButton, Localize("Skip Tutorial"), 0, &Skip) || Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
 		{
 			Client()->RequestDDNetInfo();
-			m_Popup = g_Config.m_BrIndicateFinished ? POPUP_POINTS : POPUP_NONE;
+			m_Popup = g_Config.m_BrIndicateFinished ? POPUP_POINTS : (g_Config.m_ClMClientIntro ? POPUP_MCLIENT_INTRO : POPUP_NONE);
 		}
 
 		Box.HSplitBottom(20.f, &Box, &Part);
@@ -2061,7 +2235,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 			if(DoButton_Menu(&s_ButtonYes, Localize("Yes"), 0, &Yes) ||
 				Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER))
 			{
-				m_Popup = POPUP_NONE;
+				m_Popup = g_Config.m_ClMClientIntro ? POPUP_MCLIENT_INTRO : POPUP_NONE;
 			}
 		}
 		else
@@ -2072,7 +2246,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 				Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER) ||
 				Client()->InfoState() == IClient::EInfoState::SUCCESS)
 			{
-				m_Popup = POPUP_NONE;
+				m_Popup = g_Config.m_ClMClientIntro ? POPUP_MCLIENT_INTRO : POPUP_NONE;
 			}
 			if(Client()->InfoState() == IClient::EInfoState::ERROR)
 			{
@@ -2140,6 +2314,54 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		TextBox.VSplitLeft(20.0f, nullptr, &TextBox);
 		Ui()->DoLabel(&Label, Localize("Name"), 18.0f, TEXTALIGN_ML);
 		Ui()->DoClearableEditBox(&m_SkinNameInput, &TextBox, 12.0f);
+	}
+	else if(m_Popup == POPUP_MCLIENT_INTRO)
+	{
+		Box.HSplitBottom(20.0f, &Box, nullptr);
+		Box.HSplitBottom(24.0f, &Box, &Part);
+		Part.VMargin(120.0f, &Part);
+
+		static CButtonContainer s_NextButton;
+		if(DoButton_Menu(&s_NextButton, Localize("Next"), 0, &Part) || Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER))
+			m_Popup = POPUP_MCLIENT_SETUP;
+	}
+	else if(m_Popup == POPUP_MCLIENT_SETUP)
+	{
+		RenderPopupMClientSetup(Box);
+	}
+	else if(m_Popup == POPUP_MCLIENT_FUNNY)
+	{
+		CUIRect Checkbox;
+
+		Box.HSplitBottom(20.0f, &Box, nullptr);
+		Box.HSplitBottom(24.0f, &Box, &Part);
+		Part.VMargin(120.0f, &Part);
+
+		static CButtonContainer s_DoneButton;
+		if(DoButton_Menu(&s_DoneButton, Localize("Next"), 0, &Part) || Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER))
+		{
+			g_Config.m_ClMClientIntro = 0;
+			m_Popup = POPUP_NONE;
+		}
+
+		// feature toggles (off by default), shown bottom-up
+		Box.HSplitBottom(20.0f, &Box, nullptr);
+		Box.HSplitBottom(24.0f, &Box, &Checkbox);
+		Checkbox.VMargin(60.0f, &Checkbox);
+		if(DoButton_CheckBox(&g_Config.m_ClMClientAds, Localize("Random advertisement pop-ups"), g_Config.m_ClMClientAds, &Checkbox))
+			g_Config.m_ClMClientAds ^= 1;
+
+		Box.HSplitBottom(4.0f, &Box, nullptr);
+		Box.HSplitBottom(24.0f, &Box, &Checkbox);
+		Checkbox.VMargin(60.0f, &Checkbox);
+		if(DoButton_CheckBox(&g_Config.m_ClMClientPet, Localize("Show petting hand"), g_Config.m_ClMClientPet, &Checkbox))
+			g_Config.m_ClMClientPet ^= 1;
+
+		Box.HSplitBottom(4.0f, &Box, nullptr);
+		Box.HSplitBottom(24.0f, &Box, &Checkbox);
+		Checkbox.VMargin(60.0f, &Checkbox);
+		if(DoButton_CheckBox(&g_Config.m_ClMClientForceSkin, Localize("Force maodie skin on everyone"), g_Config.m_ClMClientForceSkin, &Checkbox))
+			g_Config.m_ClMClientForceSkin ^= 1;
 	}
 	else
 	{

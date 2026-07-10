@@ -219,6 +219,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 					"have fun out there!",
 					"gl hf :)",
 					"welcome back!",
+					"mighty is a cute cat!",
 					"made with love <3",
 					"ur the best!",
 				};
