@@ -101,29 +101,6 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 		Left.HSplitTop(20.0f, &Button, &Left);
 		if(DoButton_CheckBox(&g_Config.m_ClAutoswitchWeaponsOutOfAmmo, Localize("Switch weapon when out of ammo"), g_Config.m_ClAutoswitchWeaponsOutOfAmmo, &Button))
 			g_Config.m_ClAutoswitchWeaponsOutOfAmmo ^= 1;
-
-		// foe anonymization
-		Right.HSplitTop(20.0f, &Button, &Right);
-		if(DoButton_CheckBox(&g_Config.m_ClFoeAnonymize, Localize("Fully anonymize tees on your foe list"), g_Config.m_ClFoeAnonymize, &Button))
-			g_Config.m_ClFoeAnonymize ^= 1;
-
-		// rename near finish when the current name already finished the map
-		Right.HSplitTop(5.0f, nullptr, &Right);
-		Right.HSplitTop(20.0f, &Button, &Right);
-		if(DoButton_CheckBox(&g_Config.m_ClFinishRename, Localize("Rename near finish if name has finished"), g_Config.m_ClFinishRename, &Button))
-			g_Config.m_ClFinishRename ^= 1;
-		if(g_Config.m_ClFinishRename)
-		{
-			Right.HSplitTop(2.0f, nullptr, &Right);
-			Right.HSplitTop(20.0f, &Button, &Right);
-			CUIRect NamesLabel;
-			Button.VSplitLeft(140.0f, &NamesLabel, &Button);
-			Ui()->DoLabel(&NamesLabel, Localize("Alternative names:"), 13.0f, TEXTALIGN_ML);
-			static CLineInput s_FinishRenameNamesInput;
-			s_FinishRenameNamesInput.SetBuffer(g_Config.m_ClFinishRenameNames, sizeof(g_Config.m_ClFinishRenameNames));
-			s_FinishRenameNamesInput.SetEmptyText("name1, name2, …");
-			Ui()->DoEditBox(&s_FinishRenameNamesInput, &Button, 12.0f);
-		}
 	}
 
 	// client
@@ -509,14 +486,6 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	if(DoButton_CheckBox(&g_Config.m_ClFatSkins, Localize("Fat skins (DDFat)"), g_Config.m_ClFatSkins, &Button))
 	{
 		g_Config.m_ClFatSkins ^= 1;
-	}
-
-	// m-client
-	Checkboxes.HSplitTop(20.0f, &Button, &Checkboxes);
-	if(DoButton_CheckBox(&g_Config.m_ClMClientForceSkin, Localize("Force maodie skin on everyone"), g_Config.m_ClMClientForceSkin, &Button))
-	{
-		g_Config.m_ClMClientForceSkin ^= 1;
-		ShouldRefresh = true;
 	}
 
 	// Skin prefix
@@ -1238,10 +1207,6 @@ void CMenus::RenderSettingsGraphics(CUIRect MainView)
 	static CButtonContainer s_UiColorResetId;
 	DoLine_ColorPicker(&s_UiColorResetId, 25.0f, 13.0f, 2.0f, &MainView, Localize("UI Color"), &g_Config.m_UiColor, color_cast<ColorRGBA>(ColorHSLA(0xE4A046AFU, true)), false, nullptr, true);
 
-	MainView.HSplitTop(2.0f, nullptr, &MainView);
-	static CButtonContainer s_MClientColorResetId;
-	DoLine_ColorPicker(&s_MClientColorResetId, 25.0f, 13.0f, 2.0f, &MainView, Localize("Menu accent color"), &g_Config.m_ClMClientColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientColor, false)), false, nullptr, false);
-
 	// Backend list
 	struct SMenuBackendInfo
 	{
@@ -1481,10 +1446,6 @@ void CMenus::RenderSettingsSound(CUIRect MainView)
 	if(DoButton_CheckBox(&g_Config.m_SndHighlight, Localize("Enable highlighted chat sound"), g_Config.m_SndHighlight, &Button))
 		g_Config.m_SndHighlight ^= 1;
 
-	MainView.HSplitTop(20.0f, &Button, &MainView);
-	if(DoButton_CheckBox(&g_Config.m_ClMClientWalkSound, Localize("Enable walking sound for maodie tees"), g_Config.m_ClMClientWalkSound, &Button))
-		g_Config.m_ClMClientWalkSound ^= 1;
-
 	// volume slider
 	{
 		MainView.HSplitTop(5.0f, nullptr, &MainView);
@@ -1610,6 +1571,171 @@ bool CMenus::RenderLanguageSelection(CUIRect MainView)
 	return s_ListBox.WasItemActivated();
 }
 
+// M-Client
+void CMenus::RenderSettingsMClient(CUIRect MainView)
+{
+	CUIRect LeftView, RightView, Button, Label;
+
+	const float LineSize = 20.0f;
+	const float HeadlineFontSize = 20.0f;
+	const float HeadlineHeight = 30.0f;
+	const float MarginSmall = 5.0f;
+	const float MarginBetweenViews = 20.0f;
+	const float ColorPickerLabelSize = 13.0f;
+
+	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+
+	// gameplay
+	Ui()->DoLabel_AutoLineSize(Localize("Gameplay"), HeadlineFontSize, TEXTALIGN_ML, &LeftView, HeadlineHeight);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFoeAnonymize, Localize("Fully anonymize tees on your foe list"), &g_Config.m_ClFoeAnonymize, &LeftView, LineSize);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFinishRename, Localize("Rename near finish if name has finished"), &g_Config.m_ClFinishRename, &LeftView, LineSize);
+	if(g_Config.m_ClFinishRename)
+	{
+		CUIRect NamesLabel;
+		LeftView.HSplitTop(LineSize, &Button, &LeftView);
+		Button.VSplitLeft(140.0f, &NamesLabel, &Button);
+		Ui()->DoLabel(&NamesLabel, Localize("Alternative names:"), ColorPickerLabelSize, TEXTALIGN_ML);
+		static CLineInput s_FinishRenameNamesInput;
+		s_FinishRenameNamesInput.SetBuffer(g_Config.m_ClFinishRenameNames, sizeof(g_Config.m_ClFinishRenameNames));
+		s_FinishRenameNamesInput.SetEmptyText("name1, name2, …");
+		Ui()->DoEditBox(&s_FinishRenameNamesInput, &Button, 12.0f);
+	}
+
+	// appearance
+	LeftView.HSplitTop(MarginBetweenViews, nullptr, &LeftView);
+	Ui()->DoLabel_AutoLineSize(Localize("Appearance"), HeadlineFontSize, TEXTALIGN_ML, &LeftView, HeadlineHeight);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+	static CButtonContainer s_MClientColorResetId;
+	DoLine_ColorPicker(&s_MClientColorResetId, 25.0f, 13.0f, 2.0f, &LeftView, Localize("Menu accent color"), &g_Config.m_ClMClientColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientColor, false)), false, nullptr, false);
+
+	// funny
+	LeftView.HSplitTop(MarginBetweenViews, nullptr, &LeftView);
+	Ui()->DoLabel_AutoLineSize(Localize("Funny"), HeadlineFontSize, TEXTALIGN_ML, &LeftView, HeadlineHeight);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientForceSkin, Localize("Force maodie skin on everyone"), &g_Config.m_ClMClientForceSkin, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPet, Localize("Show petting hand"), &g_Config.m_ClMClientPet, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientWalkSound, Localize("Enable walking sound for maodie tees"), &g_Config.m_ClMClientWalkSound, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientAds, Localize("Random advertisement pop-ups (please keep that on, i need the money)"), &g_Config.m_ClMClientAds, &LeftView, LineSize);
+
+	// companion pet
+	LeftView.HSplitTop(MarginBetweenViews, nullptr, &LeftView);
+	Ui()->DoLabel_AutoLineSize(Localize("Companion pet"), HeadlineFontSize, TEXTALIGN_ML, &LeftView, HeadlineHeight);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPetTee, Localize("Show companion tee (pet)"), &g_Config.m_ClMClientPetTee, &LeftView, LineSize);
+	if(g_Config.m_ClMClientPetTee)
+	{
+		LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClMClientPetTeeSize, &g_Config.m_ClMClientPetTeeSize, &Button, Localize("Companion tee size"), 10, 500, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+		LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClMClientPetTeeAlpha, &g_Config.m_ClMClientPetTeeAlpha, &Button, Localize("Companion tee opacity"), 10, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+	}
+	LeftView.HSplitTop(LineSize, &Label, &LeftView);
+	TextRender()->TextColor(0.6f, 0.6f, 0.6f, 1.0f);
+	Ui()->DoLabel(&Label, Localize("Pick the companion skin in the Tee settings tab."), 11.0f, TEXTALIGN_ML);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	// frozen teammates HUD
+	Ui()->DoLabel_AutoLineSize(Localize("Frozen teammates HUD"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHud, Localize("Show frozen teammates on HUD"), &g_Config.m_ClMClientFrozenHud, &RightView, LineSize);
+	if(g_Config.m_ClMClientFrozenHud)
+	{
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHudSkins, Localize("Use player skins for frozen tees"), &g_Config.m_ClMClientFrozenHudSkins, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHudTeamOnly, Localize("Only show frozen tees while in a team"), &g_Config.m_ClMClientFrozenHudTeamOnly, &RightView, LineSize);
+		RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClMClientFrozenHudTeeSize, &g_Config.m_ClMClientFrozenHudTeeSize, &Button, Localize("Frozen tee size"), 8, 20, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE);
+		RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClMClientFrozenMaxRows, &g_Config.m_ClMClientFrozenMaxRows, &Button, Localize("Max frozen tee rows"), 1, 6, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE);
+		RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClMClientFrozenNearDistance, &g_Config.m_ClMClientFrozenNearDistance, &Button, Localize("Nearby range when not in a team"), 100, 5000, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE);
+	}
+
+	// chat translation
+	RightView.HSplitTop(MarginBetweenViews, nullptr, &RightView);
+	Ui()->DoLabel_AutoLineSize(Localize("Chat translation"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslate, Localize("Translate incoming chat"), &g_Config.m_ClChatTranslate, &RightView, LineSize);
+
+	static const char *s_apTranslateLangCodes[] = {
+		"en", "de", "es", "fr", "pt", "it", "nl", "pl", "ru", "uk", "tr", "ar",
+		"zh-CN", "ja", "ko", "vi", "id", "th", "sv", "cs", "el", "hu", "ro", "fi", "da", "no", "sl", "sk", "hr", "sr", "bg"};
+	static const char *s_apTranslateLangNames[] = {
+		"English", "German", "Spanish", "French", "Portuguese", "Italian", "Dutch", "Polish", "Russian", "Ukrainian", "Turkish", "Arabic",
+		"Chinese", "Japanese", "Korean", "Vietnamese", "Indonesian", "Thai", "Swedish", "Czech", "Greek", "Hungarian", "Romanian", "Finnish", "Danish", "Norwegian", "Slovenian", "Slovak", "Croatian", "Serbian", "Bulgarian"};
+	static const int s_NumTranslateLang = std::size(s_apTranslateLangCodes);
+	const auto FindTranslateLang = [&](const char *pCode) {
+		for(int i = 0; i < s_NumTranslateLang; ++i)
+			if(str_comp(pCode, s_apTranslateLangCodes[i]) == 0)
+				return i;
+		return 0;
+	};
+
+	CUIRect TranslateRow, TranslateLabel, TranslateDropDown;
+
+	// language incoming chat is translated to
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	RightView.HSplitTop(LineSize, &TranslateRow, &RightView);
+	TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
+	Ui()->DoLabel(&TranslateLabel, Localize("Translate incoming to"), ColorPickerLabelSize, TEXTALIGN_ML);
+	static CUi::SDropDownState s_InTargetDropDownState;
+	static CScrollRegion s_InTargetScrollRegion;
+	s_InTargetDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_InTargetScrollRegion;
+	const int OldInTarget = FindTranslateLang(g_Config.m_ClChatTranslateInTarget);
+	const int NewInTarget = Ui()->DoDropDown(&TranslateDropDown, OldInTarget, s_apTranslateLangNames, s_NumTranslateLang, s_InTargetDropDownState);
+	if(NewInTarget != OldInTarget)
+	{
+		str_copy(g_Config.m_ClChatTranslateInTarget, s_apTranslateLangCodes[NewInTarget]);
+		GameClient()->m_Chat.ClearTranslationCache();
+	}
+
+	// languages that are never translated
+	{
+		CUIRect IgnoreRow, IgnoreLabel, IgnoreEditBox;
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+		RightView.HSplitTop(LineSize, &IgnoreRow, &RightView);
+		IgnoreRow.VSplitMid(&IgnoreLabel, &IgnoreEditBox, MarginSmall);
+		Ui()->DoLabel(&IgnoreLabel, Localize("Ignored languages (e.g. \"en,de\")"), ColorPickerLabelSize, TEXTALIGN_ML);
+		static CLineInput s_IgnoreInput(g_Config.m_ClChatTranslateIgnore, sizeof(g_Config.m_ClChatTranslateIgnore));
+		if(Ui()->DoClearableEditBox(&s_IgnoreInput, &IgnoreEditBox, 14.0f))
+			GameClient()->m_Chat.ClearTranslationCache();
+	}
+
+	if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslateShowLang, Localize("Show detected language after translated messages"), &g_Config.m_ClChatTranslateShowLang, &RightView, LineSize))
+		GameClient()->m_Chat.RebuildChat();
+
+	// outgoing translate: your language
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	RightView.HSplitTop(LineSize, &TranslateRow, &RightView);
+	TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
+	Ui()->DoLabel(&TranslateLabel, Localize("Translate chat: your language"), ColorPickerLabelSize, TEXTALIGN_ML);
+	static CUi::SDropDownState s_SourceLangDropDownState;
+	static CScrollRegion s_SourceLangScrollRegion;
+	s_SourceLangDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_SourceLangScrollRegion;
+	const int OldSourceLang = FindTranslateLang(g_Config.m_ClChatTranslateOutSource);
+	const int NewSourceLang = Ui()->DoDropDown(&TranslateDropDown, OldSourceLang, s_apTranslateLangNames, s_NumTranslateLang, s_SourceLangDropDownState);
+	if(NewSourceLang != OldSourceLang)
+		str_copy(g_Config.m_ClChatTranslateOutSource, s_apTranslateLangCodes[NewSourceLang]);
+
+	// outgoing translate: send as
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	RightView.HSplitTop(LineSize, &TranslateRow, &RightView);
+	TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
+	Ui()->DoLabel(&TranslateLabel, Localize("Translate chat: send as"), ColorPickerLabelSize, TEXTALIGN_ML);
+	static CUi::SDropDownState s_TargetLangDropDownState;
+	static CScrollRegion s_TargetLangScrollRegion;
+	s_TargetLangDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_TargetLangScrollRegion;
+	const int OldTargetLang = FindTranslateLang(g_Config.m_ClChatTranslateOutTarget);
+	const int NewTargetLang = Ui()->DoDropDown(&TranslateDropDown, OldTargetLang, s_apTranslateLangNames, s_NumTranslateLang, s_TargetLangDropDownState);
+	if(NewTargetLang != OldTargetLang)
+		str_copy(g_Config.m_ClChatTranslateOutTarget, s_apTranslateLangCodes[NewTargetLang]);
+}
+
 void CMenus::RenderSettings(CUIRect MainView)
 {
 	// content panel only (not full-screen); translucent in-game so the match
@@ -1646,7 +1772,8 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("Graphics"),
 		Localize("Sound"),
 		Localize("DDNet"),
-		Localize("Assets")};
+		Localize("Assets"),
+		Localize("M-Client")};
 	static CButtonContainer s_aTabButtons[SETTINGS_LENGTH];
 
 	TabBar.HSplitTop(52.0f, nullptr, &TabBar);
@@ -1736,6 +1863,11 @@ void CMenus::RenderSettings(CUIRect MainView)
 	{
 		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_ASSETS);
 		RenderSettingsCustom(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_MCLIENT)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_ASSETS);
+		RenderSettingsMClient(MainView);
 	}
 	else
 	{
@@ -2104,17 +2236,6 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowhudScore, Localize("Show score"), &g_Config.m_ClShowhudScore, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowLocalTimeAlways, Localize("Show local time always"), &g_Config.m_ClShowLocalTimeAlways, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClSpecCursor, Localize("Show spectator cursor"), &g_Config.m_ClSpecCursor, &LeftView, LineSize);
-		// m-client
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientAds, Localize("Random advertisement pop-ups (please keep that on, i need the money)"), &g_Config.m_ClMClientAds, &LeftView, LineSize);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPet, Localize("Show petting hand"), &g_Config.m_ClMClientPet, &LeftView, LineSize);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPetTee, Localize("Show companion tee (pet)"), &g_Config.m_ClMClientPetTee, &LeftView, LineSize);
-		if(g_Config.m_ClMClientPetTee)
-		{
-			LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
-			Ui()->DoScrollbarOption(&g_Config.m_ClMClientPetTeeSize, &g_Config.m_ClMClientPetTeeSize, &Button, Localize("Companion tee size"), 10, 500, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
-			LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
-			Ui()->DoScrollbarOption(&g_Config.m_ClMClientPetTeeAlpha, &g_Config.m_ClMClientPetTeeAlpha, &Button, Localize("Companion tee opacity"), 10, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
-		}
 
 		// Settings of the HUD element for votes
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowVotesAfterVoting, Localize("Show votes window after voting"), &g_Config.m_ClShowVotesAfterVoting, &LeftView, LineSize);
@@ -2165,26 +2286,11 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		{
 			Ui()->DoScrollbarOption(&g_Config.m_ClFreezeBarsAlphaInsideFreeze, &g_Config.m_ClFreezeBarsAlphaInsideFreeze, &Button, Localize("Opacity of freeze bars inside freeze"), 0, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
 		}
-
-		// frozen teammates HUD
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHud, Localize("Show frozen teammates on HUD"), &g_Config.m_ClMClientFrozenHud, &RightView, LineSize);
-		if(g_Config.m_ClMClientFrozenHud)
-		{
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHudSkins, Localize("Use player skins for frozen tees"), &g_Config.m_ClMClientFrozenHudSkins, &RightView, LineSize);
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHudTeamOnly, Localize("Only show frozen tees while in a team"), &g_Config.m_ClMClientFrozenHudTeamOnly, &RightView, LineSize);
-			RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
-			Ui()->DoScrollbarOption(&g_Config.m_ClMClientFrozenHudTeeSize, &g_Config.m_ClMClientFrozenHudTeeSize, &Button, Localize("Frozen tee size"), 8, 20, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE);
-			RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
-			Ui()->DoScrollbarOption(&g_Config.m_ClMClientFrozenMaxRows, &g_Config.m_ClMClientFrozenMaxRows, &Button, Localize("Max frozen tee rows"), 1, 6, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE);
-			RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
-			Ui()->DoScrollbarOption(&g_Config.m_ClMClientFrozenNearDistance, &g_Config.m_ClMClientFrozenNearDistance, &Button, Localize("Nearby range when not in a team"), 100, 5000, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE);
-		}
 	}
 	else if(s_CurTab == APPEARANCE_TAB_CHAT)
 	{
 		CChat &Chat = GameClient()->m_Chat;
 		CUIRect TopView, PreviewView;
-		// m-client: slightly smaller preview so the added translation settings fit above
 		MainView.HSplitBottom(160.0f, &TopView, &PreviewView);
 		TopView.HSplitBottom(MarginBetweenViews, &TopView, nullptr);
 		TopView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
@@ -2211,56 +2317,6 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTeamColors, Localize("Show names in chat in team colors"), &g_Config.m_ClChatTeamColors, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowChatFriends, Localize("Show only chat messages from friends"), &g_Config.m_ClShowChatFriends, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClShowChatTeamMembersOnly, Localize("Show only chat messages from team members"), &g_Config.m_ClShowChatTeamMembersOnly, &LeftView, LineSize);
-
-		// chat translation
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslate, Localize("Translate incoming chat"), &g_Config.m_ClChatTranslate, &LeftView, LineSize);
-
-		static const char *s_apTranslateLangCodes[] = {
-			"en", "de", "es", "fr", "pt", "it", "nl", "pl", "ru", "uk", "tr", "ar",
-			"zh-CN", "ja", "ko", "vi", "id", "th", "sv", "cs", "el", "hu", "ro", "fi", "da", "no", "sl", "sk", "hr", "sr", "bg"};
-		static const char *s_apTranslateLangNames[] = {
-			"English", "German", "Spanish", "French", "Portuguese", "Italian", "Dutch", "Polish", "Russian", "Ukrainian", "Turkish", "Arabic",
-			"Chinese", "Japanese", "Korean", "Vietnamese", "Indonesian", "Thai", "Swedish", "Czech", "Greek", "Hungarian", "Romanian", "Finnish", "Danish", "Norwegian", "Slovenian", "Slovak", "Croatian", "Serbian", "Bulgarian"};
-		static const int s_NumTranslateLang = std::size(s_apTranslateLangCodes);
-		const auto FindTranslateLang = [&](const char *pCode) {
-			for(int i = 0; i < s_NumTranslateLang; ++i)
-				if(str_comp(pCode, s_apTranslateLangCodes[i]) == 0)
-					return i;
-			return 0;
-		};
-
-		CUIRect TranslateRow, TranslateLabel, TranslateDropDown;
-
-		// language incoming chat is translated to
-		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-		LeftView.HSplitTop(LineSize, &TranslateRow, &LeftView);
-		TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
-		Ui()->DoLabel(&TranslateLabel, Localize("Translate incoming to"), ColorPickerLabelSize, TEXTALIGN_ML);
-		static CUi::SDropDownState s_InTargetDropDownState;
-		static CScrollRegion s_InTargetScrollRegion;
-		s_InTargetDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_InTargetScrollRegion;
-		const int OldInTarget = FindTranslateLang(g_Config.m_ClChatTranslateInTarget);
-		const int NewInTarget = Ui()->DoDropDown(&TranslateDropDown, OldInTarget, s_apTranslateLangNames, s_NumTranslateLang, s_InTargetDropDownState);
-		if(NewInTarget != OldInTarget)
-		{
-			str_copy(g_Config.m_ClChatTranslateInTarget, s_apTranslateLangCodes[NewInTarget]);
-			GameClient()->m_Chat.ClearTranslationCache();
-		}
-
-		// languages that are never translated
-		{
-			CUIRect IgnoreRow, IgnoreLabel, IgnoreEditBox;
-			LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-			LeftView.HSplitTop(LineSize, &IgnoreRow, &LeftView);
-			IgnoreRow.VSplitMid(&IgnoreLabel, &IgnoreEditBox, MarginSmall);
-			Ui()->DoLabel(&IgnoreLabel, Localize("Ignored languages (e.g. \"en,de\")"), ColorPickerLabelSize, TEXTALIGN_ML);
-			static CLineInput s_IgnoreInput(g_Config.m_ClChatTranslateIgnore, sizeof(g_Config.m_ClChatTranslateIgnore));
-			if(Ui()->DoClearableEditBox(&s_IgnoreInput, &IgnoreEditBox, 14.0f))
-				GameClient()->m_Chat.ClearTranslationCache();
-		}
-
-		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslateShowLang, Localize("Show detected language after translated messages"), &g_Config.m_ClChatTranslateShowLang, &LeftView, LineSize))
-			GameClient()->m_Chat.RebuildChat();
 
 		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatOld, Localize("Use old chat style"), &g_Config.m_ClChatOld, &LeftView, LineSize))
 			GameClient()->m_Chat.RebuildChat();
@@ -2306,31 +2362,6 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		str_format(aBuf, sizeof(aBuf), "%s (echo)", Localize("Client message"));
 		static CButtonContainer s_ClientMessageColor;
 		DoLine_ColorPicker(&s_ClientMessageColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, aBuf, &g_Config.m_ClMessageClientColor, ColorRGBA(0.5f, 0.78f, 1.0f));
-
-		// language selectors for the outgoing translate chat
-		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-		RightView.HSplitTop(LineSize, &TranslateRow, &RightView);
-		TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
-		Ui()->DoLabel(&TranslateLabel, Localize("Translate chat: your language"), ColorPickerLabelSize, TEXTALIGN_ML);
-		static CUi::SDropDownState s_SourceLangDropDownState;
-		static CScrollRegion s_SourceLangScrollRegion;
-		s_SourceLangDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_SourceLangScrollRegion;
-		const int OldSourceLang = FindTranslateLang(g_Config.m_ClChatTranslateOutSource);
-		const int NewSourceLang = Ui()->DoDropDown(&TranslateDropDown, OldSourceLang, s_apTranslateLangNames, s_NumTranslateLang, s_SourceLangDropDownState);
-		if(NewSourceLang != OldSourceLang)
-			str_copy(g_Config.m_ClChatTranslateOutSource, s_apTranslateLangCodes[NewSourceLang]);
-
-		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-		RightView.HSplitTop(LineSize, &TranslateRow, &RightView);
-		TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
-		Ui()->DoLabel(&TranslateLabel, Localize("Translate chat: send as"), ColorPickerLabelSize, TEXTALIGN_ML);
-		static CUi::SDropDownState s_TargetLangDropDownState;
-		static CScrollRegion s_TargetLangScrollRegion;
-		s_TargetLangDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_TargetLangScrollRegion;
-		const int OldTargetLang = FindTranslateLang(g_Config.m_ClChatTranslateOutTarget);
-		const int NewTargetLang = Ui()->DoDropDown(&TranslateDropDown, OldTargetLang, s_apTranslateLangNames, s_NumTranslateLang, s_TargetLangDropDownState);
-		if(NewTargetLang != OldTargetLang)
-			str_copy(g_Config.m_ClChatTranslateOutTarget, s_apTranslateLangCodes[NewTargetLang]);
 
 		// ***** Chat Preview ***** //
 		Ui()->DoLabel_AutoLineSize(Localize("Preview"), HeadlineFontSize,
