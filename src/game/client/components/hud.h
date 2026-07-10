@@ -86,15 +86,6 @@ class CHud : public CComponent
 	void UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, float Value, float &PrevValue);
 	void RenderMovementInformationTextContainer(STextContainerIndex &TextContainer, const ColorRGBA &Color, float X, float Y);
 
-	class CMovementInformation
-	{
-	public:
-		vec2 m_Pos;
-		vec2 m_Speed;
-		float m_Angle = 0.0f;
-	};
-	class CMovementInformation GetMovementInformation(int ClientId, int Conn) const;
-
 	void RenderGameTimer();
 	void RenderPauseNotification();
 	void RenderSuddenDeath();
@@ -111,6 +102,15 @@ class CHud : public CComponent
 public:
 	CHud();
 	int Sizeof() const override { return sizeof(*this); }
+
+	class CMovementInformation
+	{
+	public:
+		vec2 m_Pos;
+		vec2 m_Speed;
+		float m_Angle = 0.0f;
+	};
+	class CMovementInformation GetMovementInformation(int ClientId, int Conn) const;
 
 	void ResetHudContainers();
 	void OnWindowResize() override;

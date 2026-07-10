@@ -628,6 +628,7 @@ protected:
 	void RenderSettingsMClient(CUIRect MainView);
 	void RenderSettingsProfiles(CUIRect MainView);
 	void RenderSettingsBindWheel(CUIRect MainView);
+	void RenderSettingsWidgetBar(CUIRect MainView);
 
 	// found in menus_settings_controls.cpp
 	// TODO: Change PopupConfirm to avoid using a function pointer to a CMenus
@@ -734,6 +735,7 @@ public:
 		SETTINGS_ASSETS,
 		SETTINGS_MCLIENT,
 		SETTINGS_BINDWHEEL,
+		SETTINGS_WIDGETBAR,
 		SETTINGS_PROFILES,
 
 		SETTINGS_LENGTH,

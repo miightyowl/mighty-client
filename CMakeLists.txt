@@ -2529,6 +2529,8 @@ if(CLIENT)
     components/ghost.h
     components/hud.cpp
     components/hud.h
+    components/widgetbar.cpp
+    components/widgetbar.h
     components/important_alert.cpp
     components/important_alert.h
     components/infomessages.cpp

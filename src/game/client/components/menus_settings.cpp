@@ -2178,6 +2178,65 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 	Ui()->DoLabel(&Row, Localize("Click a slice on the left to edit it."), 11.0f, TEXTALIGN_ML, TipProps);
 }
 
+// customizable bar
+void CMenus::RenderSettingsWidgetBar(CUIRect MainView)
+{
+	CUIRect Headline, Hint, Left, Right, Row, PreviewArea, PreviewCaption, PreviewBar;
+
+	MainView.HSplitTop(30.0f, &Headline, &MainView);
+	Ui()->DoLabel(&Headline, Localize("Widget Bar"), 20.0f, TEXTALIGN_ML);
+	MainView.HSplitTop(4.0f, nullptr, &MainView);
+	MainView.HSplitTop(18.0f, &Hint, &MainView);
+	{
+		SLabelProperties Props;
+		Props.SetColor(ColorRGBA(0.6f, 0.6f, 0.6f, 1.0f));
+		Ui()->DoLabel(&Hint, Localize("A customizable bar at the bottom of the screen. Choose which widgets to show and where they appear."), 11.0f, TEXTALIGN_ML, Props);
+	}
+	MainView.HSplitTop(12.0f, nullptr, &MainView);
+
+	MainView.HSplitBottom(46.0f, &MainView, &PreviewArea);
+	PreviewArea.HSplitTop(14.0f, &PreviewCaption, &PreviewArea);
+	{
+		SLabelProperties Props;
+		Props.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+		Ui()->DoLabel(&PreviewCaption, Localize("Preview"), 11.0f, TEXTALIGN_ML, Props);
+	}
+	PreviewArea.HSplitTop((float)g_Config.m_ClMClientInfoBarHeight, &PreviewBar, nullptr);
+	PreviewBar.Draw(ColorRGBA(0.32f, 0.34f, 0.40f, 1.0f), IGraphics::CORNER_ALL, 4.0f);
+	GameClient()->m_WidgetBar.RenderBar(PreviewBar);
+
+	MainView.VSplitMid(&Left, &Right, 20.0f);
+
+	// general
+	Left.HSplitTop(20.0f, &Row, &Left);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientInfoBar, Localize("Enable widget bar"), g_Config.m_ClMClientInfoBar, &Row))
+		g_Config.m_ClMClientInfoBar ^= 1;
+	Left.HSplitTop(10.0f, nullptr, &Left);
+	Left.HSplitTop(20.0f, &Row, &Left);
+	Ui()->DoScrollbarOption(&g_Config.m_ClMClientInfoBarHeight, &g_Config.m_ClMClientInfoBarHeight, &Row, Localize("Bar height"), 12, 28);
+	Left.HSplitTop(8.0f, nullptr, &Left);
+	Left.HSplitTop(20.0f, &Row, &Left);
+	Ui()->DoScrollbarOption(&g_Config.m_ClMClientInfoBarAlpha, &g_Config.m_ClMClientInfoBarAlpha, &Row, Localize("Background opacity"), 10, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
+
+	Left.HSplitTop(8.0f, nullptr, &Left);
+	static CButtonContainer s_BgColor, s_LabelColor, s_ValueColor;
+	DoLine_ColorPicker(&s_BgColor, 25.0f, 13.0f, 2.0f, &Left, Localize("Background color"), &g_Config.m_ClMClientInfoBarBgColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientInfoBarBgColor, false)), false, nullptr, false);
+	DoLine_ColorPicker(&s_LabelColor, 25.0f, 13.0f, 2.0f, &Left, Localize("Label color"), &g_Config.m_ClMClientInfoBarLabelColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientInfoBarLabelColor, false)), false, nullptr, false);
+	DoLine_ColorPicker(&s_ValueColor, 25.0f, 13.0f, 2.0f, &Left, Localize("Value color"), &g_Config.m_ClMClientInfoBarValueColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientInfoBarValueColor, false)), false, nullptr, false);
+
+	// widgets
+	const std::vector<const char *> vLabels = {Localize("Off"), Localize("Left"), Localize("Center"), Localize("Right")};
+	const std::vector<int> vValues = {0, 1, 2, 3};
+	static std::vector<CButtonContainer> s_vClock(4), s_vFps(4), s_vPing(4), s_vPred(4), s_vPos(4), s_vAngle(4), s_vSpeed(4);
+	DoLine_RadioMenu(Right, Localize("Clock"), s_vClock, vLabels, vValues, g_Config.m_ClMClientInfoBarClock);
+	DoLine_RadioMenu(Right, Localize("FPS"), s_vFps, vLabels, vValues, g_Config.m_ClMClientInfoBarFps);
+	DoLine_RadioMenu(Right, Localize("Ping"), s_vPing, vLabels, vValues, g_Config.m_ClMClientInfoBarPing);
+	DoLine_RadioMenu(Right, Localize("Prediction"), s_vPred, vLabels, vValues, g_Config.m_ClMClientInfoBarPred);
+	DoLine_RadioMenu(Right, Localize("Position"), s_vPos, vLabels, vValues, g_Config.m_ClMClientInfoBarPos);
+	DoLine_RadioMenu(Right, Localize("Angle"), s_vAngle, vLabels, vValues, g_Config.m_ClMClientInfoBarAngle);
+	DoLine_RadioMenu(Right, Localize("Speed"), s_vSpeed, vLabels, vValues, g_Config.m_ClMClientInfoBarSpeed);
+}
+
 void CMenus::RenderSettings(CUIRect MainView)
 {
 	// content panel only (not full-screen); translucent in-game so the match
@@ -2217,6 +2276,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("Assets"),
 		Localize("M-Client"),
 		Localize("Bind Wheel"),
+		Localize("Widget Bar"),
 		Localize("Profiles")};
 	static CButtonContainer s_aTabButtons[SETTINGS_LENGTH];
 
@@ -2322,6 +2382,11 @@ void CMenus::RenderSettings(CUIRect MainView)
 	{
 		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_ASSETS);
 		RenderSettingsBindWheel(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_WIDGETBAR)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_ASSETS);
+		RenderSettingsWidgetBar(MainView);
 	}
 	else
 	{
