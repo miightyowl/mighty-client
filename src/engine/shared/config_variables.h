@@ -180,6 +180,7 @@ MACRO_CONFIG_STR(ClSkinPrefix, cl_skin_prefix, 12, "", CFGFLAG_CLIENT | CFGFLAG_
 MACRO_CONFIG_INT(ClFatSkins, cl_fat_skins, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable fat skins")
 
 // m-client
+MACRO_CONFIG_COL(ClMClientColor, cl_mclient_color, 5078649, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: accent color used throughout the UI")
 MACRO_CONFIG_INT(ClMClientForceSkin, cl_mclient_force_skin, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: force every tee to render as the maodie skin")
 MACRO_CONFIG_INT(ClMClientWalkSound, cl_mclient_walk_sound, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: play a walking sound while a maodie tee is moving on the ground")
 MACRO_CONFIG_INT(ClMClientAds, cl_mclient_ads, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: randomly show advertisement pop-ups while playing")

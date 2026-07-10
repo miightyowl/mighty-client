@@ -59,6 +59,26 @@ ColorRGBA CMenus::ms_ColorTabbarHoverIngame;
 float CMenus::ms_ButtonHeight = 25.0f;
 float CMenus::ms_ListheaderHeight = 17.0f;
 
+ColorRGBA CMenus::AccentColor()
+{
+	return color_cast<ColorRGBA>(ColorHSLA((unsigned)g_Config.m_ClMClientColor, false));
+}
+
+ColorRGBA CMenus::AccentColorLight()
+{
+	ColorHSLA Hsl((unsigned)g_Config.m_ClMClientColor, false);
+	Hsl.l = std::clamp(Hsl.l + 0.08f, 0.0f, 1.0f);
+	return color_cast<ColorRGBA>(Hsl);
+}
+
+ColorRGBA CMenus::AccentColorDark()
+{
+	ColorHSLA Hsl((unsigned)g_Config.m_ClMClientColor, false);
+	Hsl.s = std::clamp(Hsl.s + 0.05f, 0.0f, 1.0f);
+	Hsl.l = std::clamp(Hsl.l - 0.30f, 0.0f, 1.0f);
+	return color_cast<ColorRGBA>(Hsl);
+}
+
 CMenus::CMenus()
 {
 	m_Popup = POPUP_NONE;
@@ -291,7 +311,8 @@ int CMenus::DoButton_CheckBox_Common(const void *pId, const char *pText, const c
 	if(Checkable)
 	{
 		const float Mul = Ui()->ButtonColorMul(pId);
-		Box.Draw(ColorRGBA(0.33f * Mul, 0.71f * Mul, 0.24f * Mul, 1.0f), IGraphics::CORNER_ALL, 3.0f);
+		const ColorRGBA Accent = AccentColor();
+		Box.Draw(ColorRGBA(Accent.r * Mul, Accent.g * Mul, Accent.b * Mul, 1.0f), IGraphics::CORNER_ALL, 3.0f);
 	}
 	else
 	{
@@ -707,7 +728,7 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 			Props.SetColor(Active ? ColorRGBA(0.96f, 0.96f, 0.96f, 1.0f) : (Hovered ? ColorRGBA(0.80f, 0.80f, 0.80f, 1.0f) : ColorRGBA(0.50f, 0.50f, 0.50f, 1.0f)));
 			Ui()->DoLabel(&TabLabel, pText, 12.0f, TEXTALIGN_MC, Props);
 			if(Active)
-				Underline.Draw(ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f), IGraphics::CORNER_T, 1.0f);
+				Underline.Draw(AccentColor().WithAlpha(1.0f), IGraphics::CORNER_T, 1.0f);
 			return Ui()->DoButtonLogic(pId, 0, &Tab, BUTTONFLAG_LEFT);
 		};
 
@@ -827,7 +848,7 @@ void CMenus::RenderLoading(const char *pCaption, const char *pContent, int Incre
 		CUIRect Fill = ProgressBar;
 		Fill.w *= std::clamp(CurLoadRenderCount / (float)m_LoadingState.m_Total, 0.0f, 1.0f);
 		if(Fill.w >= ProgressBar.h)
-			Fill.Draw(ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f), IGraphics::CORNER_ALL, ProgressBar.h / 2.0f);
+			Fill.Draw(AccentColor().WithAlpha(1.0f), IGraphics::CORNER_ALL, ProgressBar.h / 2.0f);
 	}
 
 	Graphics()->SetColor(1.0, 1.0, 1.0, 1.0);

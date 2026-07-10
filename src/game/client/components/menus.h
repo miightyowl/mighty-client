@@ -44,6 +44,10 @@ class CMenus : public CComponent
 	static ColorRGBA ms_ColorTabbarHover;
 
 public:
+	static ColorRGBA AccentColor();
+	static ColorRGBA AccentColorLight();
+	static ColorRGBA AccentColorDark();
+
 	int DoButton_Toggle(const void *pId, int Checked, const CUIRect *pRect, bool Active, unsigned Flags = BUTTONFLAG_LEFT);
 	int DoButton_Menu(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, unsigned Flags = BUTTONFLAG_LEFT, const char *pImageName = nullptr, int Corners = IGraphics::CORNER_ALL, float Rounding = 5.0f, float FontFactor = 0.0f, ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 0.1f));
 	int DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, int Corners, SUIAnimator *pAnimator = nullptr, const ColorRGBA *pDefaultColor = nullptr, const ColorRGBA *pActiveColor = nullptr, const ColorRGBA *pHoverColor = nullptr, float EdgeRounding = 10.0f, const CCommunityIcon *pCommunityIcon = nullptr);
@@ -526,6 +530,18 @@ protected:
 	void RenderServerControl(CUIRect MainView);
 	bool RenderServerControlKick(CUIRect MainView, bool FilterSpectators, bool UpdateScroll);
 	bool RenderServerControlServer(CUIRect MainView, bool UpdateScroll);
+	void RenderServerControlSaveMaps(CUIRect MainView);
+
+	// user's personal list of saved maps + notes, persisted to disk
+	struct CSavedMap
+	{
+		char m_aMap[128] = "";
+		char m_aNote[128] = "";
+	};
+	std::vector<CSavedMap> m_vSavedMaps;
+	bool m_SavedMapsLoaded = false;
+	void LoadSavedMaps();
+	void SaveSavedMaps() const;
 	void RenderUnfinishedVoteTeeSelection(CUIRect *pMainView);
 	void RenderIngameHint();
 

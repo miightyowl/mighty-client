@@ -1225,7 +1225,7 @@ void CMenus::RenderDemoBrowserList(CUIRect ListView, bool &WasListboxItemActivat
 			continue;
 
 		const bool ActiveSort = g_Config.m_BrDemoSort == Col.m_Sort;
-		const ColorRGBA CaptionColor = ActiveSort ? ColorRGBA(0.45f, 0.80f, 0.35f, 1.0f) : ColorRGBA(0.45f, 0.45f, 0.45f, 1.0f);
+		const ColorRGBA CaptionColor = ActiveSort ? AccentColorLight().WithAlpha(1.0f) : ColorRGBA(0.45f, 0.45f, 0.45f, 1.0f);
 
 		if(Col.m_FontIcon)
 		{
@@ -1276,8 +1276,8 @@ void CMenus::RenderDemoBrowserList(CUIRect ListView, bool &WasListboxItemActivat
 	}
 
 	s_ListBox.SetRowColors(
-		ColorRGBA(0.33f, 0.71f, 0.24f, 0.20f),
-		ColorRGBA(0.33f, 0.71f, 0.24f, 0.14f),
+		AccentColor().WithAlpha(0.20f),
+		AccentColor().WithAlpha(0.14f),
 		ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f));
 	s_ListBox.DoStart(ms_ListheaderHeight, m_vpFilteredDemos.size(), 1, 3, m_DemolistSelectedIndex, &ListBox, false, IGraphics::CORNER_ALL, true);
 
@@ -1507,7 +1507,7 @@ void CMenus::RenderDemoBrowserButtons(CUIRect ButtonsView, bool WasListboxItemAc
 	};
 
 	const ColorRGBA DarkButton(1.0f, 1.0f, 1.0f, 0.06f);
-	const ColorRGBA GreenButton(0.33f, 0.71f, 0.24f, 1.0f);
+	const ColorRGBA GreenButton = AccentColor();
 
 	CUIRect ButtonBarTop, ButtonBarBottom;
 	ButtonsView.HSplitTop(5.0f, nullptr, &ButtonsView);

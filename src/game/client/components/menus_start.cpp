@@ -105,8 +105,8 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		{
 			CUIRect Rim;
 			Rect.Margin(-1.5f, &Rim);
-			Rim.Draw(ColorRGBA(0.13f, 0.28f, 0.10f, 1.0f), IGraphics::CORNER_ALL, 8.5f);
-			Rect.Draw(Mix(ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f), ColorRGBA(0.40f, 0.79f, 0.30f, 1.0f), Hover), IGraphics::CORNER_ALL, 7.0f);
+			Rim.Draw(CMenus::AccentColorDark().WithAlpha(1.0f), IGraphics::CORNER_ALL, 8.5f);
+			Rect.Draw(Mix(CMenus::AccentColor().WithAlpha(1.0f), CMenus::AccentColorLight().WithAlpha(1.0f), Hover), IGraphics::CORNER_ALL, 7.0f);
 			IconCol = ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f);
 			TextCol = ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f);
 		}
@@ -163,7 +163,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	const float LogoSize = 22.0f;
 	const float MightyW = TextRender()->TextWidth(LogoSize, "mighty");
 	Label(MakeRect(Logo.x, Logo.y, MightyW + 4.0f, Logo.h), "mighty", LogoSize, TEXTALIGN_ML, ColorRGBA(0.96f, 0.96f, 0.96f, 1.0f));
-	Label(MakeRect(Logo.x + MightyW + 2.0f, Logo.y, Logo.w, Logo.h), "client", LogoSize, TEXTALIGN_ML, ColorRGBA(0.45f, 0.80f, 0.35f, 1.0f));
+	Label(MakeRect(Logo.x + MightyW + 2.0f, Logo.y, Logo.w, Logo.h), "client", LogoSize, TEXTALIGN_ML, CMenus::AccentColorLight().WithAlpha(1.0f));
 
 	char aVersion[32];
 	str_format(aVersion, sizeof(aVersion), "v%s", GAME_RELEASE_VERSION);
@@ -343,7 +343,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	CUIRect NewsLink;
 	NewsInner.HSplitBottom(14.0f, nullptr, &NewsLink);
 	const char *pChangelog = Localize("Changelog");
-	const ColorRGBA ChangelogCol = Mix(ColorRGBA(0.45f, 0.80f, 0.35f, 1.0f), ColorRGBA(0.55f, 0.90f, 0.42f, 1.0f), NewsHover);
+	const ColorRGBA ChangelogCol = Mix(CMenus::AccentColorLight().WithAlpha(1.0f), CMenus::AccentColorLight().WithAlpha(1.0f), NewsHover);
 	Label(NewsLink, pChangelog, 10.5f, TEXTALIGN_ML, ChangelogCol);
 	const float ChangelogW = TextRender()->TextWidth(10.5f, pChangelog);
 	IconLabel(MakeRect(NewsLink.x + ChangelogW + 6.0f + NewsHover * 2.0f, NewsLink.y, 10.0f, NewsLink.h), FontIcon::CHEVRON_RIGHT, 8.0f, TEXTALIGN_ML, ChangelogCol);
@@ -422,13 +422,13 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	if(State == IUpdater::CLEAN && NeedUpdate)
 	{
 		static CButtonContainer s_VersionUpdate;
-		if(GameClient()->m_Menus.DoButton_Menu(&s_VersionUpdate, Localize("Update now"), 0, &UpdateButton, BUTTONFLAG_LEFT, 0, IGraphics::CORNER_ALL, 6.0f, 0.0f, ColorRGBA(0.33f, 0.71f, 0.24f, 0.7f)))
+		if(GameClient()->m_Menus.DoButton_Menu(&s_VersionUpdate, Localize("Update now"), 0, &UpdateButton, BUTTONFLAG_LEFT, 0, IGraphics::CORNER_ALL, 6.0f, 0.0f, CMenus::AccentColor().WithAlpha(0.7f)))
 			Updater()->InitiateUpdate();
 	}
 	else if(State == IUpdater::NEED_RESTART)
 	{
 		static CButtonContainer s_VersionUpdate;
-		if(GameClient()->m_Menus.DoButton_Menu(&s_VersionUpdate, Localize("Restart"), 0, &UpdateButton, BUTTONFLAG_LEFT, 0, IGraphics::CORNER_ALL, 6.0f, 0.0f, ColorRGBA(0.33f, 0.71f, 0.24f, 0.7f)))
+		if(GameClient()->m_Menus.DoButton_Menu(&s_VersionUpdate, Localize("Restart"), 0, &UpdateButton, BUTTONFLAG_LEFT, 0, IGraphics::CORNER_ALL, 6.0f, 0.0f, CMenus::AccentColor().WithAlpha(0.7f)))
 			Client()->Restart();
 	}
 	else if(State >= IUpdater::GETTING_MANIFEST && State < IUpdater::NEED_RESTART)
@@ -460,7 +460,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		DownloadButton.HMargin(3.0f, &DownloadButton);
 
 		static CButtonContainer s_DownloadButton;
-		if(GameClient()->m_Menus.DoButton_Menu(&s_DownloadButton, Localize("Download"), 0, &DownloadButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f, 0.0f, ColorRGBA(0.33f, 0.71f, 0.24f, 0.7f)))
+		if(GameClient()->m_Menus.DoButton_Menu(&s_DownloadButton, Localize("Download"), 0, &DownloadButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f, 0.0f, CMenus::AccentColor().WithAlpha(0.7f)))
 			Client()->ViewLink("https://ddnet.org/downloads/");
 
 		char aBuf[64];

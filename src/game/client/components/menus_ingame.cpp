@@ -7,6 +7,7 @@
 
 #include <base/color.h>
 #include <base/dbg.h>
+#include <base/io.h>
 #include <base/math.h>
 #include <base/str.h>
 #include <base/time.h>
@@ -21,9 +22,12 @@
 #include <engine/keys.h>
 #include <engine/serverbrowser.h>
 #include <engine/shared/config.h>
+#include <engine/shared/jsonwriter.h>
 #include <engine/shared/localization.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>
+
+#include <engine/external/json-parser/json.h>
 
 #include <generated/client_data.h>
 #include <generated/protocol.h>
@@ -532,8 +536,8 @@ void CMenus::RenderPlayers(CUIRect MainView)
 
 	static CListBox s_ListBox;
 	s_ListBox.SetRowColors(
-		ColorRGBA(0.33f, 0.71f, 0.24f, 0.20f),
-		ColorRGBA(0.33f, 0.71f, 0.24f, 0.14f),
+		AccentColor().WithAlpha(0.20f),
+		AccentColor().WithAlpha(0.14f),
 		ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f));
 	s_ListBox.DoStart(24.0f, TotalPlayers, 1, 3, -1, &PlayerList);
 
@@ -915,7 +919,7 @@ void CMenus::RenderUnfinishedVoteTeeSelection(CUIRect *pMainView)
 
 		const bool Selected = UnfinishedVote.IsPlayerSelected(pRealName);
 		if(Selected)
-			Cell.Draw(ColorRGBA(0.33f, 0.71f, 0.24f, 0.25f), IGraphics::CORNER_ALL, 4.0f);
+			Cell.Draw(AccentColor().WithAlpha(0.25f), IGraphics::CORNER_ALL, 4.0f);
 		else if(Ui()->HotItem() == &s_aTeeButtonIds[ClientId])
 			Cell.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.1f), IGraphics::CORNER_ALL, 4.0f);
 
@@ -1118,6 +1122,218 @@ bool CMenus::RenderServerControlKick(CUIRect MainView, bool FilterSpectators, bo
 	return s_ListBox.WasItemActivated();
 }
 
+static const char *const SAVEDMAPS_FILE = "mightyclient_savedmaps.json";
+
+void CMenus::LoadSavedMaps()
+{
+	m_SavedMapsLoaded = true;
+	m_vSavedMaps.clear();
+
+	void *pFileData;
+	unsigned FileSize;
+	if(!Storage()->ReadFile(SAVEDMAPS_FILE, IStorage::TYPE_SAVE, &pFileData, &FileSize))
+		return;
+
+	json_settings JsonSettings{};
+	char aError[256];
+	json_value *pData = json_parse_ex(&JsonSettings, static_cast<const json_char *>(pFileData), FileSize, aError);
+	free(pFileData);
+	if(pData == nullptr)
+		return;
+
+	if(pData->type == json_array)
+	{
+		for(unsigned i = 0; i < pData->u.array.length; ++i)
+		{
+			const json_value &Entry = (*pData)[i];
+			if(Entry.type != json_object)
+				continue;
+			CSavedMap Saved;
+			const json_value &Map = Entry["map"];
+			const json_value &Note = Entry["note"];
+			if(Map.type == json_string)
+				str_copy(Saved.m_aMap, Map);
+			if(Note.type == json_string)
+				str_copy(Saved.m_aNote, Note);
+			if(Saved.m_aMap[0] != '\0')
+				m_vSavedMaps.push_back(Saved);
+		}
+	}
+	json_value_free(pData);
+}
+
+void CMenus::SaveSavedMaps() const
+{
+	IOHANDLE File = Storage()->OpenFile(SAVEDMAPS_FILE, IOFLAG_WRITE, IStorage::TYPE_SAVE);
+	if(!File)
+		return;
+	CJsonFileWriter Writer(File);
+	Writer.BeginArray();
+	for(const CSavedMap &Saved : m_vSavedMaps)
+	{
+		Writer.BeginObject();
+		Writer.WriteAttribute("map");
+		Writer.WriteStrValue(Saved.m_aMap);
+		Writer.WriteAttribute("note");
+		Writer.WriteStrValue(Saved.m_aNote);
+		Writer.EndObject();
+	}
+	Writer.EndArray();
+}
+
+void CMenus::RenderServerControlSaveMaps(CUIRect MainView)
+{
+	if(!m_SavedMapsLoaded)
+		LoadSavedMaps();
+
+	const char *pCurrentMap = GameClient()->Map() != nullptr ? GameClient()->Map()->BaseName() : "";
+	static CLineInputBuffered<sizeof(CSavedMap::m_aNote)> s_NoteInput;
+
+	CUIRect TopBar, AddButton, NoteInput, MapLabel;
+	MainView.HSplitTop(28.0f, &TopBar, &MainView);
+	MainView.HSplitTop(6.0f, nullptr, &MainView);
+
+	TopBar.VSplitRight(150.0f, &TopBar, &AddButton);
+	TopBar.VSplitRight(8.0f, &TopBar, nullptr);
+	TopBar.VSplitLeft(TopBar.w * 0.45f, &MapLabel, &NoteInput);
+	NoteInput.VSplitLeft(8.0f, nullptr, &NoteInput);
+
+	char aMapLabel[160];
+	str_format(aMapLabel, sizeof(aMapLabel), "%s %s", Localize("Current map:"), pCurrentMap[0] != '\0' ? pCurrentMap : "—");
+	Ui()->DoLabel(&MapLabel, aMapLabel, 14.0f, TEXTALIGN_ML);
+
+	static const ColorRGBA s_FieldColor(1.0f, 1.0f, 1.0f, 0.06f);
+	s_NoteInput.SetEmptyText(Localize("Note (optional)"));
+	Ui()->DoEditBox(&s_NoteInput, &NoteInput, 12.0f, IGraphics::CORNER_ALL, {}, &s_FieldColor);
+
+	static CButtonContainer s_AddButton;
+	if(DoButton_Menu(&s_AddButton, Localize("Add current map"), 0, &AddButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, AccentColor().WithAlpha(1.0f)) && pCurrentMap[0] != '\0')
+	{
+		CSavedMap Saved;
+		str_copy(Saved.m_aMap, pCurrentMap);
+		str_copy(Saved.m_aNote, s_NoteInput.GetString());
+		m_vSavedMaps.push_back(Saved);
+		s_NoteInput.Clear();
+		SaveSavedMaps();
+	}
+
+	CUIRect Divider;
+	MainView.HSplitTop(1.0f, &Divider, &MainView);
+	Divider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_NONE, 0.0f);
+	MainView.HSplitTop(6.0f, nullptr, &MainView);
+
+	CUIRect BottomBar, SearchBox, CallVoteButton;
+	MainView.HSplitBottom(28.0f, &MainView, &BottomBar);
+	MainView.HSplitBottom(6.0f, &MainView, nullptr);
+	BottomBar.VSplitLeft(250.0f, &SearchBox, nullptr);
+	BottomBar.VSplitRight(120.0f, nullptr, &CallVoteButton);
+
+	static CLineInputBuffered<64> s_SearchInput;
+	Ui()->DoEditBox_Search(&s_SearchInput, &SearchBox, 12.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive(), &s_FieldColor);
+
+	std::vector<size_t> vFiltered;
+	for(size_t i = 0; i < m_vSavedMaps.size(); ++i)
+	{
+		if(s_SearchInput.IsEmpty() ||
+			str_find_nocase(m_vSavedMaps[i].m_aMap, s_SearchInput.GetString()) != nullptr ||
+			str_find_nocase(m_vSavedMaps[i].m_aNote, s_SearchInput.GetString()) != nullptr)
+			vFiltered.push_back(i);
+	}
+
+	const auto &&DoMapVote = [this, pCurrentMap](size_t RealIndex) {
+		if(str_comp_nocase(m_vSavedMaps[RealIndex].m_aMap, pCurrentMap) == 0)
+			return;
+		char aCmd[192];
+		str_format(aCmd, sizeof(aCmd), "/map %s", m_vSavedMaps[RealIndex].m_aMap);
+		GameClient()->m_Chat.SendChat(0, aCmd);
+		SetActive(false);
+	};
+
+	static int s_Selected = -1;
+	if(s_Selected >= (int)vFiltered.size())
+		s_Selected = -1;
+
+	if(vFiltered.empty())
+	{
+		SLabelProperties Props;
+		Props.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+		CUIRect Hint;
+		MainView.HSplitTop(24.0f, &Hint, nullptr);
+		Ui()->DoLabel(&Hint, m_vSavedMaps.empty() ? Localize("No saved maps yet.") : Localize("No saved maps match your search."), 12.0f, TEXTALIGN_ML, Props);
+	}
+	else
+	{
+		static CListBox s_ListBox;
+		s_ListBox.SetRowColors(
+			AccentColor().WithAlpha(0.14f),
+			AccentColor().WithAlpha(0.10f),
+			ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f));
+		s_ListBox.DoStart(24.0f, vFiltered.size(), 1, 3, s_Selected, &MainView, false);
+
+		int DeleteIndex = -1;
+		for(size_t k = 0; k < vFiltered.size(); ++k)
+		{
+			const size_t RealIndex = vFiltered[k];
+			const CListboxItem Item = s_ListBox.DoNextItem(&m_vSavedMaps[RealIndex], (int)k == s_Selected);
+			if(!Item.m_Visible)
+				continue;
+
+			CUIRect Row = Item.m_Rect, MapCol, NoteCol, DeleteButton;
+			Row.VSplitLeft(6.0f, nullptr, &Row);
+			Row.VSplitRight(26.0f, &Row, &DeleteButton);
+			Row.VSplitLeft(Row.w * 0.4f, &MapCol, &NoteCol);
+			NoteCol.VSplitLeft(8.0f, nullptr, &NoteCol);
+
+			SLabelProperties MapProps;
+			MapProps.m_MaxWidth = MapCol.w;
+			MapProps.m_EllipsisAtEnd = true;
+
+			if(str_comp_nocase(m_vSavedMaps[RealIndex].m_aMap, pCurrentMap) == 0)
+				MapProps.SetColor(AccentColorLight().WithAlpha(1.0f));
+			Ui()->DoLabel(&MapCol, m_vSavedMaps[RealIndex].m_aMap, 12.0f, TEXTALIGN_ML, MapProps);
+
+			if(m_vSavedMaps[RealIndex].m_aNote[0] != '\0')
+			{
+				SLabelProperties NoteProps;
+				NoteProps.m_MaxWidth = NoteCol.w;
+				NoteProps.m_EllipsisAtEnd = true;
+				NoteProps.SetColor(ColorRGBA(0.60f, 0.60f, 0.60f, 1.0f));
+				Ui()->DoLabel(&NoteCol, m_vSavedMaps[RealIndex].m_aNote, 12.0f, TEXTALIGN_ML, NoteProps);
+			}
+
+			// delete button
+			void *pDeleteId = &m_vSavedMaps[RealIndex].m_aNote;
+			const bool Hovered = Ui()->HotItem() == pDeleteId;
+			SLabelProperties TrashProps;
+			TrashProps.SetColor(Hovered ? ColorRGBA(0.95f, 0.45f, 0.45f, 1.0f) : ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+			Ui()->DoLabel(&DeleteButton, FontIcon::TRASH, 11.0f, TEXTALIGN_MC, TrashProps);
+			TextRender()->SetRenderFlags(0);
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+			if(Ui()->DoButtonLogic(pDeleteId, 0, &DeleteButton, BUTTONFLAG_LEFT))
+				DeleteIndex = (int)RealIndex;
+		}
+		s_Selected = s_ListBox.DoEnd();
+
+		// double click
+		if(s_ListBox.WasItemActivated() && s_Selected >= 0 && s_Selected < (int)vFiltered.size())
+			DoMapVote(vFiltered[s_Selected]);
+
+		if(DeleteIndex >= 0)
+		{
+			m_vSavedMaps.erase(m_vSavedMaps.begin() + DeleteIndex);
+			SaveSavedMaps();
+			s_Selected = -1;
+		}
+	}
+
+	// call vote button
+	static CButtonContainer s_CallVoteButton;
+	if(DoButton_Menu(&s_CallVoteButton, Localize("Call vote"), 0, &CallVoteButton) && s_Selected >= 0 && s_Selected < (int)vFiltered.size())
+		DoMapVote(vFiltered[s_Selected]);
+}
+
 void CMenus::RenderServerControl(CUIRect MainView)
 {
 	enum class EServerControlTab
@@ -1125,6 +1341,7 @@ void CMenus::RenderServerControl(CUIRect MainView)
 		SETTINGS,
 		KICKVOTE,
 		SPECVOTE,
+		SAVEMAPS,
 	};
 	static EServerControlTab s_ControlPage = EServerControlTab::SETTINGS;
 
@@ -1136,23 +1353,35 @@ void CMenus::RenderServerControl(CUIRect MainView)
 	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.8f), IGraphics::CORNER_B, 10.0f);
 	MainView.Margin(10.0f, &MainView);
 
-	if(Client()->RconAuthed())
+	if(Client()->RconAuthed() && s_ControlPage != EServerControlTab::SAVEMAPS)
 		MainView.HSplitBottom(90.0f, &MainView, &RconExtension);
 
 	// tab bar
-	TabBar.VSplitLeft(TabBar.w / 3, &Button, &TabBar);
+	const float TabWidth = TabBar.w / 4.0f;
+	TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
 	static CButtonContainer s_Button0;
 	if(DoButton_MenuTab(&s_Button0, Localize("Change settings"), s_ControlPage == EServerControlTab::SETTINGS, &Button, IGraphics::CORNER_NONE))
 		s_ControlPage = EServerControlTab::SETTINGS;
 
-	TabBar.VSplitMid(&Button, &TabBar);
+	TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
 	static CButtonContainer s_Button1;
 	if(DoButton_MenuTab(&s_Button1, Localize("Kick player"), s_ControlPage == EServerControlTab::KICKVOTE, &Button, IGraphics::CORNER_NONE))
 		s_ControlPage = EServerControlTab::KICKVOTE;
 
+	TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
 	static CButtonContainer s_Button2;
-	if(DoButton_MenuTab(&s_Button2, Localize("Move player to spectators"), s_ControlPage == EServerControlTab::SPECVOTE, &TabBar, IGraphics::CORNER_NONE))
+	if(DoButton_MenuTab(&s_Button2, Localize("Move player to spectators"), s_ControlPage == EServerControlTab::SPECVOTE, &Button, IGraphics::CORNER_NONE))
 		s_ControlPage = EServerControlTab::SPECVOTE;
+
+	static CButtonContainer s_Button3;
+	if(DoButton_MenuTab(&s_Button3, Localize("Save maps"), s_ControlPage == EServerControlTab::SAVEMAPS, &TabBar, IGraphics::CORNER_NONE))
+		s_ControlPage = EServerControlTab::SAVEMAPS;
+
+	if(s_ControlPage == EServerControlTab::SAVEMAPS)
+	{
+		RenderServerControlSaveMaps(MainView);
+		return;
+	}
 
 	// render page
 	MainView.HSplitBottom(ms_ButtonHeight + 5 * 2, &MainView, &Bottom);

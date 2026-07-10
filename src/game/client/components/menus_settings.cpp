@@ -1238,6 +1238,10 @@ void CMenus::RenderSettingsGraphics(CUIRect MainView)
 	static CButtonContainer s_UiColorResetId;
 	DoLine_ColorPicker(&s_UiColorResetId, 25.0f, 13.0f, 2.0f, &MainView, Localize("UI Color"), &g_Config.m_UiColor, color_cast<ColorRGBA>(ColorHSLA(0xE4A046AFU, true)), false, nullptr, true);
 
+	MainView.HSplitTop(2.0f, nullptr, &MainView);
+	static CButtonContainer s_MClientColorResetId;
+	DoLine_ColorPicker(&s_MClientColorResetId, 25.0f, 13.0f, 2.0f, &MainView, Localize("Menu accent color"), &g_Config.m_ClMClientColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientColor, false)), false, nullptr, false);
+
 	// Backend list
 	struct SMenuBackendInfo
 	{
@@ -1653,14 +1657,29 @@ void CMenus::RenderSettings(CUIRect MainView)
 		const bool Active = g_Config.m_UiSettingsPage == i;
 		const bool Hovered = Ui()->HotItem() == &s_aTabButtons[i];
 		if(Active)
-			Button.Draw(ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f), IGraphics::CORNER_ALL, 6.0f);
+			Button.Draw(AccentColor().WithAlpha(1.0f), IGraphics::CORNER_ALL, 6.0f);
 		else if(Hovered)
 			Button.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f), IGraphics::CORNER_ALL, 6.0f);
 		CUIRect TabLabel;
 		Button.VMargin(12.0f, &TabLabel);
-		SLabelProperties Props;
-		Props.SetColor(Active ? ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f) : (Hovered ? ColorRGBA(0.92f, 0.92f, 0.92f, 1.0f) : ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f)));
-		Ui()->DoLabel(&TabLabel, apTabs[i], 12.0f, TEXTALIGN_ML, Props);
+		if(Active)
+		{
+			static CUIElement s_ActiveLabel;
+			if(!s_ActiveLabel.AreRectsInit())
+				s_ActiveLabel.Init(Ui(), 1);
+			CUIRect Local = TabLabel;
+			TextRender()->TextColor(ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f));
+			TextRender()->TextOutlineColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f));
+			Ui()->DoLabelStreamed(*s_ActiveLabel.Rect(0), &Local, apTabs[i], 12.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+			TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+		}
+		else
+		{
+			SLabelProperties Props;
+			Props.SetColor(Hovered ? ColorRGBA(0.92f, 0.92f, 0.92f, 1.0f) : ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+			Ui()->DoLabel(&TabLabel, apTabs[i], 12.0f, TEXTALIGN_ML, Props);
+		}
 		if(Ui()->DoButtonLogic(&s_aTabButtons[i], 0, &Button, BUTTONFLAG_LEFT))
 			g_Config.m_UiSettingsPage = i;
 	}
@@ -1740,7 +1759,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 		}
 
 		static CButtonContainer s_RestartButton;
-		if(DoButton_Menu(&s_RestartButton, Localize("Restart"), 0, &RestartButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.33f, 0.71f, 0.24f, 0.7f)))
+		if(DoButton_Menu(&s_RestartButton, Localize("Restart"), 0, &RestartButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, AccentColor().WithAlpha(0.7f)))
 		{
 			if(Client()->State() == IClient::STATE_ONLINE || GameClient()->Editor()->HasUnsavedData())
 			{
@@ -2047,7 +2066,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 		Props.SetColor(Active ? ColorRGBA(0.96f, 0.96f, 0.96f, 1.0f) : (Hovered ? ColorRGBA(0.80f, 0.80f, 0.80f, 1.0f) : ColorRGBA(0.50f, 0.50f, 0.50f, 1.0f)));
 		Ui()->DoLabel(&TabLabel, apTabNames[Tab], 12.0f, TEXTALIGN_MC, Props);
 		if(Active)
-			Underline.Draw(ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f), IGraphics::CORNER_T, 1.0f);
+			Underline.Draw(AccentColor().WithAlpha(1.0f), IGraphics::CORNER_T, 1.0f);
 		if(Ui()->DoButtonLogic(&s_aPageTabs[Tab], 0, &Button, BUTTONFLAG_LEFT))
 			s_CurTab = Tab;
 	}

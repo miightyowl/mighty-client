@@ -30,7 +30,7 @@ static ColorRGBA PlayerBackgroundColor(bool Friend, bool Clan, bool Afk, bool In
 {
 	ColorRGBA Base;
 	if(Friend)
-		Base = Afk ? ColorRGBA(0.50f, 0.62f, 0.28f, 1.0f) : ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f);
+		Base = Afk ? ColorRGBA(0.50f, 0.62f, 0.28f, 1.0f) : CMenus::AccentColor().WithAlpha(1.0f);
 	else if(Clan)
 		Base = Afk ? ColorRGBA(0.35f, 0.58f, 0.85f, 1.0f) : ColorRGBA(0.38f, 0.52f, 1.0f, 1.0f);
 	else
@@ -180,7 +180,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			Checked = 2;
 
 		const bool ActiveSort = Col.m_Sort != -1 && Checked;
-		const ColorRGBA CaptionColor = ActiveSort ? ColorRGBA(0.45f, 0.80f, 0.35f, 1.0f) : ColorRGBA(0.45f, 0.45f, 0.45f, 1.0f);
+		const ColorRGBA CaptionColor = ActiveSort ? AccentColorLight().WithAlpha(1.0f) : ColorRGBA(0.45f, 0.45f, 0.45f, 1.0f);
 
 		if(Col.m_Id == COL_FRIENDS || Col.m_Id == COL_FLAG_FAV)
 		{
@@ -283,8 +283,8 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 
 	s_ListBox.SetActive(!Ui()->IsPopupOpen());
 	s_ListBox.SetRowColors(
-		ColorRGBA(0.33f, 0.71f, 0.24f, 0.20f),
-		ColorRGBA(0.33f, 0.71f, 0.24f, 0.14f),
+		AccentColor().WithAlpha(0.20f),
+		AccentColor().WithAlpha(0.14f),
 		ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f));
 	s_ListBox.DoStart(ms_ListheaderHeight, NumServers, 1, 3, -1, &View, false);
 
@@ -635,7 +635,7 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 	// connect button
 	{
 		static CButtonContainer s_ConnectButton;
-		if(IconButton(&s_ConnectButton, ConnectButton, FontIcon::RIGHT_TO_BRACKET, ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f), ColorRGBA(0.40f, 0.79f, 0.30f, 1.0f), ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f)) ||
+		if(IconButton(&s_ConnectButton, ConnectButton, FontIcon::RIGHT_TO_BRACKET, AccentColor().WithAlpha(1.0f), AccentColorLight().WithAlpha(1.0f), ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f)) ||
 			WasListboxItemActivated || (!Ui()->IsPopupOpen() && Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER)))
 		{
 			Connect(g_Config.m_UiServerAddress);
