@@ -1066,7 +1066,6 @@ set(EXPECTED_DATA
   assets/entities/comfort/ddnet.png
   assets/entities/license.txt
   assets/game/game_06.png
-  audio/catwalking.wv
   audio/firework_explode.wv
   audio/firework_launch.wv
   audio/foley_body_impact-01.wv
@@ -2490,6 +2489,8 @@ if(CLIENT)
     components/background.h
     components/binds.cpp
     components/binds.h
+    components/bindwheel.cpp
+    components/bindwheel.h
     components/broadcast.cpp
     components/broadcast.h
     components/camera.cpp

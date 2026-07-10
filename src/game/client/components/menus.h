@@ -543,6 +543,25 @@ protected:
 	bool m_SavedMapsLoaded = false;
 	void LoadSavedMaps();
 	void SaveSavedMaps() const;
+
+	// user's saved player profiles
+	struct CProfile
+	{
+		char m_aName[MAX_NAME_LENGTH] = "";
+		char m_aClan[MAX_CLAN_LENGTH] = "";
+		int m_Country = -1;
+		char m_aSkin[MAX_SKIN_LENGTH] = "";
+		int m_UseCustomColor = 0;
+		int m_ColorBody = 0;
+		int m_ColorFeet = 0;
+	};
+	std::vector<CProfile> m_vProfiles;
+	bool m_ProfilesLoaded = false;
+	void LoadProfiles();
+	// writes the combined mclient.json (profiles + bind wheel); loads profiles first if needed
+	void SaveMClient();
+	void ApplyProfile(const CProfile &Profile);
+	static void ConLoadProfile(IConsole::IResult *pResult, void *pUserData);
 	void RenderUnfinishedVoteTeeSelection(CUIRect *pMainView);
 	void RenderIngameHint();
 
@@ -608,6 +627,8 @@ protected:
 	void RenderSettings(CUIRect MainView);
 	void RenderSettingsCustom(CUIRect MainView);
 	void RenderSettingsMClient(CUIRect MainView);
+	void RenderSettingsProfiles(CUIRect MainView);
+	void RenderSettingsBindWheel(CUIRect MainView);
 
 	// found in menus_settings_controls.cpp
 	// TODO: Change PopupConfirm to avoid using a function pointer to a CMenus
@@ -668,6 +689,7 @@ public:
 
 	void OnInterfacesInit(CGameClient *pClient) override;
 	void OnInit() override;
+	void OnConsoleInit() override;
 
 	void OnStateChange(int NewState, int OldState) override;
 	void OnWindowResize() override;
@@ -712,6 +734,8 @@ public:
 		SETTINGS_DDNET,
 		SETTINGS_ASSETS,
 		SETTINGS_MCLIENT,
+		SETTINGS_BINDWHEEL,
+		SETTINGS_PROFILES,
 
 		SETTINGS_LENGTH,
 	};

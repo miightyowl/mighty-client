@@ -6,13 +6,16 @@
 
 #include <base/dbg.h>
 #include <base/fs.h>
+#include <base/io.h>
 #include <base/log.h>
 #include <base/math.h>
 #include <base/str.h>
 
+#include <engine/external/json-parser/json.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
+#include <engine/shared/jsonwriter.h>
 #include <engine/shared/localization.h>
 #include <engine/shared/protocol7.h>
 #include <engine/storage.h>
@@ -1735,6 +1738,431 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		str_copy(g_Config.m_ClChatTranslateOutTarget, s_apTranslateLangCodes[NewTargetLang]);
 }
 
+static const char *const MCLIENT_FILE = "mclient.json";
+
+void CMenus::LoadProfiles()
+{
+	m_ProfilesLoaded = true;
+	m_vProfiles.clear();
+
+	void *pFileData;
+	unsigned FileSize;
+	if(!Storage()->ReadFile(MCLIENT_FILE, IStorage::TYPE_SAVE, &pFileData, &FileSize))
+		return;
+
+	json_settings JsonSettings{};
+	char aError[256];
+	json_value *pData = json_parse_ex(&JsonSettings, static_cast<const json_char *>(pFileData), FileSize, aError);
+	free(pFileData);
+	if(pData == nullptr)
+		return;
+
+	const json_value &Profiles = (*pData)["profiles"];
+	if(Profiles.type == json_array)
+	{
+		for(unsigned i = 0; i < Profiles.u.array.length; ++i)
+		{
+			const json_value &Entry = Profiles[i];
+			if(Entry.type != json_object)
+				continue;
+			CProfile Profile;
+			const json_value &Name = Entry["name"];
+			const json_value &Clan = Entry["clan"];
+			const json_value &Country = Entry["country"];
+			const json_value &Skin = Entry["skin"];
+			const json_value &UseCustomColor = Entry["use_custom_color"];
+			const json_value &ColorBody = Entry["color_body"];
+			const json_value &ColorFeet = Entry["color_feet"];
+			if(Name.type == json_string)
+				str_copy(Profile.m_aName, Name);
+			if(Clan.type == json_string)
+				str_copy(Profile.m_aClan, Clan);
+			if(Country.type == json_integer)
+				Profile.m_Country = (int)Country.u.integer;
+			if(Skin.type == json_string)
+				str_copy(Profile.m_aSkin, Skin);
+			if(UseCustomColor.type == json_integer)
+				Profile.m_UseCustomColor = (int)UseCustomColor.u.integer;
+			if(ColorBody.type == json_integer)
+				Profile.m_ColorBody = (int)ColorBody.u.integer;
+			if(ColorFeet.type == json_integer)
+				Profile.m_ColorFeet = (int)ColorFeet.u.integer;
+			m_vProfiles.push_back(Profile);
+		}
+	}
+	json_value_free(pData);
+}
+
+void CMenus::SaveMClient()
+{
+	if(!m_ProfilesLoaded)
+		LoadProfiles();
+
+	IOHANDLE File = Storage()->OpenFile(MCLIENT_FILE, IOFLAG_WRITE, IStorage::TYPE_SAVE);
+	if(!File)
+		return;
+	CJsonFileWriter Writer(File);
+	Writer.BeginObject();
+
+	Writer.WriteAttribute("profiles");
+	Writer.BeginArray();
+	for(const CProfile &Profile : m_vProfiles)
+	{
+		Writer.BeginObject();
+		Writer.WriteAttribute("name");
+		Writer.WriteStrValue(Profile.m_aName);
+		Writer.WriteAttribute("clan");
+		Writer.WriteStrValue(Profile.m_aClan);
+		Writer.WriteAttribute("country");
+		Writer.WriteIntValue(Profile.m_Country);
+		Writer.WriteAttribute("skin");
+		Writer.WriteStrValue(Profile.m_aSkin);
+		Writer.WriteAttribute("use_custom_color");
+		Writer.WriteIntValue(Profile.m_UseCustomColor);
+		Writer.WriteAttribute("color_body");
+		Writer.WriteIntValue(Profile.m_ColorBody);
+		Writer.WriteAttribute("color_feet");
+		Writer.WriteIntValue(Profile.m_ColorFeet);
+		Writer.EndObject();
+	}
+	Writer.EndArray();
+
+	Writer.WriteAttribute("bindwheel");
+	Writer.BeginArray();
+	for(const CBindWheel::CBind &Bind : GameClient()->m_BindWheel.m_vBinds)
+	{
+		Writer.BeginObject();
+		Writer.WriteAttribute("name");
+		Writer.WriteStrValue(Bind.m_aName);
+		Writer.WriteAttribute("command");
+		Writer.WriteStrValue(Bind.m_aCommand);
+		Writer.EndObject();
+	}
+	Writer.EndArray();
+
+	Writer.EndObject();
+}
+
+void CMenus::OnConsoleInit()
+{
+	Console()->Register("load_profile", "i[index]", CFGFLAG_CLIENT, ConLoadProfile, this, "M-Client: load a saved player profile by its number in the Profiles list");
+}
+
+void CMenus::ApplyProfile(const CProfile &Profile)
+{
+	str_copy(g_Config.m_PlayerName, Profile.m_aName);
+	str_copy(g_Config.m_PlayerClan, Profile.m_aClan);
+	if(Profile.m_Country >= 0)
+		g_Config.m_PlayerCountry = Profile.m_Country;
+	str_copy(g_Config.m_ClPlayerSkin, Profile.m_aSkin);
+	g_Config.m_ClPlayerUseCustomColor = Profile.m_UseCustomColor;
+	g_Config.m_ClPlayerColorBody = Profile.m_ColorBody;
+	g_Config.m_ClPlayerColorFeet = Profile.m_ColorFeet;
+
+	if(Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK)
+		GameClient()->SendInfo(false);
+	else
+		m_NeedSendinfo = true;
+}
+
+void CMenus::ConLoadProfile(IConsole::IResult *pResult, void *pUserData)
+{
+	CMenus *pSelf = static_cast<CMenus *>(pUserData);
+	if(!pSelf->m_ProfilesLoaded)
+		pSelf->LoadProfiles();
+	const int Index = pResult->GetInteger(0) - 1;
+	if(Index < 0 || Index >= (int)pSelf->m_vProfiles.size())
+	{
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "mclient", "no saved profile with that number");
+		return;
+	}
+	pSelf->ApplyProfile(pSelf->m_vProfiles[Index]);
+}
+
+// save/load player identities
+void CMenus::RenderSettingsProfiles(CUIRect MainView)
+{
+	if(!m_ProfilesLoaded)
+		LoadProfiles();
+
+	CUIRect Headline, TopBar, Divider, Label;
+
+	// renders a tee
+	const auto &&RenderProfileTee = [this](const CUIRect &Rect, const char *pSkin, int UseCustomColor, int ColorBody, int ColorFeet) {
+		if(pSkin[0] == '\0')
+			return;
+		const CTeeRenderInfo Info = GetTeeRenderInfo(vec2(Rect.w, Rect.h), pSkin, UseCustomColor, ColorBody, ColorFeet);
+		const CAnimState *pIdle = CAnimState::GetIdle();
+		vec2 OffsetToMid;
+		CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdle, &Info, OffsetToMid);
+		const vec2 Pos = vec2(Rect.x + Rect.w / 2.0f, Rect.y + Rect.h * 0.55f + OffsetToMid.y);
+		RenderTools()->RenderTee(pIdle, &Info, EMOTE_NORMAL, vec2(1.0f, 0.0f), Pos);
+	};
+
+	const auto &&MenuButton = [this](CUIRect Rect, const char *pText, float Size, bool Hovered) {
+		Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Hovered ? 0.18f : 0.10f), IGraphics::CORNER_ALL, 5.0f);
+		Ui()->DoLabel(&Rect, pText, Size, TEXTALIGN_MC);
+	};
+
+	// headline
+	MainView.HSplitTop(30.0f, &Headline, &MainView);
+	Ui()->DoLabel(&Headline, Localize("Profiles"), 20.0f, TEXTALIGN_ML);
+	MainView.HSplitTop(5.0f, nullptr, &MainView);
+
+	// current player + "save current profile" button
+	MainView.HSplitTop(34.0f, &TopBar, &MainView);
+	MainView.HSplitTop(6.0f, nullptr, &MainView);
+	CUIRect CurTee, CurInfo, CurLabel, SaveButton, CurFlag;
+	TopBar.VSplitRight(170.0f, &TopBar, &SaveButton);
+	TopBar.VSplitRight(10.0f, &TopBar, nullptr);
+	TopBar.VSplitLeft(TopBar.h, &CurTee, &CurInfo);
+	CurInfo.VSplitLeft(8.0f, nullptr, &CurInfo);
+
+	RenderProfileTee(CurTee, g_Config.m_ClPlayerSkin, g_Config.m_ClPlayerUseCustomColor, g_Config.m_ClPlayerColorBody, g_Config.m_ClPlayerColorFeet);
+	{
+		char aCurrent[64];
+		if(g_Config.m_PlayerClan[0] != '\0')
+			str_format(aCurrent, sizeof(aCurrent), "%s [%s]", g_Config.m_PlayerName, g_Config.m_PlayerClan);
+		else
+			str_copy(aCurrent, g_Config.m_PlayerName);
+		const float TextW = std::min(TextRender()->TextWidth(14.0f, aCurrent), CurInfo.w - 30.0f);
+		CurInfo.VSplitLeft(TextW + 6.0f, &CurLabel, &CurInfo);
+		Ui()->DoLabel(&CurLabel, aCurrent, 14.0f, TEXTALIGN_ML, {.m_MaxWidth = CurLabel.w});
+	}
+	CurInfo.VSplitLeft(24.0f, &CurFlag, &CurInfo);
+	CurFlag.HMargin((CurFlag.h - 14.0f) / 2.0f, &CurFlag);
+	if(g_Config.m_PlayerCountry >= 0)
+		GameClient()->m_CountryFlags.Render(g_Config.m_PlayerCountry, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), CurFlag.x, CurFlag.y, CurFlag.w, CurFlag.h);
+
+	SaveButton.HMargin((SaveButton.h - 24.0f) / 2.0f, &SaveButton);
+	static CButtonContainer s_SaveButton;
+	MenuButton(SaveButton, Localize("Save current profile"), 14.0f, Ui()->HotItem() == &s_SaveButton);
+	if(Ui()->DoButtonLogic(&s_SaveButton, 0, &SaveButton, BUTTONFLAG_LEFT))
+	{
+		CProfile Profile;
+		str_copy(Profile.m_aName, g_Config.m_PlayerName);
+		str_copy(Profile.m_aClan, g_Config.m_PlayerClan);
+		Profile.m_Country = g_Config.m_PlayerCountry;
+		str_copy(Profile.m_aSkin, g_Config.m_ClPlayerSkin);
+		Profile.m_UseCustomColor = g_Config.m_ClPlayerUseCustomColor;
+		Profile.m_ColorBody = g_Config.m_ClPlayerColorBody;
+		Profile.m_ColorFeet = g_Config.m_ClPlayerColorFeet;
+		m_vProfiles.push_back(Profile);
+		SaveMClient();
+	}
+
+	MainView.HSplitTop(1.0f, &Divider, &MainView);
+	Divider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_NONE, 0.0f);
+	MainView.HSplitTop(6.0f, nullptr, &MainView);
+
+	if(m_vProfiles.empty())
+	{
+		SLabelProperties Props;
+		Props.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+		CUIRect Hint;
+		MainView.HSplitTop(24.0f, &Hint, nullptr);
+		Ui()->DoLabel(&Hint, Localize("No profiles saved yet. Click \"Save current profile\" to add one."), 12.0f, TEXTALIGN_ML, Props);
+		return;
+	}
+
+	static int s_Selected = -1;
+	if(s_Selected >= (int)m_vProfiles.size())
+		s_Selected = -1;
+
+	static CListBox s_ListBox;
+	s_ListBox.SetRowColors(
+		AccentColor().WithAlpha(0.14f),
+		AccentColor().WithAlpha(0.10f),
+		ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f));
+	s_ListBox.DoStart(30.0f, m_vProfiles.size(), 1, 3, s_Selected, &MainView, false);
+
+	int LoadIndex = -1;
+	int DeleteIndex = -1;
+	for(size_t i = 0; i < m_vProfiles.size(); ++i)
+	{
+		const CProfile &Profile = m_vProfiles[i];
+		const CListboxItem Item = s_ListBox.DoNextItem(&m_vProfiles[i], (int)i == s_Selected);
+		if(!Item.m_Visible)
+			continue;
+
+		CUIRect Row = Item.m_Rect, TeeRect, FlagRect, LoadButton, DeleteButton, NameCol, ClanCol, CmdBox;
+		Row.VSplitLeft(6.0f, nullptr, &Row);
+		Row.VSplitLeft(Row.h, &TeeRect, &Row);
+		Row.VSplitLeft(6.0f, nullptr, &Row);
+		Row.VSplitRight(26.0f, &Row, &DeleteButton);
+		Row.VSplitRight(4.0f, &Row, nullptr);
+		Row.VSplitRight(56.0f, &Row, &LoadButton);
+		Row.VSplitRight(10.0f, &Row, nullptr);
+
+		const float NameW = std::min(TextRender()->TextWidth(12.0f, Profile.m_aName[0] != '\0' ? Profile.m_aName : "(unnamed)"), Row.w * 0.5f);
+		Row.VSplitLeft(NameW + 12.0f, &NameCol, &Row);
+		const float ClanW = Profile.m_aClan[0] != '\0' ? std::min(TextRender()->TextWidth(12.0f, Profile.m_aClan), Row.w - 40.0f) : -8.0f;
+		Row.VSplitLeft(ClanW + 8.0f, &ClanCol, &Row);
+		Row.VSplitLeft(24.0f, &FlagRect, &Row);
+		char aLoadCmd[64];
+		str_format(aLoadCmd, sizeof(aLoadCmd), "load_profile %d", (int)i + 1);
+		Row.VSplitLeft(10.0f, nullptr, &Row);
+		Row.VSplitLeft(TextRender()->TextWidth(10.0f, aLoadCmd) + 18.0f, &CmdBox, &Row);
+
+		// tee preview
+		RenderProfileTee(TeeRect, Profile.m_aSkin, Profile.m_UseCustomColor, Profile.m_ColorBody, Profile.m_ColorFeet);
+
+		// name + clan
+		SLabelProperties NameProps;
+		NameProps.m_MaxWidth = NameCol.w;
+		NameProps.m_EllipsisAtEnd = true;
+		Ui()->DoLabel(&NameCol, Profile.m_aName[0] != '\0' ? Profile.m_aName : "(unnamed)", 12.0f, TEXTALIGN_ML, NameProps);
+		if(Profile.m_aClan[0] != '\0')
+		{
+			SLabelProperties ClanProps;
+			ClanProps.m_MaxWidth = ClanCol.w;
+			ClanProps.m_EllipsisAtEnd = true;
+			ClanProps.SetColor(ColorRGBA(0.60f, 0.60f, 0.60f, 1.0f));
+			Ui()->DoLabel(&ClanCol, Profile.m_aClan, 12.0f, TEXTALIGN_ML, ClanProps);
+		}
+
+		// flag
+		FlagRect.HMargin((FlagRect.h - 14.0f) / 2.0f, &FlagRect);
+		if(Profile.m_Country >= 0)
+			GameClient()->m_CountryFlags.Render(Profile.m_Country, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), FlagRect.x, FlagRect.y, FlagRect.w, FlagRect.h);
+
+		// copyable console command
+		CmdBox.HMargin((CmdBox.h - 18.0f) / 2.0f, &CmdBox);
+		const bool CmdHovered = Ui()->HotItem() == &Profile.m_ColorBody;
+		CmdBox.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, CmdHovered ? 0.12f : 0.06f), IGraphics::CORNER_ALL, 3.0f);
+		SLabelProperties CmdProps;
+		CmdProps.SetColor(CmdHovered ? ColorRGBA(0.90f, 0.90f, 0.90f, 1.0f) : ColorRGBA(0.60f, 0.60f, 0.60f, 1.0f));
+		Ui()->DoLabel(&CmdBox, aLoadCmd, 10.0f, TEXTALIGN_MC, CmdProps);
+		if(Ui()->DoButtonLogic(&Profile.m_ColorBody, 0, &CmdBox, BUTTONFLAG_LEFT))
+			Input()->SetClipboardText(aLoadCmd);
+		GameClient()->m_Tooltips.DoToolTip(&Profile.m_ColorBody, &CmdBox, Localize("Click to copy this console command (F1)"));
+
+		// load button
+		LoadButton.HMargin((LoadButton.h - 18.0f) / 2.0f, &LoadButton);
+		MenuButton(LoadButton, Localize("Load"), 11.0f, Ui()->HotItem() == &Profile.m_aSkin);
+		if(Ui()->DoButtonLogic(&Profile.m_aSkin, 0, &LoadButton, BUTTONFLAG_LEFT))
+			LoadIndex = (int)i;
+
+		// delete button
+		const bool DeleteHovered = Ui()->HotItem() == &Profile.m_aClan;
+		SLabelProperties TrashProps;
+		TrashProps.SetColor(DeleteHovered ? ColorRGBA(0.95f, 0.45f, 0.45f, 1.0f) : ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+		Ui()->DoLabel(&DeleteButton, FontIcon::TRASH, 12.0f, TEXTALIGN_MC, TrashProps);
+		TextRender()->SetRenderFlags(0);
+		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		if(Ui()->DoButtonLogic(&Profile.m_aClan, 0, &DeleteButton, BUTTONFLAG_LEFT))
+			DeleteIndex = (int)i;
+	}
+	s_Selected = s_ListBox.DoEnd();
+
+	if(LoadIndex >= 0)
+		ApplyProfile(m_vProfiles[LoadIndex]);
+
+	if(DeleteIndex >= 0)
+	{
+		m_vProfiles.erase(m_vProfiles.begin() + DeleteIndex);
+		SaveMClient();
+		s_Selected = -1;
+	}
+}
+
+// configure the bind wheel
+void CMenus::RenderSettingsBindWheel(CUIRect MainView)
+{
+	CBindWheel &BindWheel = GameClient()->m_BindWheel;
+	if((int)BindWheel.m_vBinds.size() != CBindWheel::MAX_BINDS)
+		BindWheel.m_vBinds.resize(CBindWheel::MAX_BINDS);
+
+	const int SliceCount = CBindWheel::NumSlots();
+	static int s_Selected = 0;
+	s_Selected = std::clamp(s_Selected, 0, SliceCount - 1);
+
+	CUIRect Headline, Hint, SlotRow, Left, Right, Row, Label, Field;
+
+	MainView.HSplitTop(30.0f, &Headline, &MainView);
+	Ui()->DoLabel(&Headline, Localize("Bind Wheel"), 20.0f, TEXTALIGN_ML);
+	MainView.HSplitTop(4.0f, nullptr, &MainView);
+	MainView.HSplitTop(18.0f, &Hint, &MainView);
+	{
+		SLabelProperties Props;
+		Props.SetColor(ColorRGBA(0.6f, 0.6f, 0.6f, 1.0f));
+		Ui()->DoLabel(&Hint, Localize("Bind a key to \"Bind wheel\" under Controls, then hold it in-game and release over a slice."), 11.0f, TEXTALIGN_ML, Props);
+	}
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+
+	// number of slices
+	MainView.HSplitTop(20.0f, &SlotRow, &MainView);
+	SlotRow.VSplitLeft(280.0f, &SlotRow, nullptr);
+	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelSlots, &g_Config.m_ClMClientBindWheelSlots, &SlotRow, Localize("Number of slices"), CBindWheel::MIN_BINDS, CBindWheel::MAX_BINDS);
+	MainView.HSplitTop(12.0f, nullptr, &MainView);
+
+	MainView.VSplitMid(&Left, &Right, 20.0f);
+
+	// wheel preview
+	const float Radius = std::min(Left.w, Left.h) / 2.0f - 55.0f;
+	const vec2 Center = vec2(Left.x + Left.w / 2.0f, Left.y + Left.h / 2.0f);
+
+	Graphics()->TextureClear();
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.04f);
+	Graphics()->DrawCircle(Center.x, Center.y, Radius + 28.0f, 64);
+	Graphics()->QuadsEnd();
+
+	for(int i = 0; i < SliceCount; i++)
+	{
+		float Angle = 2 * pi * i / (float)SliceCount;
+		if(Angle > pi)
+			Angle -= 2 * pi;
+		const vec2 Pos = Center + direction(Angle) * Radius;
+		CUIRect Slot = {Pos.x - 46.0f, Pos.y - 12.0f, 92.0f, 24.0f};
+		const bool Sel = s_Selected == i;
+		Slot.Draw(Sel ? AccentColor().WithAlpha(1.0f) : ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &BindWheel.m_vBinds[i].m_aName ? 0.16f : 0.08f), IGraphics::CORNER_ALL, 5.0f);
+
+		const CBindWheel::CBind &Bind = BindWheel.m_vBinds[i];
+		const char *pName = Bind.m_aName[0] != '\0' ? Bind.m_aName : (Bind.m_aCommand[0] != '\0' ? Bind.m_aCommand : "-");
+		SLabelProperties Props;
+		Props.m_MaxWidth = Slot.w - 8.0f;
+		Props.m_EllipsisAtEnd = true;
+		Ui()->DoLabel(&Slot, pName, 10.0f, TEXTALIGN_MC, Props);
+		if(Ui()->DoButtonLogic(&BindWheel.m_vBinds[i].m_aName, 0, &Slot, BUTTONFLAG_LEFT))
+			s_Selected = i;
+	}
+
+	// editor for the selected slice
+	char aTitle[64];
+	str_format(aTitle, sizeof(aTitle), "%s %d", Localize("Slice"), s_Selected + 1);
+	Right.HSplitTop(24.0f, &Label, &Right);
+	Ui()->DoLabel(&Label, aTitle, 16.0f, TEXTALIGN_ML);
+	Right.HSplitTop(12.0f, nullptr, &Right);
+
+	Right.HSplitTop(16.0f, &Label, &Right);
+	Ui()->DoLabel(&Label, Localize("Label"), 12.0f, TEXTALIGN_ML);
+	Right.HSplitTop(24.0f, &Field, &Right);
+	static CLineInput s_NameInput;
+	s_NameInput.SetBuffer(BindWheel.m_vBinds[s_Selected].m_aName, sizeof(BindWheel.m_vBinds[s_Selected].m_aName));
+	s_NameInput.SetEmptyText(Localize("e.g. Kill"));
+	if(Ui()->DoClearableEditBox(&s_NameInput, &Field, 12.0f))
+		SaveMClient();
+
+	Right.HSplitTop(12.0f, nullptr, &Right);
+	Right.HSplitTop(16.0f, &Label, &Right);
+	Ui()->DoLabel(&Label, Localize("Console command (as typed in the F1 console)"), 12.0f, TEXTALIGN_ML);
+	Right.HSplitTop(24.0f, &Field, &Right);
+	static CLineInput s_CommandInput;
+	s_CommandInput.SetBuffer(BindWheel.m_vBinds[s_Selected].m_aCommand, sizeof(BindWheel.m_vBinds[s_Selected].m_aCommand));
+	s_CommandInput.SetEmptyText(Localize("e.g. kill"));
+	if(Ui()->DoClearableEditBox(&s_CommandInput, &Field, 12.0f))
+		SaveMClient();
+
+	Right.HSplitTop(16.0f, nullptr, &Right);
+	Right.HSplitTop(16.0f, &Row, &Right);
+	SLabelProperties TipProps;
+	TipProps.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+	Ui()->DoLabel(&Row, Localize("Click a slice on the left to edit it."), 11.0f, TEXTALIGN_ML, TipProps);
+}
+
 void CMenus::RenderSettings(CUIRect MainView)
 {
 	// content panel only (not full-screen); translucent in-game so the match
@@ -1772,7 +2200,9 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("Sound"),
 		Localize("DDNet"),
 		Localize("Assets"),
-		Localize("M-Client")};
+		Localize("M-Client"),
+		Localize("Bind Wheel"),
+		Localize("Profiles")};
 	static CButtonContainer s_aTabButtons[SETTINGS_LENGTH];
 
 	TabBar.HSplitTop(52.0f, nullptr, &TabBar);
@@ -1867,6 +2297,16 @@ void CMenus::RenderSettings(CUIRect MainView)
 	{
 		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_ASSETS);
 		RenderSettingsMClient(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_PROFILES)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_PLAYER);
+		RenderSettingsProfiles(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_BINDWHEEL)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_ASSETS);
+		RenderSettingsBindWheel(MainView);
 	}
 	else
 	{

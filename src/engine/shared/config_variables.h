@@ -197,6 +197,7 @@ MACRO_CONFIG_INT(ClMClientPetTee, cl_mclient_pet_tee, 0, 0, 1, CFGFLAG_CLIENT | 
 MACRO_CONFIG_STR(ClMClientPetTeeSkin, cl_mclient_pet_tee_skin, 24, "twinbop", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_INSENSITIVE, "M-Client: skin used for the companion tee")
 MACRO_CONFIG_INT(ClMClientPetTeeSize, cl_mclient_pet_tee_size, 60, 10, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: size of the companion tee as a percentage of a normal player")
 MACRO_CONFIG_INT(ClMClientPetTeeAlpha, cl_mclient_pet_tee_alpha, 90, 10, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: opacity of the companion tee")
+MACRO_CONFIG_INT(ClMClientBindWheelSlots, cl_mclient_bindwheel_slots, 8, 8, 16, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: number of slices on the bind wheel (8-16)")
 
 MACRO_CONFIG_COL(ClPlayer7ColorBody, player7_color_body, 0x1B6F74, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player body color")
 MACRO_CONFIG_COL(ClPlayer7ColorFeet, player7_color_feet, 0x1C873E, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player feet color")

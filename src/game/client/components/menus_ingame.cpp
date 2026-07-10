@@ -1207,7 +1207,7 @@ void CMenus::RenderServerControlSaveMaps(CUIRect MainView)
 	Ui()->DoEditBox(&s_NoteInput, &NoteInput, 12.0f, IGraphics::CORNER_ALL, {}, &s_FieldColor);
 
 	static CButtonContainer s_AddButton;
-	if(DoButton_Menu(&s_AddButton, Localize("Add current map"), 0, &AddButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, AccentColor().WithAlpha(1.0f)) && pCurrentMap[0] != '\0')
+	if(DoButton_Menu(&s_AddButton, Localize("Add current map"), 0, &AddButton) && pCurrentMap[0] != '\0')
 	{
 		CSavedMap Saved;
 		str_copy(Saved.m_aMap, pCurrentMap);

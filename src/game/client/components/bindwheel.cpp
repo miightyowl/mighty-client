@@ -1,0 +1,190 @@
+#include "bindwheel.h"
+#include <base/math.h>
+#include <algorithm>
+#include <engine/external/json-parser/json.h>
+#include <engine/graphics.h>
+#include <engine/shared/config.h>
+#include <engine/storage.h>
+#include <engine/textrender.h>
+#include <game/client/gameclient.h>
+#include <game/client/render.h>
+
+static const char *const MCLIENT_FILE = "mclient.json";
+
+int CBindWheel::NumSlots()
+{
+	return std::clamp(g_Config.m_ClMClientBindWheelSlots, MIN_BINDS, MAX_BINDS);
+}
+
+void CBindWheel::ConKeyBindWheel(IConsole::IResult *pResult, void *pUserData)
+{
+	CBindWheel *pSelf = static_cast<CBindWheel *>(pUserData);
+	if(pSelf->GameClient()->m_Scoreboard.IsActive())
+		return;
+	pSelf->m_Active = pResult->GetInteger(0) != 0;
+}
+
+void CBindWheel::OnConsoleInit()
+{
+	m_vBinds.assign(MAX_BINDS, CBind());
+	LoadBinds();
+	Console()->Register("+bindwheel", "", CFGFLAG_CLIENT, ConKeyBindWheel, this, "M-Client: hold to open the bind wheel");
+}
+
+void CBindWheel::OnReset()
+{
+	m_WasActive = false;
+	m_Active = false;
+	m_SelectedBind = -1;
+	m_SelectorMouse = vec2(0.0f, 0.0f);
+	if((int)m_vBinds.size() != MAX_BINDS)
+		m_vBinds.resize(MAX_BINDS);
+}
+
+void CBindWheel::OnRelease()
+{
+	m_Active = false;
+}
+
+bool CBindWheel::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
+{
+	if(!m_Active)
+		return false;
+
+	Ui()->ConvertMouseMove(&x, &y, CursorType);
+	m_SelectorMouse += vec2(x, y);
+	return true;
+}
+
+bool CBindWheel::OnInput(const IInput::CEvent &Event)
+{
+	if(IsActive() && Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE)
+	{
+		OnRelease();
+		m_SelectedBind = -1;
+		m_WasActive = false;
+		return true;
+	}
+	return false;
+}
+
+void CBindWheel::OnRender()
+{
+	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+		return;
+
+	if(!m_Active)
+	{
+		if(m_WasActive && m_SelectedBind >= 0 && m_SelectedBind < (int)m_vBinds.size())
+		{
+			const char *pCommand = m_vBinds[m_SelectedBind].m_aCommand;
+			if(pCommand[0] != '\0')
+				Console()->ExecuteLine(pCommand, -1);
+		}
+		m_WasActive = false;
+		m_SelectedBind = -1;
+		return;
+	}
+
+	m_WasActive = true;
+
+	const CUIRect Screen = *Ui()->Screen();
+	const vec2 Center = Screen.Center();
+
+	const int SliceCount = NumSlots();
+
+	const float WheelRadius = 170.0f;
+	if(length(m_SelectorMouse) > WheelRadius)
+		m_SelectorMouse = normalize(m_SelectorMouse) * WheelRadius;
+
+	float SelectedAngle = angle(m_SelectorMouse) + pi / (float)SliceCount;
+	if(SelectedAngle < 0)
+		SelectedAngle += 2 * pi;
+
+	m_SelectedBind = -1;
+	if(length(m_SelectorMouse) > 60.0f)
+		m_SelectedBind = (int)(SelectedAngle / (2 * pi) * (float)SliceCount);
+
+	Ui()->MapScreen();
+
+	Graphics()->TextureClear();
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.35f);
+	Graphics()->DrawCircle(Center.x, Center.y, 190.0f, 64);
+	Graphics()->QuadsEnd();
+
+	for(int i = 0; i < SliceCount; i++)
+	{
+		float Angle = 2 * pi * i / (float)SliceCount;
+		if(Angle > pi)
+			Angle -= 2 * pi;
+		const vec2 Pos = Center + direction(Angle) * 130.0f;
+		const bool Selected = m_SelectedBind == i;
+
+		if(Selected)
+		{
+			Graphics()->TextureClear();
+			Graphics()->QuadsBegin();
+			const ColorRGBA Accent = CMenus::AccentColor();
+			Graphics()->SetColor(Accent.r, Accent.g, Accent.b, 0.85f);
+			Graphics()->DrawCircle(Pos.x, Pos.y, 34.0f, 32);
+			Graphics()->QuadsEnd();
+		}
+
+		const CBind &Bind = m_vBinds[i];
+		const char *pName = Bind.m_aName[0] != '\0' ? Bind.m_aName : (Bind.m_aCommand[0] != '\0' ? Bind.m_aCommand : "-");
+		CUIRect Label = {Pos.x - 65.0f, Pos.y - 10.0f, 130.0f, 20.0f};
+		SLabelProperties Props;
+		Props.m_MaxWidth = Label.w;
+		Props.m_EllipsisAtEnd = true;
+		Props.SetColor(Selected ? ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f) : ColorRGBA(0.9f, 0.9f, 0.9f, 1.0f));
+		if(Selected)
+			TextRender()->TextOutlineColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f));
+		Ui()->DoLabel(&Label, pName, Selected ? 14.0f : 12.0f, TEXTALIGN_MC, Props);
+		if(Selected)
+			TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+	}
+
+	Graphics()->TextureClear();
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.35f);
+	Graphics()->DrawCircle(Center.x, Center.y, 40.0f, 32);
+	Graphics()->QuadsEnd();
+
+	RenderTools()->RenderCursor(Center + m_SelectorMouse, 24.0f);
+}
+
+void CBindWheel::LoadBinds()
+{
+	m_vBinds.assign(MAX_BINDS, CBind());
+
+	void *pFileData;
+	unsigned FileSize;
+	if(!Storage()->ReadFile(MCLIENT_FILE, IStorage::TYPE_SAVE, &pFileData, &FileSize))
+		return;
+
+	json_settings JsonSettings{};
+	char aError[256];
+	json_value *pData = json_parse_ex(&JsonSettings, static_cast<const json_char *>(pFileData), FileSize, aError);
+	free(pFileData);
+	if(pData == nullptr)
+		return;
+
+	const json_value &BindWheel = (*pData)["bindwheel"];
+	if(BindWheel.type == json_array)
+	{
+		for(unsigned i = 0; i < BindWheel.u.array.length && i < (unsigned)MAX_BINDS; ++i)
+		{
+			const json_value &Entry = BindWheel[i];
+			if(Entry.type != json_object)
+				continue;
+			const json_value &Name = Entry["name"];
+			const json_value &Command = Entry["command"];
+			if(Name.type == json_string)
+				str_copy(m_vBinds[i].m_aName, Name);
+			if(Command.type == json_string)
+				str_copy(m_vBinds[i].m_aCommand, Command);
+		}
+	}
+	json_value_free(pData);
+}

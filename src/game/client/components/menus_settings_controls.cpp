@@ -108,6 +108,7 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Show entities"), "toggle cl_overlay_entities 0 100"},
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Show HUD"), "toggle cl_showhud 0 1"},
 		{EBindOptionGroup::MCLIENT, Localizable("Translate chat"), "+show_chat; chat translate"},
+		{EBindOptionGroup::MCLIENT, Localizable("Bind wheel"), "+bindwheel"},
 	};
 	m_NumPredefinedBindOptions = m_vBindOptions.size();
 

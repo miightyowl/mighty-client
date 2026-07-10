@@ -29,6 +29,7 @@
 
 // components
 #include "components/ads.h"
+#include "components/bindwheel.h"
 #include "components/background.h"
 #include "components/binds.h"
 #include "components/broadcast.h"
@@ -184,6 +185,7 @@ public:
 	CPetting m_Petting;
 	CPetTee m_PetTee;
 	CAds m_Ads;
+	CBindWheel m_BindWheel;
 	CNamePlates m_NamePlates;
 	CFreezeBars m_FreezeBars;
 	CItems m_Items;
