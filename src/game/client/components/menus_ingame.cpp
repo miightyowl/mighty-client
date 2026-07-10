@@ -1223,13 +1223,16 @@ void CMenus::RenderServerControlSaveMaps(CUIRect MainView)
 	MainView.HSplitTop(6.0f, nullptr, &MainView);
 
 	CUIRect BottomBar, SearchBox, CallVoteButton;
-	MainView.HSplitBottom(28.0f, &MainView, &BottomBar);
-	MainView.HSplitBottom(6.0f, &MainView, nullptr);
-	BottomBar.VSplitLeft(250.0f, &SearchBox, nullptr);
+	MainView.HSplitBottom(ms_ButtonHeight + 5 * 2, &MainView, &BottomBar);
+	BottomBar.HMargin(5.0f, &BottomBar);
+	BottomBar.HSplitTop(5.0f, nullptr, &BottomBar);
+	BottomBar.VSplitLeft(5.0f, nullptr, &BottomBar);
+	BottomBar.VSplitLeft(250.0f, &SearchBox, &BottomBar);
+	BottomBar.VSplitRight(10.0f, &BottomBar, nullptr);
 	BottomBar.VSplitRight(120.0f, nullptr, &CallVoteButton);
 
 	static CLineInputBuffered<64> s_SearchInput;
-	Ui()->DoEditBox_Search(&s_SearchInput, &SearchBox, 12.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive(), &s_FieldColor);
+	Ui()->DoEditBox_Search(&s_SearchInput, &SearchBox, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive());
 
 	std::vector<size_t> vFiltered;
 	for(size_t i = 0; i < m_vSavedMaps.size(); ++i)

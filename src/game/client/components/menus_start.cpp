@@ -166,7 +166,17 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	Label(MakeRect(Logo.x + MightyW + 2.0f, Logo.y, Logo.w, Logo.h), "client", LogoSize, TEXTALIGN_ML, CMenus::AccentColorLight().WithAlpha(1.0f));
 
 	char aVersion[32];
-	str_format(aVersion, sizeof(aVersion), "v%s", GAME_RELEASE_VERSION);
+	if(m_aReleaseTag[0] != '\0')
+	{
+		const char *pTag = m_aReleaseTag;
+		if(pTag[0] == 'v' || pTag[0] == 'V')
+			++pTag;
+		str_format(aVersion, sizeof(aVersion), "v%s", pTag);
+	}
+	else
+	{
+		str_copy(aVersion, "dev");
+	}
 	Label(MakeRect(Header.x, Header.y, Header.w, 28.0f), aVersion, 9.0f, TEXTALIGN_MR, ColorRGBA(0.45f, 0.45f, 0.45f, 1.0f));
 
 	// running tee
@@ -335,7 +345,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	Label(NewsRow, pNewsTitle, 16.5f, TEXTALIGN_ML, ColorRGBA(0.96f, 0.96f, 0.96f, 1.0f), NewsRow.w);
 	NewsInner.HSplitTop(7.0f, nullptr, &NewsInner);
 	CUIRect NewsDesc;
-	NewsInner.HSplitTop(28.0f, &NewsDesc, &NewsInner);
+	NewsInner.HSplitBottom(18.0f, &NewsDesc, &NewsInner);
 	if(m_aReleaseDesc[0] != '\0')
 		Label(NewsDesc, m_aReleaseDesc, 11.0f, TEXTALIGN_TL, ColorRGBA(0.58f, 0.58f, 0.58f, 1.0f), NewsDesc.w);
 
@@ -516,23 +526,47 @@ void CMenusStart::UpdateLatestRelease()
 			else if(Tag.type == json_string)
 				str_copy(m_aReleaseTitle, Tag);
 
+			if(Tag.type == json_string && ((const char *)Tag)[0] != '\0')
+				str_copy(m_aReleaseTag, Tag);
+
 			const json_value &Body = Release["body"];
 			if(Body.type == json_string)
 			{
-				char aFirstLine[256];
-				str_copy(aFirstLine, Body);
-				for(char *pCur = aFirstLine; *pCur != '\0'; ++pCur)
+				m_aReleaseDesc[0] = '\0';
+				const char *pCur = (const char *)Body;
+				bool SeenContent = false;
+				while(*pCur != '\0')
 				{
-					if(*pCur == '\r' || *pCur == '\n')
+					char aLine[256];
+					int Len = 0;
+					while(*pCur != '\0' && *pCur != '\n' && *pCur != '\r' && Len < (int)sizeof(aLine) - 1)
+						aLine[Len++] = *pCur++;
+					aLine[Len] = '\0';
+					while(*pCur == '\n' || *pCur == '\r')
+						++pCur;
+
+					const char *pLine = str_skip_whitespaces(aLine);
+					if(pLine[0] == '\0')
 					{
-						*pCur = '\0';
-						break;
+						if(SeenContent)
+							break;
+						continue;
 					}
+					if(pLine[0] == '#')
+					{
+						if(SeenContent)
+							break;
+						continue;
+					}
+					while(*pLine == '-' || *pLine == '*' || *pLine == ' ')
+						++pLine;
+					if(pLine[0] == '\0')
+						continue;
+					if(m_aReleaseDesc[0] != '\0')
+						str_append(m_aReleaseDesc, "\n");
+					str_append(m_aReleaseDesc, pLine);
+					SeenContent = true;
 				}
-				const char *pStart = str_skip_whitespaces(aFirstLine);
-				while(*pStart == '#' || *pStart == '*' || *pStart == '-' || *pStart == ' ')
-					++pStart;
-				str_copy(m_aReleaseDesc, pStart);
 			}
 		}
 		json_value_free(pJson);

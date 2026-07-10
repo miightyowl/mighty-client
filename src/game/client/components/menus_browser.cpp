@@ -30,7 +30,7 @@ static ColorRGBA PlayerBackgroundColor(bool Friend, bool Clan, bool Afk, bool In
 {
 	ColorRGBA Base;
 	if(Friend)
-		Base = Afk ? ColorRGBA(0.50f, 0.62f, 0.28f, 1.0f) : CMenus::AccentColor().WithAlpha(1.0f);
+		Base = Afk ? ColorRGBA(0.85f, 0.76f, 0.30f, 1.0f) : CMenus::AccentColor().WithAlpha(1.0f);
 	else if(Clan)
 		Base = Afk ? ColorRGBA(0.35f, 0.58f, 0.85f, 1.0f) : ColorRGBA(0.38f, 0.52f, 1.0f, 1.0f);
 	else
@@ -520,24 +520,24 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 	}
 
 	CUIRect Row;
-	StatusBox.HMargin((StatusBox.h - 27.0f) / 2.0f, &Row);
+	StatusBox.HMargin((StatusBox.h - 21.0f) / 2.0f, &Row);
 
 	const auto &&IconField = [&](CLineInput &Input, const CUIRect &Rect, const char *pIcon, const char *pPlaceholder) -> bool {
 		Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f), IGraphics::CORNER_ALL, 6.0f);
 		CUIRect Inner, IconRect, Field;
-		Rect.VMargin(11.0f, &Inner);
-		Inner.VSplitLeft(15.0f, &IconRect, &Field);
-		Field.VSplitLeft(6.0f, nullptr, &Field);
+		Rect.VMargin(9.0f, &Inner);
+		Inner.VSplitLeft(13.0f, &IconRect, &Field);
+		Field.VSplitLeft(5.0f, nullptr, &Field);
 		SLabelProperties IconProps;
 		IconProps.SetColor(ColorRGBA(0.5f, 0.5f, 0.5f, 1.0f));
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
-		Ui()->DoLabel(&IconRect, pIcon, 12.0f, TEXTALIGN_ML, IconProps);
+		Ui()->DoLabel(&IconRect, pIcon, 10.5f, TEXTALIGN_ML, IconProps);
 		TextRender()->SetRenderFlags(0);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		Input.SetEmptyText(pPlaceholder);
 		static const ColorRGBA s_Transparent(0.0f, 0.0f, 0.0f, 0.0f);
-		return Ui()->DoEditBox(&Input, &Field, 12.0f, IGraphics::CORNER_NONE, {}, &s_Transparent);
+		return Ui()->DoEditBox(&Input, &Field, 10.5f, IGraphics::CORNER_NONE, {}, &s_Transparent);
 	};
 
 	// helper: square icon button
@@ -548,7 +548,7 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
 		CUIRect IconRect = Rect;
-		Ui()->DoLabel(&IconRect, pIcon, 14.0f, TEXTALIGN_MC, Props);
+		Ui()->DoLabel(&IconRect, pIcon, 12.0f, TEXTALIGN_MC, Props);
 		TextRender()->SetRenderFlags(0);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		return Ui()->DoButtonLogic(pId, 0, &Rect, BUTTONFLAG_LEFT);
@@ -556,12 +556,12 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 
 	// carve out the right-hand controls first
 	CUIRect ConnectButton, RefreshButton, Stats;
-	Row.VSplitRight(44.0f, &Row, &ConnectButton);
-	Row.VSplitRight(8.0f, &Row, nullptr);
-	Row.VSplitRight(40.0f, &Row, &RefreshButton);
-	Row.VSplitRight(14.0f, &Row, nullptr);
-	Row.VSplitRight(190.0f, &Row, &Stats);
-	Row.VSplitRight(14.0f, &Row, nullptr);
+	Row.VSplitRight(38.0f, &Row, &ConnectButton);
+	Row.VSplitRight(7.0f, &Row, nullptr);
+	Row.VSplitRight(34.0f, &Row, &RefreshButton);
+	Row.VSplitRight(12.0f, &Row, nullptr);
+	Row.VSplitRight(175.0f, &Row, &Stats);
+	Row.VSplitRight(12.0f, &Row, nullptr);
 
 	// search, exclude, address
 	const float Gap = 8.0f;
@@ -618,7 +618,7 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 		str_format(aStats, sizeof(aStats), "%s · %s", aPlayers, aServers);
 		SLabelProperties Props;
 		Props.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
-		Ui()->DoLabel(&Stats, aStats, 10.0f, TEXTALIGN_MR, Props);
+		Ui()->DoLabel(&Stats, aStats, 9.0f, TEXTALIGN_MR, Props);
 	}
 
 	// refresh button
@@ -1569,7 +1569,8 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 				// Compare unsorted server id of the friend with the unsorted id of the currently selected server
 				bool InSelectedServer = m_SelectedIndex >= 0 && Friend.ServerInfo() && Friend.ServerInfo()->m_ServerIndex == ServerBrowser()->SortedGet(m_SelectedIndex)->m_ServerIndex;
 
-				const ColorRGBA Color = PlayerBackgroundColor(FriendType == FRIEND_PLAYER_ON, FriendType == FRIEND_CLAN_ON, FriendType == FRIEND_OFF ? true : Friend.IsAfk(), InSelectedServer, Inside);
+				ColorRGBA Color = PlayerBackgroundColor(FriendType == FRIEND_PLAYER_ON, FriendType == FRIEND_CLAN_ON, FriendType == FRIEND_OFF ? true : Friend.IsAfk(), InSelectedServer, Inside);
+				Color = Color.WithAlpha(std::min(1.0f, Color.a + 0.10f));
 				Rect.Draw(Color, IGraphics::CORNER_ALL, 5.0f);
 				Rect.Margin(2.0f, &Rect);
 
@@ -1887,7 +1888,7 @@ void CMenus::RenderServerbrowser(CUIRect MainView)
 	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, BackgroundAlpha), IGraphics::CORNER_B, 10.0f);
 	MainView.Margin(10.0f, &MainView);
 
-	MainView.HSplitBottom(30.0f, &Content, &StatusBox);
+	MainView.HSplitBottom(24.0f, &Content, &StatusBox);
 	Content.HSplitBottom(8.0f, &Content, nullptr);
 
 	Content.VSplitRight(205.0f, &ServerList, &ToolBox);

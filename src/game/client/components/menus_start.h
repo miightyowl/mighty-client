@@ -24,6 +24,7 @@ private:
 	bool m_ReleaseLoaded = false;
 	char m_aReleaseTitle[128] = "";
 	char m_aReleaseDesc[256] = "";
+	char m_aReleaseTag[32] = "";
 };
 
 #endif
