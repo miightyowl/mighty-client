@@ -510,6 +510,8 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 		dbg_assert_failed("Client state %d is invalid for RenderMenubar", ClientState);
 	}
 
+	Box.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.6f), IGraphics::CORNER_NONE, 0.0f);
+
 	// First render buttons aligned from right side so remaining
 	// width is known when rendering buttons from left side.
 	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
@@ -694,39 +696,46 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 		TextRender()->SetRenderFlags(0);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 
-		// online menus
-		Box.VSplitLeft(90.0f, &Button, &Box);
+		const auto &&TextTab = [&](CButtonContainer *pId, const char *pText, bool Active) -> bool {
+			const float LabelW = TextRender()->TextWidth(12.0f, pText);
+			CUIRect Tab;
+			Box.VSplitLeft(LabelW + 24.0f, &Tab, &Box);
+			const bool Hovered = Ui()->HotItem() == pId;
+			CUIRect TabLabel, Underline;
+			Tab.HSplitBottom(2.0f, &TabLabel, &Underline);
+			SLabelProperties Props;
+			Props.SetColor(Active ? ColorRGBA(0.96f, 0.96f, 0.96f, 1.0f) : (Hovered ? ColorRGBA(0.80f, 0.80f, 0.80f, 1.0f) : ColorRGBA(0.50f, 0.50f, 0.50f, 1.0f)));
+			Ui()->DoLabel(&TabLabel, pText, 12.0f, TEXTALIGN_MC, Props);
+			if(Active)
+				Underline.Draw(ColorRGBA(0.33f, 0.71f, 0.24f, 1.0f), IGraphics::CORNER_T, 1.0f);
+			return Ui()->DoButtonLogic(pId, 0, &Tab, BUTTONFLAG_LEFT);
+		};
+
 		static CButtonContainer s_GameButton;
-		if(DoButton_MenuTab(&s_GameButton, Localize("Game"), ActivePage == PAGE_GAME, &Button, IGraphics::CORNER_TL))
+		if(TextTab(&s_GameButton, Localize("Game"), ActivePage == PAGE_GAME))
 			NewPage = PAGE_GAME;
 
-		Box.VSplitLeft(90.0f, &Button, &Box);
 		static CButtonContainer s_PlayersButton;
-		if(DoButton_MenuTab(&s_PlayersButton, Localize("Players"), ActivePage == PAGE_PLAYERS, &Button, IGraphics::CORNER_NONE))
+		if(TextTab(&s_PlayersButton, Localize("Players"), ActivePage == PAGE_PLAYERS))
 			NewPage = PAGE_PLAYERS;
 
-		Box.VSplitLeft(130.0f, &Button, &Box);
 		static CButtonContainer s_ServerInfoButton;
-		if(DoButton_MenuTab(&s_ServerInfoButton, Localize("Server info"), ActivePage == PAGE_SERVER_INFO, &Button, IGraphics::CORNER_NONE))
+		if(TextTab(&s_ServerInfoButton, Localize("Server info"), ActivePage == PAGE_SERVER_INFO))
 			NewPage = PAGE_SERVER_INFO;
 
-		Box.VSplitLeft(90.0f, &Button, &Box);
 		static CButtonContainer s_NetworkButton;
-		if(DoButton_MenuTab(&s_NetworkButton, Localize("Browser"), ActivePage == PAGE_NETWORK, &Button, IGraphics::CORNER_NONE))
+		if(TextTab(&s_NetworkButton, Localize("Browser"), ActivePage == PAGE_NETWORK))
 			NewPage = PAGE_NETWORK;
 
 		if(GameClient()->m_GameInfo.m_Race)
 		{
-			Box.VSplitLeft(90.0f, &Button, &Box);
 			static CButtonContainer s_GhostButton;
-			if(DoButton_MenuTab(&s_GhostButton, Localize("Ghost"), ActivePage == PAGE_GHOST, &Button, IGraphics::CORNER_NONE))
+			if(TextTab(&s_GhostButton, Localize("Ghost"), ActivePage == PAGE_GHOST))
 				NewPage = PAGE_GHOST;
 		}
 
-		Box.VSplitLeft(100.0f, &Button, &Box);
-		Box.VSplitLeft(4.0f, nullptr, &Box);
 		static CButtonContainer s_CallVoteButton;
-		if(DoButton_MenuTab(&s_CallVoteButton, Localize("Call vote"), ActivePage == PAGE_CALLVOTE, &Button, IGraphics::CORNER_TR))
+		if(TextTab(&s_CallVoteButton, Localize("Call vote"), ActivePage == PAGE_CALLVOTE))
 		{
 			NewPage = PAGE_CALLVOTE;
 			m_ControlPageOpening = true;
@@ -738,9 +747,9 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
 
 			Box.VSplitRight(10.0f, &Box, nullptr);
-			Box.VSplitRight(33.0f, &Box, &Button);
+			Box.VSplitRight(IconTabW, &Box, &Button);
 			static CButtonContainer s_DemoButton;
-			if(DoButton_MenuTab(&s_DemoButton, FontIcon::CLAPPERBOARD, ActivePage == PAGE_DEMOS, &Button, IGraphics::CORNER_T, &m_aAnimatorsSmallPage[SMALL_TAB_DEMOBUTTON]))
+			if(IconTab(&s_DemoButton, FontIcon::CLAPPERBOARD, ActivePage == PAGE_DEMOS, Button))
 			{
 				NewPage = PAGE_DEMOS;
 			}
@@ -780,13 +789,6 @@ void CMenus::RenderLoading(const char *pCaption, const char *pContent, int Incre
 
 	Ui()->MapScreen();
 
-	if(GameClient()->m_MenuBackground.IsLoading())
-	{
-		// Avoid rendering while loading the menu background as this would otherwise
-		// cause the regular menu background to be rendered for a few frames while
-		// the menu background is not loaded yet.
-		return;
-	}
 	m_LoadingState.m_LastRender = Now;
 
 	Graphics()->TextureClear();
@@ -1097,10 +1099,8 @@ void CMenus::Render()
 	}
 	else
 	{
-		if(!GameClient()->m_MenuBackground.Render())
-		{
-			RenderBackground();
-		}
+		Ui()->MapScreen();
+		Ui()->Screen()->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f), IGraphics::CORNER_NONE, 0.0f);
 		ms_ColorTabbarInactive = ms_ColorTabbarInactiveOutgame;
 		ms_ColorTabbarActive = ms_ColorTabbarActiveOutgame;
 		ms_ColorTabbarHover = ms_ColorTabbarHoverOutgame;

@@ -183,21 +183,6 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 		}
 		GameClient()->m_Tooltips.DoToolTip(&s_ConfigButtonId, &ConfigButton, Localize("Open the directory that contains the configuration and user files"));
 
-		CUIRect DirectoryButton;
-		Left.HSplitBottom(20.0f, &Left, &DirectoryButton);
-		Left.HSplitBottom(5.0f, &Left, nullptr);
-		static CButtonContainer s_ThemesButtonId;
-		if(DoButton_Menu(&s_ThemesButtonId, Localize("Themes directory"), 0, &DirectoryButton))
-		{
-			Storage()->GetCompletePath(IStorage::TYPE_SAVE, "themes", aBuf, sizeof(aBuf));
-			Storage()->CreateFolder("themes", IStorage::TYPE_SAVE);
-			Client()->ViewFile(aBuf);
-		}
-		GameClient()->m_Tooltips.DoToolTip(&s_ThemesButtonId, &DirectoryButton, Localize("Open the directory to add custom themes"));
-
-		Left.HSplitTop(20.0f, nullptr, &Left);
-		RenderThemeSelection(Left);
-
 		// auto demo settings
 		{
 			Right.HSplitTop(40.0f, nullptr, &Right);
@@ -1623,7 +1608,10 @@ bool CMenus::RenderLanguageSelection(CUIRect MainView)
 
 void CMenus::RenderSettings(CUIRect MainView)
 {
-	Ui()->Screen()->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f), IGraphics::CORNER_NONE, 0.0f);
+	// content panel only (not full-screen); translucent in-game so the match
+	// stays visible around the panel
+	const float BackgroundAlpha = Client()->State() == IClient::STATE_OFFLINE ? 1.0f : 0.8f;
+	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, BackgroundAlpha), IGraphics::CORNER_B, 10.0f);
 
 	CUIRect Button, TabBar, RestartBar;
 	MainView.VSplitRight(150.0f, &MainView, &TabBar);

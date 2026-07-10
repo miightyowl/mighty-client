@@ -1113,11 +1113,17 @@ void CMenus::RenderDemoBrowser(CUIRect MainView)
 	GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_DEMOS);
 
 	CUIRect ListView, DetailsView, ButtonsView;
-	MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
+	const float BackgroundAlpha = Client()->State() == IClient::STATE_OFFLINE ? 1.0f : 0.8f;
+	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, BackgroundAlpha), IGraphics::CORNER_B, 10.0f);
 	MainView.Margin(10.0f, &MainView);
 	MainView.HSplitBottom(22.0f * 2.0f + 5.0f, &ListView, &ButtonsView);
 	ListView.VSplitRight(205.0f, &ListView, &DetailsView);
-	ListView.VSplitRight(5.0f, &ListView, nullptr);
+	CUIRect PanelDivider;
+	ListView.VSplitRight(1.0f, &ListView, &PanelDivider);
+	PanelDivider.HMargin(2.0f, &PanelDivider);
+	PanelDivider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f), IGraphics::CORNER_NONE, 0.0f);
+	ListView.VSplitRight(9.0f, &ListView, nullptr);
+	DetailsView.VSplitLeft(9.0f, nullptr, &DetailsView);
 
 	bool WasListboxItemActivated;
 	RenderDemoBrowserList(ListView, WasListboxItemActivated);
@@ -1187,8 +1193,9 @@ void CMenus::RenderDemoBrowserList(CUIRect ListView, bool &WasListboxItemActivat
 
 	CUIRect Headers, ListBox;
 	ListView.HSplitTop(ms_ListheaderHeight, &Headers, &ListBox);
-	Headers.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_T, 5.0f);
-	ListBox.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_B, 5.0f);
+	CUIRect HeaderDivider;
+	ListBox.HSplitTop(1.0f, &HeaderDivider, nullptr);
+	HeaderDivider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_NONE, 0.0f);
 
 	for(auto &Col : s_aCols)
 	{
@@ -1214,34 +1221,51 @@ void CMenus::RenderDemoBrowserList(CUIRect ListView, bool &WasListboxItemActivat
 
 	for(auto &Col : s_aCols)
 	{
-		if(Col.m_pCaption[0] != '\0' && Col.m_Sort != -1)
+		if(Col.m_pCaption[0] == '\0' || Col.m_Sort == -1)
+			continue;
+
+		const bool ActiveSort = g_Config.m_BrDemoSort == Col.m_Sort;
+		const ColorRGBA CaptionColor = ActiveSort ? ColorRGBA(0.45f, 0.80f, 0.35f, 1.0f) : ColorRGBA(0.45f, 0.45f, 0.45f, 1.0f);
+
+		if(Col.m_FontIcon)
 		{
-			if(Col.m_FontIcon)
+			SLabelProperties Props;
+			Props.SetColor(CaptionColor);
+			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING);
+			Ui()->DoLabel(&Col.m_Rect, Col.m_pCaption, 11.0f, TEXTALIGN_MC, Props);
+			TextRender()->SetRenderFlags(0);
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		}
+		else
+		{
+			char aCaption[32];
+			str_copy(aCaption, Localize(Col.m_pCaption));
+			for(char *pChar = aCaption; *pChar != '\0'; ++pChar)
 			{
-				TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-				TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING);
+				if(*pChar >= 'a' && *pChar <= 'z')
+					*pChar -= 'a' - 'A';
 			}
-			const int ButtonPressed = DoButton_GridHeader(&Col.m_Id, Col.m_FontIcon ? Col.m_pCaption : Localize(Col.m_pCaption), g_Config.m_BrDemoSort == Col.m_Sort, &Col.m_Rect, Col.m_FontIcon ? TEXTALIGN_MC : TEXTALIGN_ML);
-			if(Col.m_pTooltip != nullptr)
-			{
-				GameClient()->m_Tooltips.DoToolTip(&Col.m_Id, &Col.m_Rect, Localize(Col.m_pTooltip));
-			}
-			if(Col.m_FontIcon)
-			{
-				TextRender()->SetRenderFlags(0);
-				TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-			}
-			if(ButtonPressed)
-			{
-				if(g_Config.m_BrDemoSort == Col.m_Sort)
-					g_Config.m_BrDemoSortOrder ^= 1;
-				else
-					g_Config.m_BrDemoSortOrder = 0;
-				g_Config.m_BrDemoSort = Col.m_Sort;
-				// Don't rescan in order to keep fetched headers, just resort
-				std::stable_sort(m_vDemos.begin(), m_vDemos.end());
-				DemolistOnUpdate(false);
-			}
+			CUIRect Caption;
+			Col.m_Rect.VMargin(5.0f, &Caption);
+			SLabelProperties Props;
+			Props.SetColor(CaptionColor);
+			Ui()->DoLabel(&Caption, aCaption, 8.0f, Col.m_Direction == 1 ? TEXTALIGN_MR : TEXTALIGN_ML, Props);
+		}
+
+		if(Col.m_pTooltip != nullptr)
+			GameClient()->m_Tooltips.DoToolTip(&Col.m_Id, &Col.m_Rect, Localize(Col.m_pTooltip));
+
+		if(Ui()->DoButtonLogic(&Col.m_Id, 0, &Col.m_Rect, BUTTONFLAG_LEFT))
+		{
+			if(g_Config.m_BrDemoSort == Col.m_Sort)
+				g_Config.m_BrDemoSortOrder ^= 1;
+			else
+				g_Config.m_BrDemoSortOrder = 0;
+			g_Config.m_BrDemoSort = Col.m_Sort;
+			// Don't rescan in order to keep fetched headers, just resort
+			std::stable_sort(m_vDemos.begin(), m_vDemos.end());
+			DemolistOnUpdate(false);
 		}
 	}
 
@@ -1251,6 +1275,10 @@ void CMenus::RenderDemoBrowserList(CUIRect ListView, bool &WasListboxItemActivat
 		m_DemolistSelectedReveal = false;
 	}
 
+	s_ListBox.SetRowColors(
+		ColorRGBA(0.33f, 0.71f, 0.24f, 0.20f),
+		ColorRGBA(0.33f, 0.71f, 0.24f, 0.14f),
+		ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f));
 	s_ListBox.DoStart(ms_ListheaderHeight, m_vpFilteredDemos.size(), 1, 3, m_DemolistSelectedIndex, &ListBox, false, IGraphics::CORNER_ALL, true);
 
 	char aBuf[64];
@@ -1342,13 +1370,14 @@ void CMenus::RenderDemoBrowserDetails(CUIRect DetailsView)
 {
 	CUIRect Contents, Header;
 	DetailsView.HSplitTop(ms_ListheaderHeight, &Header, &Contents);
-	Contents.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_B, 5.0f);
+	CUIRect DetailsDivider;
+	Contents.HSplitTop(1.0f, &DetailsDivider, nullptr);
+	DetailsDivider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_NONE, 0.0f);
 	Contents.Margin(5.0f, &Contents);
 
 	const float FontSize = 12.0f;
 	CDemoItem *pItem = m_DemolistSelectedIndex >= 0 ? m_vpFilteredDemos[m_DemolistSelectedIndex] : nullptr;
 
-	Header.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_T, 5.0f);
 	const char *pHeaderLabel;
 	if(pItem == nullptr)
 		pHeaderLabel = Localize("No demo selected");
@@ -1477,6 +1506,9 @@ void CMenus::RenderDemoBrowserButtons(CUIRect ButtonsView, bool WasListboxItemAc
 		}
 	};
 
+	const ColorRGBA DarkButton(1.0f, 1.0f, 1.0f, 0.06f);
+	const ColorRGBA GreenButton(0.33f, 0.71f, 0.24f, 1.0f);
+
 	CUIRect ButtonBarTop, ButtonBarBottom;
 	ButtonsView.HSplitTop(5.0f, nullptr, &ButtonsView);
 	ButtonsView.HSplitMid(&ButtonBarTop, &ButtonBarBottom, 5.0f);
@@ -1486,7 +1518,8 @@ void CMenus::RenderDemoBrowserButtons(CUIRect ButtonsView, bool WasListboxItemAc
 		CUIRect DemoSearch;
 		ButtonBarTop.VSplitLeft(ButtonBarBottom.h * 21.0f, &DemoSearch, &ButtonBarTop);
 		ButtonBarTop.VSplitLeft(ButtonBarTop.h / 2.0f, nullptr, &ButtonBarTop);
-		if(Ui()->DoEditBox_Search(&m_DemoSearchInput, &DemoSearch, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive()))
+		static const ColorRGBA s_DarkFieldColor(1.0f, 1.0f, 1.0f, 0.06f);
+		if(Ui()->DoEditBox_Search(&m_DemoSearchInput, &DemoSearch, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive(), &s_DarkFieldColor))
 		{
 			RefreshFilteredDemos();
 			DemolistOnUpdate(false);
@@ -1500,7 +1533,7 @@ void CMenus::RenderDemoBrowserButtons(CUIRect ButtonsView, bool WasListboxItemAc
 		ButtonBarBottom.VSplitLeft(ButtonBarBottom.h / 2.0f, nullptr, &ButtonBarBottom);
 		SetIconMode(true);
 		static CButtonContainer s_RefreshButton;
-		if(DoButton_Menu(&s_RefreshButton, FontIcon::ARROW_ROTATE_RIGHT, 0, &RefreshButton) || Input()->KeyPress(KEY_F5) || (Input()->KeyPress(KEY_R) && Input()->ModifierIsPressed()))
+		if(DoButton_Menu(&s_RefreshButton, FontIcon::ARROW_ROTATE_RIGHT, 0, &RefreshButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, DarkButton) || Input()->KeyPress(KEY_F5) || (Input()->KeyPress(KEY_R) && Input()->ModifierIsPressed()))
 		{
 			SetIconMode(false);
 			DemolistPopulate();
@@ -1530,7 +1563,7 @@ void CMenus::RenderDemoBrowserButtons(CUIRect ButtonsView, bool WasListboxItemAc
 		ButtonBarBottom.VSplitLeft(ButtonBarBottom.h * 10.0f, &DemosDirectoryButton, &ButtonBarBottom);
 		ButtonBarBottom.VSplitLeft(ButtonBarBottom.h / 2.0f, nullptr, &ButtonBarBottom);
 		static CButtonContainer s_DemosDirectoryButton;
-		if(DoButton_Menu(&s_DemosDirectoryButton, Localize("Demos directory"), 0, &DemosDirectoryButton))
+		if(DoButton_Menu(&s_DemosDirectoryButton, Localize("Demos directory"), 0, &DemosDirectoryButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, DarkButton))
 		{
 			char aBuf[IO_MAX_PATH_LENGTH];
 			Storage()->GetCompletePath(m_DemolistSelectedIndex >= 0 ? m_vpFilteredDemos[m_DemolistSelectedIndex]->m_StorageType : IStorage::TYPE_SAVE, m_aCurrentDemoFolder[0] == '\0' ? "demos" : m_aCurrentDemoFolder, aBuf, sizeof(aBuf));
@@ -1547,7 +1580,7 @@ void CMenus::RenderDemoBrowserButtons(CUIRect ButtonsView, bool WasListboxItemAc
 		ButtonBarBottom.VSplitRight(ButtonBarBottom.h, &ButtonBarBottom, nullptr);
 		SetIconMode(true);
 		static CButtonContainer s_PlayButton;
-		const bool ActivateSelectedItem = DoButton_Menu(&s_PlayButton, (m_DemolistSelectedIndex >= 0 && m_vpFilteredDemos[m_DemolistSelectedIndex]->m_IsDir) ? FontIcon::FOLDER_OPEN : FontIcon::PLAY, 0, &PlayButton) || WasListboxItemActivated ||
+		const bool ActivateSelectedItem = DoButton_Menu(&s_PlayButton, (m_DemolistSelectedIndex >= 0 && m_vpFilteredDemos[m_DemolistSelectedIndex]->m_IsDir) ? FontIcon::FOLDER_OPEN : FontIcon::PLAY, 0, &PlayButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, GreenButton) || WasListboxItemActivated ||
 						  Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER) ||
 						  (Input()->KeyPress(KEY_P) && !GameClient()->m_GameConsole.IsActive() && !m_DemoSearchInput.IsActive());
 		SetIconMode(false);
@@ -1613,7 +1646,7 @@ void CMenus::RenderDemoBrowserButtons(CUIRect ButtonsView, bool WasListboxItemAc
 				ButtonBarBottom.VSplitRight(ButtonBarBottom.h / 2.0f, &ButtonBarBottom, nullptr);
 				SetIconMode(true);
 				static CButtonContainer s_RenameButton;
-				if(DoButton_Menu(&s_RenameButton, FontIcon::PENCIL, 0, &RenameButton))
+				if(DoButton_Menu(&s_RenameButton, FontIcon::PENCIL, 0, &RenameButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, DarkButton))
 				{
 					SetIconMode(false);
 					m_Popup = POPUP_RENAME_DEMO;
@@ -1638,7 +1671,7 @@ void CMenus::RenderDemoBrowserButtons(CUIRect ButtonsView, bool WasListboxItemAc
 				CUIRect DeleteButton;
 				ButtonBarBottom.VSplitRight(ButtonBarBottom.h * 3.0f, &ButtonBarBottom, &DeleteButton);
 				ButtonBarBottom.VSplitRight(ButtonBarBottom.h / 2.0f, &ButtonBarBottom, nullptr);
-				if(DoButton_Menu(&s_DeleteButton, FontIcon::TRASH, 0, &DeleteButton) || Ui()->ConsumeHotkey(CUi::HOTKEY_DELETE) || (Input()->KeyPress(KEY_D) && !GameClient()->m_GameConsole.IsActive() && !m_DemoSearchInput.IsActive()))
+				if(DoButton_Menu(&s_DeleteButton, FontIcon::TRASH, 0, &DeleteButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, DarkButton) || Ui()->ConsumeHotkey(CUi::HOTKEY_DELETE) || (Input()->KeyPress(KEY_D) && !GameClient()->m_GameConsole.IsActive() && !m_DemoSearchInput.IsActive()))
 				{
 					SetIconMode(false);
 					char aBuf[128 + IO_MAX_PATH_LENGTH];
@@ -1660,7 +1693,7 @@ void CMenus::RenderDemoBrowserButtons(CUIRect ButtonsView, bool WasListboxItemAc
 				ButtonBarTop.VSplitRight(ButtonBarBottom.h, &ButtonBarTop, nullptr);
 				SetIconMode(true);
 				static CButtonContainer s_RenderButton;
-				if(DoButton_Menu(&s_RenderButton, FontIcon::VIDEO, 0, &RenderButton) || (Input()->KeyPress(KEY_R) && !GameClient()->m_GameConsole.IsActive() && !m_DemoSearchInput.IsActive()))
+				if(DoButton_Menu(&s_RenderButton, FontIcon::VIDEO, 0, &RenderButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, DarkButton) || (Input()->KeyPress(KEY_R) && !GameClient()->m_GameConsole.IsActive() && !m_DemoSearchInput.IsActive()))
 				{
 					SetIconMode(false);
 					m_Popup = POPUP_RENDER_DEMO;

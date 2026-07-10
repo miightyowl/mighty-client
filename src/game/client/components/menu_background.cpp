@@ -83,9 +83,6 @@ void CMenuBackground::OnInit()
 
 	m_IsInit = true;
 
-	if(g_Config.m_ClMenuMap[0] != '\0')
-		LoadMenuBackground();
-
 	m_Camera.m_ZoomSet = false;
 	m_Camera.m_ZoomSmoothingTarget = 0;
 }

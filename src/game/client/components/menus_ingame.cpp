@@ -46,7 +46,7 @@ void CMenus::RenderGame(CUIRect MainView)
 	CUIRect Button, ButtonBars, ButtonBar, ButtonBar2;
 	bool ShowDDRaceButtons = MainView.w > 855.0f;
 	MainView.HSplitTop(45.0f + (g_Config.m_ClTouchControls ? 35.0f : 0.0f), &ButtonBars, &MainView);
-	ButtonBars.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
+	ButtonBars.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.6f), IGraphics::CORNER_B, 10.0f);
 	ButtonBars.Margin(10.0f, &ButtonBars);
 	ButtonBars.HSplitTop(25.0f, &ButtonBar, &ButtonBars);
 	if(g_Config.m_ClTouchControls)
@@ -491,11 +491,11 @@ void CMenus::PopupConfirmOpenWiki()
 void CMenus::RenderPlayers(CUIRect MainView)
 {
 	CUIRect Button, Button2, ButtonBar, PlayerList, Player;
-	MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
+	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.8f), IGraphics::CORNER_B, 10.0f);
 
 	// list background color
 	MainView.Margin(10.0f, &PlayerList);
-	PlayerList.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_ALL, 10.0f);
+	PlayerList.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.04f), IGraphics::CORNER_ALL, 10.0f);
 	PlayerList.Margin(10.0f, &PlayerList);
 
 	// headline
@@ -531,6 +531,10 @@ void CMenus::RenderPlayers(CUIRect MainView)
 	}
 
 	static CListBox s_ListBox;
+	s_ListBox.SetRowColors(
+		ColorRGBA(0.33f, 0.71f, 0.24f, 0.20f),
+		ColorRGBA(0.33f, 0.71f, 0.24f, 0.14f),
+		ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f));
 	s_ListBox.DoStart(24.0f, TotalPlayers, 1, 3, -1, &PlayerList);
 
 	// options
@@ -555,7 +559,7 @@ void CMenus::RenderPlayers(CUIRect MainView)
 
 		CUIRect Row = Item.m_Rect;
 		if(Count % 2 == 1)
-			Row.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_ALL, 5.0f);
+			Row.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.03f), IGraphics::CORNER_ALL, 5.0f);
 		Row.VSplitRight(s_ListBox.ScrollbarWidthMax() - s_ListBox.ScrollbarWidth(), &Row, nullptr);
 		Row.VSplitRight(300.0f, &Player, &Row);
 
@@ -631,12 +635,12 @@ void CMenus::RenderServerInfo(CUIRect MainView)
 	Client()->GetServerInfo(&CurrentServerInfo);
 
 	CUIRect ServerInfo, GameInfo, Motd;
-	MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
+	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.8f), IGraphics::CORNER_B, 10.0f);
 	MainView.Margin(10.0f, &MainView);
 	MainView.HSplitMid(&ServerInfo, &Motd, 10.0f);
 	ServerInfo.VSplitMid(&ServerInfo, &GameInfo, 10.0f);
 
-	ServerInfo.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_ALL, 10.0f);
+	ServerInfo.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.04f), IGraphics::CORNER_ALL, 10.0f);
 	ServerInfo.Margin(10.0f, &ServerInfo);
 
 	CUIRect Label;
@@ -724,7 +728,7 @@ void CMenus::RenderServerInfo(CUIRect MainView)
 		}
 	}
 
-	GameInfo.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_ALL, 10.0f);
+	GameInfo.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.04f), IGraphics::CORNER_ALL, 10.0f);
 	GameInfo.Margin(10.0f, &GameInfo);
 
 	GameInfo.HSplitTop(FontSizeTitle, &Label, &GameInfo);
@@ -812,7 +816,7 @@ void CMenus::RenderServerInfo(CUIRect MainView)
 void CMenus::RenderServerInfoMotd(CUIRect Motd)
 {
 	const float MotdFontSize = 16.0f;
-	Motd.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_ALL, 10.0f);
+	Motd.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.04f), IGraphics::CORNER_ALL, 10.0f);
 	Motd.Margin(10.0f, &Motd);
 
 	CUIRect MotdHeader;
@@ -911,7 +915,7 @@ void CMenus::RenderUnfinishedVoteTeeSelection(CUIRect *pMainView)
 
 		const bool Selected = UnfinishedVote.IsPlayerSelected(pRealName);
 		if(Selected)
-			Cell.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_ALL, 4.0f);
+			Cell.Draw(ColorRGBA(0.33f, 0.71f, 0.24f, 0.25f), IGraphics::CORNER_ALL, 4.0f);
 		else if(Ui()->HotItem() == &s_aTeeButtonIds[ClientId])
 			Cell.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.1f), IGraphics::CORNER_ALL, 4.0f);
 
@@ -1127,9 +1131,9 @@ void CMenus::RenderServerControl(CUIRect MainView)
 	// render background
 	CUIRect Bottom, RconExtension, TabBar, Button;
 	MainView.HSplitTop(20.0f, &Bottom, &MainView);
-	Bottom.Draw(ms_ColorTabbarActive, IGraphics::CORNER_NONE, 0.0f);
+	Bottom.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.8f), IGraphics::CORNER_NONE, 0.0f);
 	MainView.HSplitTop(20.0f, &TabBar, &MainView);
-	MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
+	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.8f), IGraphics::CORNER_B, 10.0f);
 	MainView.Margin(10.0f, &MainView);
 
 	if(Client()->RconAuthed())
@@ -1329,7 +1333,7 @@ void CMenus::RenderServerControl(CUIRect MainView)
 
 void CMenus::RenderInGameNetwork(CUIRect MainView)
 {
-	MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
+	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.8f), IGraphics::CORNER_B, 10.0f);
 
 	CUIRect TabBar, Button;
 	MainView.HSplitTop(24.0f, &TabBar, &MainView);
@@ -1534,7 +1538,7 @@ void CMenus::SortGhostlist()
 void CMenus::RenderGhost(CUIRect MainView)
 {
 	// render background
-	MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
+	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.8f), IGraphics::CORNER_B, 10.0f);
 
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 	MainView.HSplitBottom(5.0f, &MainView, nullptr);
@@ -1548,7 +1552,7 @@ void CMenus::RenderGhost(CUIRect MainView)
 	View.HSplitBottom(28.0f, &View, &Status);
 
 	// split of the scrollbar
-	Headers.Draw(ColorRGBA(1, 1, 1, 0.25f), IGraphics::CORNER_T, 5.0f);
+	Headers.Draw(ColorRGBA(1, 1, 1, 0.06f), IGraphics::CORNER_T, 5.0f);
 	Headers.VSplitRight(20.0f, &Headers, nullptr);
 
 	class CColumn
@@ -1684,7 +1688,7 @@ void CMenus::RenderGhost(CUIRect MainView)
 
 	s_SelectedIndex = s_ListBox.DoEnd();
 
-	Status.Draw(ColorRGBA(1, 1, 1, 0.25f), IGraphics::CORNER_B, 5.0f);
+	Status.Draw(ColorRGBA(1, 1, 1, 0.06f), IGraphics::CORNER_B, 5.0f);
 	Status.Margin(5.0f, &Status);
 
 	CUIRect Button;
