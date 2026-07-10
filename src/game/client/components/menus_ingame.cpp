@@ -1122,8 +1122,6 @@ bool CMenus::RenderServerControlKick(CUIRect MainView, bool FilterSpectators, bo
 	return s_ListBox.WasItemActivated();
 }
 
-static const char *const SAVEDMAPS_FILE = "mightyclient_savedmaps.json";
-
 void CMenus::LoadSavedMaps()
 {
 	m_SavedMapsLoaded = true;
@@ -1131,7 +1129,7 @@ void CMenus::LoadSavedMaps()
 
 	void *pFileData;
 	unsigned FileSize;
-	if(!Storage()->ReadFile(SAVEDMAPS_FILE, IStorage::TYPE_SAVE, &pFileData, &FileSize))
+	if(!Storage()->ReadFile("mclient.json", IStorage::TYPE_SAVE, &pFileData, &FileSize))
 		return;
 
 	json_settings JsonSettings{};
@@ -1141,11 +1139,12 @@ void CMenus::LoadSavedMaps()
 	if(pData == nullptr)
 		return;
 
-	if(pData->type == json_array)
+	const json_value &SavedMaps = (*pData)["savedmaps"];
+	if(SavedMaps.type == json_array)
 	{
-		for(unsigned i = 0; i < pData->u.array.length; ++i)
+		for(unsigned i = 0; i < SavedMaps.u.array.length; ++i)
 		{
-			const json_value &Entry = (*pData)[i];
+			const json_value &Entry = SavedMaps[i];
 			if(Entry.type != json_object)
 				continue;
 			CSavedMap Saved;
@@ -1160,25 +1159,6 @@ void CMenus::LoadSavedMaps()
 		}
 	}
 	json_value_free(pData);
-}
-
-void CMenus::SaveSavedMaps() const
-{
-	IOHANDLE File = Storage()->OpenFile(SAVEDMAPS_FILE, IOFLAG_WRITE, IStorage::TYPE_SAVE);
-	if(!File)
-		return;
-	CJsonFileWriter Writer(File);
-	Writer.BeginArray();
-	for(const CSavedMap &Saved : m_vSavedMaps)
-	{
-		Writer.BeginObject();
-		Writer.WriteAttribute("map");
-		Writer.WriteStrValue(Saved.m_aMap);
-		Writer.WriteAttribute("note");
-		Writer.WriteStrValue(Saved.m_aNote);
-		Writer.EndObject();
-	}
-	Writer.EndArray();
 }
 
 void CMenus::RenderServerControlSaveMaps(CUIRect MainView)
@@ -1214,7 +1194,7 @@ void CMenus::RenderServerControlSaveMaps(CUIRect MainView)
 		str_copy(Saved.m_aNote, s_NoteInput.GetString());
 		m_vSavedMaps.push_back(Saved);
 		s_NoteInput.Clear();
-		SaveSavedMaps();
+		SaveMClient();
 	}
 
 	CUIRect Divider;
@@ -1326,7 +1306,7 @@ void CMenus::RenderServerControlSaveMaps(CUIRect MainView)
 		if(DeleteIndex >= 0)
 		{
 			m_vSavedMaps.erase(m_vSavedMaps.begin() + DeleteIndex);
-			SaveSavedMaps();
+			SaveMClient();
 			s_Selected = -1;
 		}
 	}

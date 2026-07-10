@@ -1797,6 +1797,8 @@ void CMenus::SaveMClient()
 {
 	if(!m_ProfilesLoaded)
 		LoadProfiles();
+	if(!m_SavedMapsLoaded)
+		LoadSavedMaps();
 
 	IOHANDLE File = Storage()->OpenFile(MCLIENT_FILE, IOFLAG_WRITE, IStorage::TYPE_SAVE);
 	if(!File)
@@ -1836,6 +1838,19 @@ void CMenus::SaveMClient()
 		Writer.WriteStrValue(Bind.m_aName);
 		Writer.WriteAttribute("command");
 		Writer.WriteStrValue(Bind.m_aCommand);
+		Writer.EndObject();
+	}
+	Writer.EndArray();
+
+	Writer.WriteAttribute("savedmaps");
+	Writer.BeginArray();
+	for(const CSavedMap &Saved : m_vSavedMaps)
+	{
+		Writer.BeginObject();
+		Writer.WriteAttribute("map");
+		Writer.WriteStrValue(Saved.m_aMap);
+		Writer.WriteAttribute("note");
+		Writer.WriteStrValue(Saved.m_aNote);
 		Writer.EndObject();
 	}
 	Writer.EndArray();

@@ -542,7 +542,6 @@ protected:
 	std::vector<CSavedMap> m_vSavedMaps;
 	bool m_SavedMapsLoaded = false;
 	void LoadSavedMaps();
-	void SaveSavedMaps() const;
 
 	// user's saved player profiles
 	struct CProfile

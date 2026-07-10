@@ -137,12 +137,22 @@ void CBindWheel::OnRender()
 		SLabelProperties Props;
 		Props.m_MaxWidth = Label.w;
 		Props.m_EllipsisAtEnd = true;
-		Props.SetColor(Selected ? ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f) : ColorRGBA(0.9f, 0.9f, 0.9f, 1.0f));
 		if(Selected)
-			TextRender()->TextOutlineColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f));
-		Ui()->DoLabel(&Label, pName, Selected ? 14.0f : 12.0f, TEXTALIGN_MC, Props);
-		if(Selected)
+		{
+			static CUIElement s_SelectedLabel;
+			if(!s_SelectedLabel.AreRectsInit())
+				s_SelectedLabel.Init(Ui(), 1);
+			TextRender()->TextColor(0.0f, 0.0f, 0.0f, 1.0f);
+			TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.0f);
+			Ui()->DoLabelStreamed(*s_SelectedLabel.Rect(0), &Label, pName, 14.0f, TEXTALIGN_MC, Props);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
 			TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+		}
+		else
+		{
+			Props.SetColor(ColorRGBA(0.9f, 0.9f, 0.9f, 1.0f));
+			Ui()->DoLabel(&Label, pName, 12.0f, TEXTALIGN_MC, Props);
+		}
 	}
 
 	Graphics()->TextureClear();
