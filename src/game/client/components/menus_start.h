@@ -7,6 +7,7 @@
 #include <game/client/ui_rect.h>
 
 #include <memory>
+#include <vector>
 
 class CHttpRequest;
 
@@ -23,8 +24,14 @@ private:
 	bool m_ReleaseRequested = false;
 	bool m_ReleaseLoaded = false;
 	char m_aReleaseTitle[128] = "";
-	char m_aReleaseDesc[256] = "";
+	char m_aReleaseDesc[1024] = "";
 	char m_aReleaseTag[32] = "";
+	struct SReleaseEmphasis
+	{
+		int m_Start;
+		int m_Length;
+	};
+	std::vector<SReleaseEmphasis> m_vReleaseEmphasis;
 };
 
 #endif

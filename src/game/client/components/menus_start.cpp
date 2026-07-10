@@ -347,7 +347,17 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	CUIRect NewsDesc;
 	NewsInner.HSplitBottom(18.0f, &NewsDesc, &NewsInner);
 	if(m_aReleaseDesc[0] != '\0')
-		Label(NewsDesc, m_aReleaseDesc, 11.0f, TEXTALIGN_TL, ColorRGBA(0.58f, 0.58f, 0.58f, 1.0f), NewsDesc.w);
+	{
+		SLabelProperties DescProps;
+		DescProps.m_MaxWidth = NewsDesc.w;
+		DescProps.m_EllipsisAtEnd = true;
+		DescProps.SetColor(ColorRGBA(0.58f, 0.58f, 0.58f, 1.0f));
+
+		for(const auto &Emphasis : m_vReleaseEmphasis)
+			DescProps.m_vColorSplits.emplace_back(Emphasis.m_Start, Emphasis.m_Length, ColorRGBA(0.95f, 0.95f, 0.95f, 1.0f));
+		CUIRect Local = NewsDesc;
+		Ui()->DoLabel(&Local, m_aReleaseDesc, 11.0f, TEXTALIGN_TL, DescProps);
+	}
 
 	static CButtonContainer s_NewsButton;
 	const float NewsHover = HoverProgress(&s_NewsButton);
@@ -533,6 +543,7 @@ void CMenusStart::UpdateLatestRelease()
 			if(Body.type == json_string)
 			{
 				m_aReleaseDesc[0] = '\0';
+				m_vReleaseEmphasis.clear();
 				const char *pCur = (const char *)Body;
 				bool SeenContent = false;
 				while(*pCur != '\0')
@@ -548,8 +559,6 @@ void CMenusStart::UpdateLatestRelease()
 					const char *pLine = str_skip_whitespaces(aLine);
 					if(pLine[0] == '\0')
 					{
-						if(SeenContent)
-							break;
 						continue;
 					}
 					if(pLine[0] == '#')
@@ -558,13 +567,44 @@ void CMenusStart::UpdateLatestRelease()
 							break;
 						continue;
 					}
-					while(*pLine == '-' || *pLine == '*' || *pLine == ' ')
+					if((pLine[0] == '-' || pLine[0] == '+' || (pLine[0] == '*' && pLine[1] == ' ')) && pLine[1] != '\0')
+						pLine += (pLine[1] == ' ') ? 2 : 1;
+					while(*pLine == ' ' || *pLine == '\t')
 						++pLine;
 					if(pLine[0] == '\0')
 						continue;
+					if(str_length(m_aReleaseDesc) + str_length(pLine) + 4 >= (int)sizeof(m_aReleaseDesc))
+						break;
+
 					if(m_aReleaseDesc[0] != '\0')
 						str_append(m_aReleaseDesc, "\n");
-					str_append(m_aReleaseDesc, pLine);
+					str_append(m_aReleaseDesc, "- ");
+
+					bool Emphasis = false;
+					int EmphasisStart = 0;
+					for(const char *pChar = pLine; *pChar != '\0';)
+					{
+						if(pChar[0] == '*' && pChar[1] == '*')
+						{
+							if(!Emphasis)
+							{
+								Emphasis = true;
+								EmphasisStart = str_length(m_aReleaseDesc);
+							}
+							else
+							{
+								Emphasis = false;
+								m_vReleaseEmphasis.push_back({EmphasisStart, str_length(m_aReleaseDesc) - EmphasisStart});
+							}
+							pChar += 2;
+							continue;
+						}
+						const char aChar[2] = {*pChar, '\0'};
+						str_append(m_aReleaseDesc, aChar);
+						++pChar;
+					}
+					if(Emphasis)
+						m_vReleaseEmphasis.push_back({EmphasisStart, str_length(m_aReleaseDesc) - EmphasisStart});
 					SeenContent = true;
 				}
 			}
