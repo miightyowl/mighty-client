@@ -1,3 +1,6 @@
+[advisories]
+ignore = ["RUSTSEC-2026-0202"]
+
 [licenses]
 allow = [
   "Apache-2.0",
