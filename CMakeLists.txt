@@ -1059,8 +1059,10 @@ endif()
 set(EXPECTED_DATA
   # tidy-alphabetical-start
   ads/doubledipp.png
+  ads/ilak.png
   ads/maodie.png
   ads/sockii.png
+  ads/tuskabina.png
   announcement.txt
   arrow.png
   assets/entities/comfort/ddnet.png

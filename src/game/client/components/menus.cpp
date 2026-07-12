@@ -2348,7 +2348,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		Box.HSplitBottom(20.0f, &Box, nullptr);
 		Box.HSplitBottom(24.0f, &Box, &Checkbox);
 		Checkbox.VMargin(60.0f, &Checkbox);
-		if(DoButton_CheckBox(&g_Config.m_ClMClientAds, Localize("Random advertisement pop-ups"), g_Config.m_ClMClientAds, &Checkbox))
+		if(DoButton_CheckBox(&g_Config.m_ClMClientAds, Localize("Random advertisement/quote pop-ups"), g_Config.m_ClMClientAds, &Checkbox))
 			g_Config.m_ClMClientAds ^= 1;
 
 		Box.HSplitBottom(4.0f, &Box, nullptr);

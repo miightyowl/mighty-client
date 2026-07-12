@@ -184,7 +184,7 @@ MACRO_CONFIG_COL(ClMClientColor, cl_mclient_color, 10518912, CFGFLAG_CLIENT | CF
 MACRO_CONFIG_INT(ClMClientIntro, cl_mclient_intro, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show the M-Client welcome/intro popups on the next launch")
 MACRO_CONFIG_INT(ClMClientForceSkin, cl_mclient_force_skin, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: force every tee to render as the maodie skin")
 MACRO_CONFIG_INT(ClMClientAds, cl_mclient_ads, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: randomly show advertisement pop-ups while playing")
-MACRO_CONFIG_INT(ClMClientAdsInterval, cl_mclient_ads_interval, 120, 5, 3600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: average seconds between random advertisement pop-ups")
+MACRO_CONFIG_INT(ClMClientAdsInterval, cl_mclient_ads_interval, 120, 5, 3600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: average seconds between random advertisement/quote pop-ups")
 MACRO_CONFIG_INT(ClMClientPet, cl_mclient_pet, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show a hand when a player is petting a nearby player")
 MACRO_CONFIG_INT(ClMClientFrozenText, cl_mclient_frozen_tees_text, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show how many tees in your team are frozen (0 - off, 1 - show alive, 2 - show frozen)")
 MACRO_CONFIG_INT(ClMClientFrozenHud, cl_mclient_frozen_tees_hud, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show frozen tees of your team on the HUD")

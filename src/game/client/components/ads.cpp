@@ -58,7 +58,7 @@ int CAds::AdScan(const char *pName, int IsDir, int DirType, void *pUser)
 
 void CAds::OnConsoleInit()
 {
-	Console()->Register("ad", "", CFGFLAG_CLIENT, ConShowAd, this, "M-Client: show a random advertisement pop-up");
+	Console()->Register("ad", "", CFGFLAG_CLIENT, ConShowAd, this, "M-Client: show a random advertisement/quote pop-up");
 }
 
 void CAds::ConShowAd(IConsole::IResult *pResult, void *pUserData)
