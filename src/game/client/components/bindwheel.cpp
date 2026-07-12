@@ -21,7 +21,11 @@ void CBindWheel::ConKeyBindWheel(IConsole::IResult *pResult, void *pUserData)
 	CBindWheel *pSelf = static_cast<CBindWheel *>(pUserData);
 	if(pSelf->GameClient()->m_Scoreboard.IsActive())
 		return;
-	pSelf->m_Active = pResult->GetInteger(0) != 0;
+	const bool Activate = pResult->GetInteger(0) != 0;
+	// don't open while the emote wheel is open
+	if(Activate && pSelf->GameClient()->m_Emoticon.IsActive())
+		return;
+	pSelf->m_Active = Activate;
 }
 
 void CBindWheel::OnConsoleInit()
@@ -107,9 +111,11 @@ void CBindWheel::OnRender()
 
 	Ui()->MapScreen();
 
+	const float BackgroundAlpha = g_Config.m_ClMClientBindWheelAlpha / 100.0f;
+
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
-	Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.35f);
+	Graphics()->SetColor(0.0f, 0.0f, 0.0f, BackgroundAlpha);
 	Graphics()->DrawCircle(Center.x, Center.y, 190.0f, 64);
 	Graphics()->QuadsEnd();
 
@@ -157,7 +163,7 @@ void CBindWheel::OnRender()
 
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
-	Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.35f);
+	Graphics()->SetColor(0.0f, 0.0f, 0.0f, BackgroundAlpha);
 	Graphics()->DrawCircle(Center.x, Center.y, 40.0f, 32);
 	Graphics()->QuadsEnd();
 

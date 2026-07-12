@@ -198,6 +198,7 @@ MACRO_CONFIG_STR(ClMClientPetTeeSkin, cl_mclient_pet_tee_skin, 24, "twinbop", CF
 MACRO_CONFIG_INT(ClMClientPetTeeSize, cl_mclient_pet_tee_size, 60, 10, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: size of the companion tee as a percentage of a normal player")
 MACRO_CONFIG_INT(ClMClientPetTeeAlpha, cl_mclient_pet_tee_alpha, 90, 10, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: opacity of the companion tee")
 MACRO_CONFIG_INT(ClMClientBindWheelSlots, cl_mclient_bindwheel_slots, 8, 8, 16, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: number of slices on the bind wheel (8-16)")
+MACRO_CONFIG_INT(ClMClientBindWheelAlpha, cl_mclient_bindwheel_alpha, 35, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: background opacity of the bind wheel")
 MACRO_CONFIG_INT(ClMClientInfoBar, cl_mclient_infobar, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show a customizable info bar at the bottom of the screen")
 MACRO_CONFIG_INT(ClMClientInfoBarHeight, cl_mclient_infobar_height, 16, 12, 28, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: height of the info bar")
 MACRO_CONFIG_INT(ClMClientInfoBarAlpha, cl_mclient_infobar_alpha, 75, 10, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: background opacity of the info bar")

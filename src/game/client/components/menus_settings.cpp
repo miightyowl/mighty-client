@@ -2111,6 +2111,13 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 	MainView.HSplitTop(20.0f, &SlotRow, &MainView);
 	SlotRow.VSplitLeft(280.0f, &SlotRow, nullptr);
 	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelSlots, &g_Config.m_ClMClientBindWheelSlots, &SlotRow, Localize("Number of slices"), CBindWheel::MIN_BINDS, CBindWheel::MAX_BINDS);
+	MainView.HSplitTop(6.0f, nullptr, &MainView);
+
+	// background opacity
+	CUIRect AlphaRow;
+	MainView.HSplitTop(20.0f, &AlphaRow, &MainView);
+	AlphaRow.VSplitLeft(280.0f, &AlphaRow, nullptr);
+	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelAlpha, &g_Config.m_ClMClientBindWheelAlpha, &AlphaRow, Localize("Background opacity"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
 	MainView.HSplitTop(12.0f, nullptr, &MainView);
 
 	MainView.VSplitMid(&Left, &Right, 20.0f);

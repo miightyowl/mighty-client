@@ -198,6 +198,9 @@ int CControls::SnapInput(int *pData)
 	if(GameClient()->m_Scoreboard.IsActive())
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags |= PLAYERFLAG_SCOREBOARD;
 
+	if(g_Config.m_ClMClientInfoBar && g_Config.m_ClShowhud && g_Config.m_ClMClientInfoBarPing != 0)
+		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags |= PLAYERFLAG_SCOREBOARD;
+
 	if(Client()->ServerCapAnyPlayerFlag() && GameClient()->m_Controls.m_aShowHookColl[g_Config.m_ClDummy])
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags |= PLAYERFLAG_AIM;
 

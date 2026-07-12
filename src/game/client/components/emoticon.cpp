@@ -25,8 +25,13 @@ void CEmoticon::ConKeyEmoticon(IConsole::IResult *pResult, void *pUserData)
 	if(pSelf->GameClient()->m_Scoreboard.IsActive())
 		return;
 
+	const bool Activate = pResult->GetInteger(0) != 0;
+	// dont open while the bind wheel is open
+	if(Activate && pSelf->GameClient()->m_BindWheel.IsActive())
+		return;
+
 	if(!pSelf->GameClient()->m_Snap.m_SpecInfo.m_Active && pSelf->Client()->State() != IClient::STATE_DEMOPLAYBACK)
-		pSelf->m_Active = pResult->GetInteger(0) != 0;
+		pSelf->m_Active = Activate;
 }
 
 void CEmoticon::ConEmote(IConsole::IResult *pResult, void *pUserData)
