@@ -67,6 +67,8 @@ bool HttpHasIpresolveBug()
 
 CHttpRequest::CHttpRequest(const char *pUrl)
 {
+	if(str_length(pUrl) >= (int)sizeof(m_aUrl))
+		log_error("http", "url too long, truncating: %s", pUrl);
 	str_copy(m_aUrl, pUrl);
 	sha256_init(&m_ActualSha256Ctx);
 }
