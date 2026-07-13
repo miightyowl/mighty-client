@@ -2,9 +2,12 @@
 #define GAME_CLIENT_COMPONENTS_FINISH_RENAME_H
 
 #include <base/vmath.h>
+
 #include <engine/map.h>
 #include <engine/shared/protocol.h>
+
 #include <game/client/component.h>
+
 #include <map>
 #include <memory>
 #include <string>

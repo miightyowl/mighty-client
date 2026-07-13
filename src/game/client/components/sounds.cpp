@@ -15,11 +15,10 @@
 
 #include <generated/client_data.h>
 
-#include <game/collision.h>
-
 #include <game/client/components/camera.h>
 #include <game/client/components/menus.h>
 #include <game/client/gameclient.h>
+#include <game/collision.h>
 #include <game/localization.h>
 
 CSoundLoading::CSoundLoading(CGameClient *pGameClient, bool Render) :

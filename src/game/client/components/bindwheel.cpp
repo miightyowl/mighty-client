@@ -1,13 +1,17 @@
 #include "bindwheel.h"
+
 #include <base/math.h>
-#include <algorithm>
+
 #include <engine/external/json-parser/json.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>
+
 #include <game/client/gameclient.h>
 #include <game/client/render.h>
+
+#include <algorithm>
 
 static const char *const MCLIENT_FILE = "mclient.json";
 

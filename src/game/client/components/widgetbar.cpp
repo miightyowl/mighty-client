@@ -1,11 +1,15 @@
 #include "widgetbar.h"
+
 #include <base/color.h>
 #include <base/math.h>
+
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/textrender.h>
+
 #include <game/client/components/hud.h>
 #include <game/client/gameclient.h>
+
 #include <ctime>
 
 void CWidgetBar::BuildSegments(std::vector<SSegment> &vLeft, std::vector<SSegment> &vCenter, std::vector<SSegment> &vRight)

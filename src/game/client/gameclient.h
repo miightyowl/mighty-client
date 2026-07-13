@@ -29,9 +29,9 @@
 
 // components
 #include "components/ads.h"
-#include "components/bindwheel.h"
 #include "components/background.h"
 #include "components/binds.h"
+#include "components/bindwheel.h"
 #include "components/broadcast.h"
 #include "components/camera.h"
 #include "components/censor.h"
@@ -49,7 +49,6 @@
 #include "components/freezebars.h"
 #include "components/ghost.h"
 #include "components/hud.h"
-#include "components/widgetbar.h"
 #include "components/important_alert.h"
 #include "components/infomessages.h"
 #include "components/items.h"
@@ -77,6 +76,7 @@
 #include "components/touch_controls.h"
 #include "components/unfinished_map_vote.h"
 #include "components/voting.h"
+#include "components/widgetbar.h"
 
 #include <memory>
 #include <vector>

@@ -5,9 +5,6 @@
 #include <base/str.h>
 #include <base/types.h>
 
-#include <algorithm>
-#include <cstdlib>
-
 #include <engine/client.h>
 #include <engine/graphics.h>
 #include <engine/image.h>
@@ -20,11 +17,15 @@
 #include <game/client/render.h>
 #include <game/client/ui.h>
 
-namespace {
-constexpr float TITLE_BAR_HEIGHT = 28.0f;
-constexpr float FONT_SIZE = 16.0f;
-constexpr float MAX_WIDTH_FRACTION = 0.8f;
-constexpr float MAX_HEIGHT_FRACTION = 0.8f;
+#include <algorithm>
+#include <cstdlib>
+
+namespace
+{
+	constexpr float TITLE_BAR_HEIGHT = 28.0f;
+	constexpr float FONT_SIZE = 16.0f;
+	constexpr float MAX_WIDTH_FRACTION = 0.8f;
+	constexpr float MAX_HEIGHT_FRACTION = 0.8f;
 }
 
 void CAds::OnInit()

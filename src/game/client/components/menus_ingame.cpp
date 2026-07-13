@@ -14,6 +14,7 @@
 
 #include <engine/console.h>
 #include <engine/demo.h>
+#include <engine/external/json-parser/json.h>
 #include <engine/favorites.h>
 #include <engine/font_icons.h>
 #include <engine/friends.h>
@@ -26,8 +27,6 @@
 #include <engine/shared/localization.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>
-
-#include <engine/external/json-parser/json.h>
 
 #include <generated/client_data.h>
 #include <generated/protocol.h>

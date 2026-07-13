@@ -3,37 +3,38 @@
 #include <base/math.h>
 #include <base/vmath.h>
 
-#include <algorithm>
-#include <iterator>
-#include <utility>
-
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/storage.h>
 
 #include <game/client/gameclient.h>
 
-namespace {
-// gesture detection
-constexpr float OSC_WINDOW = 1.5f; // how far to look for up/down
-constexpr int OSC_MIN_REVERSALS = 4; // need several up/down reversals
-constexpr float OSC_MIN_DELTA = 0.05f;
-constexpr float OSC_MIN_AMPLITUDE = 0.12f;
+#include <algorithm>
+#include <iterator>
+#include <utility>
 
-constexpr float OSC_UP_THRESHOLD = -0.64f;
-constexpr float OSC_DOWN_LIMIT = -0.45f;
+namespace
+{
+	// gesture detection
+	constexpr float OSC_WINDOW = 1.5f; // how far to look for up/down
+	constexpr int OSC_MIN_REVERSALS = 4; // need several up/down reversals
+	constexpr float OSC_MIN_DELTA = 0.05f;
+	constexpr float OSC_MIN_AMPLITUDE = 0.12f;
 
-// standing beside target
-constexpr float PET_RANGE_X = 80.0f;
-constexpr float PET_RANGE_Y = 48.0f;
+	constexpr float OSC_UP_THRESHOLD = -0.64f;
+	constexpr float OSC_DOWN_LIMIT = -0.45f;
 
-constexpr float PET_LINGER = 2.0f;
-constexpr float PET_FADE = 0.4f;
+	// standing beside target
+	constexpr float PET_RANGE_X = 80.0f;
+	constexpr float PET_RANGE_Y = 48.0f;
 
-// hand rendering
-constexpr float HAND_SIZE = 60.0f;
-constexpr float HAND_Y_OFFSET = -18.0f;
-constexpr float FRAME_TIME = 0.06f;
+	constexpr float PET_LINGER = 2.0f;
+	constexpr float PET_FADE = 0.4f;
+
+	// hand rendering
+	constexpr float HAND_SIZE = 60.0f;
+	constexpr float HAND_Y_OFFSET = -18.0f;
+	constexpr float FRAME_TIME = 0.06f;
 }
 
 void CPetting::OnInit()

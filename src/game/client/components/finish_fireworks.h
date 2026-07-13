@@ -3,7 +3,9 @@
 
 #include <base/color.h>
 #include <base/vmath.h>
+
 #include <game/client/component.h>
+
 #include <vector>
 
 class CFinishFireworks : public CComponent

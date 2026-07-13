@@ -2,8 +2,10 @@
 #define GAME_CLIENT_COMPONENTS_WIDGETBAR_H
 
 #include <base/types.h>
+
 #include <game/client/component.h>
 #include <game/client/ui_rect.h>
+
 #include <vector>
 
 class CWidgetBar : public CComponent

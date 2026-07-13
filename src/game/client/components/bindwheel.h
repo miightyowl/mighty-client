@@ -2,9 +2,12 @@
 #define GAME_CLIENT_COMPONENTS_BINDWHEEL_H
 
 #include <base/vmath.h>
+
 #include <engine/console.h>
+
 #include <game/client/component.h>
 #include <game/client/ui.h>
+
 #include <vector>
 
 class CBindWheel : public CComponent

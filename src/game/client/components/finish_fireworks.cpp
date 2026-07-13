@@ -1,10 +1,14 @@
 #include "finish_fireworks.h"
+
 #include <base/str.h>
+
 #include <engine/shared/config.h>
 #include <engine/sound.h>
 #include <engine/storage.h>
+
 #include <generated/client_data.h>
 #include <generated/protocol.h>
+
 #include <game/client/components/particles.h>
 #include <game/client/components/sounds.h>
 #include <game/client/gameclient.h>

@@ -2550,8 +2550,6 @@ if(CLIENT)
     components/ghost.h
     components/hud.cpp
     components/hud.h
-    components/widgetbar.cpp
-    components/widgetbar.h
     components/important_alert.cpp
     components/important_alert.h
     components/infomessages.cpp
@@ -2618,6 +2616,8 @@ if(CLIENT)
     components/unfinished_map_vote.h
     components/voting.cpp
     components/voting.h
+    components/widgetbar.cpp
+    components/widgetbar.h
     gameclient.cpp
     gameclient.h
     laser_data.cpp
