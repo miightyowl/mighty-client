@@ -114,8 +114,10 @@ void CPetTee::OnRender()
 	if(length(m_Dir) > 0.001f)
 		m_Dir = normalize(m_Dir);
 
+	// force maodie skin on pet
+	const char *pSkinName = g_Config.m_ClMClientForceSkin ? "maodie" : g_Config.m_ClMClientPetTeeSkin;
 	CTeeRenderInfo TeeRenderInfo;
-	TeeRenderInfo.Apply(GameClient()->m_Skins.Find(g_Config.m_ClMClientPetTeeSkin));
+	TeeRenderInfo.Apply(GameClient()->m_Skins.Find(pSkinName));
 	TeeRenderInfo.m_Size = 64.0f * Scale;
 	TeeRenderInfo.m_GotAirJump = m_Velocity.y > -10.0f;
 	RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeRenderInfo, EMOTE_NORMAL, m_Dir, m_Position, m_Alpha * (float)g_Config.m_ClMClientPetTeeAlpha / 100.0f);
