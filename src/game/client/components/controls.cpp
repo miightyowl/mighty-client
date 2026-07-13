@@ -294,7 +294,7 @@ int CControls::SnapInput(int *pData)
 	// we freeze the input if chat or menu is activated
 	if(!(m_aInputData[g_Config.m_ClDummy].m_PlayerFlags & PLAYERFLAG_PLAYING))
 	{
-		if(!GameClient()->m_GameInfo.m_BugDDRaceInput)
+		if(!GameClient()->m_GameInfo.m_BugDDRaceInput || GameClient()->m_Ads.IsActive())
 			ResetInput(g_Config.m_ClDummy);
 
 		mem_copy(pData, &m_aInputData[g_Config.m_ClDummy], sizeof(m_aInputData[0]));
