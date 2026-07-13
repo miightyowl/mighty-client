@@ -64,7 +64,7 @@ public:
 	void StartSelected(const char *pReason);
 	bool IsActive() const { return m_State != STATE_IDLE; }
 
-	bool IsPlayerSelected(const char *pName) const { return m_SelectedPlayers.count(pName) != 0; }
+	bool IsPlayerSelected(const char *pName) const { return m_SelectedPlayers.contains(pName); }
 	void TogglePlayerSelection(const char *pName);
 	void EnsureLocalPlayerSelected();
 };

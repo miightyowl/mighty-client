@@ -81,7 +81,7 @@ void CFinishRename::ScanFinishTiles()
 
 void CFinishRename::EnsureLookup(const char *pName)
 {
-	if(!pName[0] || m_Lookups.count(pName) != 0)
+	if(!pName[0] || m_Lookups.contains(pName))
 		return;
 
 	char aEscaped[2 * MAX_NAME_LENGTH + 64];
