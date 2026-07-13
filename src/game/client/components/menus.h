@@ -27,7 +27,9 @@
 
 #include <chrono>
 #include <deque>
+#include <initializer_list>
 #include <optional>
+#include <utility>
 #include <vector>
 
 class CMenus : public CComponent
@@ -474,6 +476,7 @@ protected:
 	void Render();
 	void RenderPopupFullscreen(CUIRect Screen);
 	void RenderPopupMClientSetup(CUIRect Box);
+	void RenderCenteredHighlightedLine(const CUIRect &Rect, float FontSize, std::initializer_list<std::pair<const char *, bool>> Segments);
 	void RenderPopupConnecting(CUIRect Screen);
 	void RenderPopupLoading(CUIRect Screen);
 #if defined(CONF_VIDEORECORDER)
