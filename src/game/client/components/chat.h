@@ -184,6 +184,11 @@ class CChat : public CComponent
 
 	bool m_ServerSupportsCommandInfo;
 
+	bool m_FatChatActive = false;
+	float m_FatChatEnd = 0.0f;
+	int m_FatChatSaved = 0;
+	void TriggerFatChat(const char *pText);
+
 	static void ConSay(IConsole::IResult *pResult, void *pUserData);
 	static void ConSayTeam(IConsole::IResult *pResult, void *pUserData);
 	static void ConChat(IConsole::IResult *pResult, void *pUserData);

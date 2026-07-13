@@ -2413,7 +2413,8 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		const SFunnyToggle aToggles[] = {
 			{&g_Config.m_ClMClientForceSkin, Localize("Force maodie skin on everyone"), Localize("Renders every tee with the best skin ever")},
 			{&g_Config.m_ClMClientPet, Localize("Show petting hand"), Localize("Shows a hand when a player pets someone nearby")},
-			{&g_Config.m_ClMClientAds, Localize("Random advertisement/quote pop-ups"), Localize("Occasionally shows a random advertisement or quote that definitely does not annoy")}};
+			{&g_Config.m_ClMClientAds, Localize("Random advertisement/quote pop-ups"), Localize("Occasionally shows a random advertisement or quote that definitely does not annoy")},
+			{&g_Config.m_ClMClientFatChat, Localize("Fat skins when someone writes \"fat\""), Localize("Everyone turns fat for a few seconds when \"fat\" is written in chat")}};
 
 		float MaxRowWidth = 0.0f;
 		for(const auto &Toggle : aToggles)

@@ -677,6 +677,36 @@ void CChat::StoreSave(const char *pText)
 	io_close(File);
 }
 
+static const float FAT_CHAT_DURATION = 5.0f;
+
+static bool ContainsWordFat(const char *pText)
+{
+	const auto IsAsciiLetter = [](char c) {
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+	};
+	for(const char *pCur = pText; *pCur != '\0'; ++pCur)
+	{
+		if(pCur != pText && IsAsciiLetter(pCur[-1]))
+			continue;
+		if((pCur[0] == 'f' || pCur[0] == 'F') && (pCur[1] == 'a' || pCur[1] == 'A') && (pCur[2] == 't' || pCur[2] == 'T') && !IsAsciiLetter(pCur[3]))
+			return true;
+	}
+	return false;
+}
+
+void CChat::TriggerFatChat(const char *pText)
+{
+	if(!g_Config.m_ClMClientFatChat || !ContainsWordFat(pText))
+		return;
+	if(!m_FatChatActive)
+	{
+		m_FatChatSaved = g_Config.m_ClFatSkins;
+		g_Config.m_ClFatSkins = 1;
+		m_FatChatActive = true;
+	}
+	m_FatChatEnd = Client()->LocalTime() + FAT_CHAT_DURATION;
+}
+
 void CChat::AddLine(int ClientId, int Team, const char *pLine)
 {
 	if(*pLine == 0 ||
@@ -687,6 +717,10 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 					  (GameClient()->m_Snap.m_LocalClientId != ClientId && g_Config.m_ClShowChatTeamMembersOnly && GameClient()->IsOtherTeam(ClientId) && GameClient()->m_Teams.Team(GameClient()->m_Snap.m_LocalClientId) != TEAM_FLOCK) ||
 					  (GameClient()->m_Snap.m_LocalClientId != ClientId && GameClient()->m_aClients[ClientId].m_Foe))))
 		return;
+
+	// briefly enable fat skins when a player writes "fat"
+	if(ClientId >= 0)
+		TriggerFatChat(pLine);
 
 	// trim right and set maximum length to 256 utf8-characters
 	int Length = 0;
@@ -1722,6 +1756,12 @@ void CChat::OnPrepareLines(float y)
 void CChat::OnRender()
 {
 	PollTranslations();
+
+	if(m_FatChatActive && Client()->LocalTime() >= m_FatChatEnd)
+	{
+		g_Config.m_ClFatSkins = m_FatChatSaved;
+		m_FatChatActive = false;
+	}
 
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
