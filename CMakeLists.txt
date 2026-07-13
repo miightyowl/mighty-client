@@ -1222,6 +1222,7 @@ set(EXPECTED_DATA
   audio/wp_switch-03.wv
   autoexec_server.cfg
   background_noise.png
+  bindwheel.png
   blob.png
   censorlist.txt
   communityicons/none.png
@@ -1533,6 +1534,7 @@ set(EXPECTED_DATA
   gui_icons.png
   gui_logo.png
   hud.png
+  ingame.png
   languages/README.txt
   languages/arabic.txt
   languages/azerbaijani.txt
@@ -1654,6 +1656,7 @@ set(EXPECTED_DATA
   maps7/Tsunami.map
   maps7/Tutorial.map
   maps7/readme.txt
+  menu.png
   menuimages/demos.png
   menuimages/editor.png
   menuimages/local_server.png
@@ -1662,6 +1665,9 @@ set(EXPECTED_DATA
   particles.png
   pet.png
   race_flag.png
+  savemaps.png
+  selectedunfinished.png
+  serverlist.png
   shader/pipeline.frag
   shader/pipeline.vert
   shader/prim.frag
