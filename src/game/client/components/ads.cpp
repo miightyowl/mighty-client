@@ -216,11 +216,16 @@ bool CAds::OnInput(const IInput::CEvent &Event)
 	if(!m_Active)
 		return false;
 
-	if((Event.m_Flags & IInput::FLAG_PRESS) && Event.m_Key == KEY_MOUSE_1)
+	if(Event.m_Flags & IInput::FLAG_PRESS)
 	{
-		const SLayout Layout = ComputeLayout();
-		if(Layout.m_CloseButton.Inside(m_MousePos))
+		if(Event.m_Key == KEY_ESCAPE)
 			Close();
+		else if(Event.m_Key == KEY_MOUSE_1)
+		{
+			const SLayout Layout = ComputeLayout();
+			if(Layout.m_CloseButton.Inside(m_MousePos))
+				Close();
+		}
 	}
 	return true;
 }
