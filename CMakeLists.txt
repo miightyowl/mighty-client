@@ -2659,6 +2659,7 @@ if(CLIENT)
     ui.h
     ui_listbox.cpp
     ui_listbox.h
+    ui_popups.cpp
     ui_rect.cpp
     ui_rect.h
     ui_scrollregion.cpp
@@ -2689,6 +2690,7 @@ if(CLIENT)
     editor_ui.h
     enums.h
     envelope_editor.cpp
+    envelope_editor.h
     explanations.cpp
     explanations.h
     file_browser.cpp
