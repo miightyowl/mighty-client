@@ -1206,6 +1206,21 @@ static bool IsIgnoredLanguage(const char *pCode)
 	return false;
 }
 
+// only translate most common languages
+static bool IsCommonLanguage(const char *pCode)
+{
+	static const char *const s_apCommon[] = {
+		"en", "de", "es", "fr", "pt", "it", "nl", "pl", "ru", "uk", "tr", "ar",
+		"zh-CN", "zh", "zh-TW", "ja", "ko", "vi", "id", "th", "sv", "cs", "el",
+		"hu", "ro", "fi", "da", "no", "sl", "sk", "hr", "sr", "bg"};
+	for(const char *pCommon : s_apCommon)
+	{
+		if(str_comp_nocase(pCode, pCommon) == 0)
+			return true;
+	}
+	return false;
+}
+
 static const char *LanguageName(const char *pCode)
 {
 	static const struct
@@ -1398,7 +1413,7 @@ void CChat::PollTranslations()
 				const bool KeepOriginal =
 					aTranslated[0] == '\0' ||
 					str_comp(aTranslated, pOriginalBody) == 0 ||
-					(!Misdetected && (pDetectedLang[0] == '\0' || IsIgnoredLanguage(pDetectedLang)));
+					(!Misdetected && (pDetectedLang[0] == '\0' || IsIgnoredLanguage(pDetectedLang) || !IsCommonLanguage(pDetectedLang)));
 
 				const char *pLangName = !KeepOriginal && pDetectedLang[0] != '\0' ? LanguageName(pDetectedLang) : "";
 
