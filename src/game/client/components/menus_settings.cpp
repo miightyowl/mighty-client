@@ -516,6 +516,21 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		ShouldRefresh = true;
 	}
 
+	if(g_Config.m_ClDownloadCommunitySkins)
+	{
+		Checkboxes.HSplitTop(20.0f, &Button, &Checkboxes);
+		Button.VSplitLeft(20.0f, nullptr, &Button);
+		if(DoButton_CheckBox(&g_Config.m_ClMClientExtraSkinProvider, Localize("Use additional skin provider (ddstats.tw)"), g_Config.m_ClMClientExtraSkinProvider, &Button))
+		{
+			g_Config.m_ClMClientExtraSkinProvider ^= 1;
+			if(g_Config.m_ClMClientExtraSkinProvider)
+				str_copy(g_Config.m_ClSkinCommunityDownloadUrl, "https://skins.ddstats.tw/");
+			else
+				str_copy(g_Config.m_ClSkinCommunityDownloadUrl, DefaultConfig::ClSkinCommunityDownloadUrl);
+			ShouldRefresh = true;
+		}
+	}
+
 	Checkboxes.HSplitTop(20.0f, &Button, &Checkboxes);
 	if(DoButton_CheckBox(&g_Config.m_ClVanillaSkinsOnly, Localize("Vanilla skins only"), g_Config.m_ClVanillaSkinsOnly, &Button))
 	{
