@@ -40,6 +40,7 @@ If you want to **enhance your gameplay** even more, these are the **most importa
 - **Forced maodie skin**: every single tee on the server becomes the best skin ever.
 - **In-game advertisements/quotes**: occasionally shows a random advertisement or quote that freezes your inputs and definitely does not annoy.
 - **Petting hand**: bob your gun over a nearby tee's head and a little hand appears that pets them.
+- **Fat tee**: when someone writes "fat" in chat everyone gets DDFat skins for a few seconds.
 
 ![Ingame](data/ingame.png)
 
