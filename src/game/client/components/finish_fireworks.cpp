@@ -26,6 +26,8 @@ void CFinishFireworks::EnsureSoundsLoaded()
 
 void CFinishFireworks::Start()
 {
+	if(!g_Config.m_ClMClientFinishFireworks)
+		return;
 	const float Now = Client()->LocalTime();
 	if(Now < m_CelebrationEnd || !GameClient()->m_Snap.m_pLocalCharacter)
 		return;
