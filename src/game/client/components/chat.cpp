@@ -978,6 +978,21 @@ static bool IsEmojiCodepoint(int Cp)
 	return (Cp >= 0x2190 && Cp <= 0x2BFF) || (Cp >= 0x1F000 && Cp <= 0x1FFFF) || (Cp >= 0xFE00 && Cp <= 0xFE0F) || Cp == 0x200D || Cp == 0x20E3;
 }
 
+static int CountLetters(const char *pText)
+{
+	int NumLetters = 0;
+	const char *pCur = pText;
+	while(*pCur != '\0')
+	{
+		const int Cp = str_utf8_decode(&pCur);
+		if(Cp <= 0)
+			break;
+		if((Cp >= 'a' && Cp <= 'z') || (Cp >= 'A' && Cp <= 'Z') || IsNonLatinLetter(Cp))
+			NumLetters++;
+	}
+	return NumLetters;
+}
+
 static bool IsTranslatableWord(const char *pWord)
 {
 	char aAscii[32];
@@ -1409,10 +1424,13 @@ void CChat::PollTranslations()
 			{
 				const bool ForeignScript = StrHasNonLatinScript(pOriginalBody);
 				const bool Misdetected = ForeignScript && (pDetectedLang[0] == '\0' || str_comp_nocase(pDetectedLang, "en") == 0);
+				// short latin-script messages are frequently misdetected into obscure/wrong languages
+				const bool ShortLatin = !ForeignScript && CountLetters(pOriginalBody) < 6;
 
 				const bool KeepOriginal =
 					aTranslated[0] == '\0' ||
 					str_comp(aTranslated, pOriginalBody) == 0 ||
+					ShortLatin ||
 					(!Misdetected && (pDetectedLang[0] == '\0' || IsIgnoredLanguage(pDetectedLang) || !IsCommonLanguage(pDetectedLang)));
 
 				const char *pLangName = !KeepOriginal && pDetectedLang[0] != '\0' ? LanguageName(pDetectedLang) : "";
