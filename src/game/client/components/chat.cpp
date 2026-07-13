@@ -1624,6 +1624,13 @@ void CChat::OnPrepareLines(float y)
 
 			TextRender()->TextEx(&AppendCursor, pText);
 
+			if(Line.m_aLangTag[0] != '\0' && g_Config.m_ClChatTranslateShowLang)
+			{
+				char aLangTag[48];
+				str_format(aLangTag, sizeof(aLangTag), " (%s)", Line.m_aLangTag);
+				TextRender()->TextEx(&AppendCursor, aLangTag);
+			}
+
 			Line.m_aYOffset[OffsetType] = AppendCursor.Height() + RealMsgPaddingY;
 		}
 
