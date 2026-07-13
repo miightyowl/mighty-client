@@ -95,8 +95,8 @@ float CWidgetBar::SegmentWidth(float FontSize, const SSegment &Segment) const
 
 float CWidgetBar::DrawSegment(float x, float y, float FontSize, const SSegment &Segment)
 {
-	const ColorRGBA LabelColor = color_cast<ColorRGBA>(ColorHSLA((unsigned)g_Config.m_ClMClientInfoBarLabelColor, false));
-	const ColorRGBA ValueColor = color_cast<ColorRGBA>(ColorHSLA((unsigned)g_Config.m_ClMClientInfoBarValueColor, false));
+	const ColorRGBA LabelColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMClientInfoBarLabelColor, false));
+	const ColorRGBA ValueColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMClientInfoBarValueColor, false));
 	if(Segment.m_aLabel[0] != '\0')
 	{
 		TextRender()->TextColor(LabelColor);
@@ -113,11 +113,11 @@ float CWidgetBar::DrawSegment(float x, float y, float FontSize, const SSegment &
 void CWidgetBar::RenderBar(const CUIRect &Bar)
 {
 	CUIRect Background = Bar;
-	const ColorRGBA BgColor = color_cast<ColorRGBA>(ColorHSLA((unsigned)g_Config.m_ClMClientInfoBarBgColor, false));
+	const ColorRGBA BgColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMClientInfoBarBgColor, false));
 	Background.Draw(BgColor.WithAlpha(g_Config.m_ClMClientInfoBarAlpha / 100.0f), IGraphics::CORNER_T, 6.0f);
 
 	const float FontSize = std::clamp(Bar.h * 0.55f, 6.0f, 12.0f);
-	const float y = Bar.y + (Bar.h - FontSize) / 2.0f;
+	float y = Bar.y + (Bar.h - FontSize) / 2.0f;
 	const float Pad = 10.0f;
 	const float Gap = 16.0f;
 
@@ -130,12 +130,12 @@ void CWidgetBar::RenderBar(const CUIRect &Bar)
 		x = DrawSegment(x, y, FontSize, Segment) + Gap;
 	}
 
-	float xr = Bar.x + Bar.w - Pad;
+	float XRight = Bar.x + Bar.w - Pad;
 	for(const SSegment &Segment : vRight)
 	{
-		xr -= SegmentWidth(FontSize, Segment);
-		DrawSegment(xr, y, FontSize, Segment);
-		xr -= Gap;
+		XRight -= SegmentWidth(FontSize, Segment);
+		DrawSegment(XRight, y, FontSize, Segment);
+		XRight -= Gap;
 	}
 
 	// center group
@@ -145,9 +145,9 @@ void CWidgetBar::RenderBar(const CUIRect &Bar)
 		for(const SSegment &Segment : vCenter)
 			TotalWidth += SegmentWidth(FontSize, Segment) + Gap;
 		TotalWidth -= Gap;
-		float xc = Bar.x + (Bar.w - TotalWidth) / 2.0f;
+		float XCenter = Bar.x + (Bar.w - TotalWidth) / 2.0f;
 		for(const SSegment &Segment : vCenter)
-			xc = DrawSegment(xc, y, FontSize, Segment) + Gap;
+			XCenter = DrawSegment(XCenter, y, FontSize, Segment) + Gap;
 	}
 }
 

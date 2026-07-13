@@ -473,8 +473,8 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	}
 
 	// force maodie skin
-	const bool maodieskin = g_Config.m_ClMClientForceSkin != 0;
-	if(maodieskin)
+	const bool MaodieSkin = g_Config.m_ClMClientForceSkin != 0;
+	if(MaodieSkin)
 		str_copy(pSkinName, "maodie", SkinNameSize);
 
 	const float EyeButtonSize = 40.0f;
@@ -646,7 +646,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	RenderSkinStatus(YourSkin, pOwnSkinContainer, &s_StatusTooltipId);
 
 	static CLineInput s_SkinInput;
-	if(maodieskin)
+	if(MaodieSkin)
 	{
 		Ui()->DoLabel(&Button, "maodie (locked)", 14.0f, TEXTALIGN_ML);
 	}
@@ -668,7 +668,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	static int s_CurrentDie = rand() % std::size(s_apDice);
 	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 	TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
-	if(DoButton_Menu(&s_RandomSkinButton, s_apDice[s_CurrentDie], 0, &RandomSkinButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, -0.2f) && !maodieskin)
+	if(DoButton_Menu(&s_RandomSkinButton, s_apDice[s_CurrentDie], 0, &RandomSkinButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, -0.2f) && !MaodieSkin)
 	{
 		GameClient()->m_Skins.RandomizeSkin(m_Dummy);
 		SetNeedSendInfo();
@@ -677,7 +677,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	}
 	TextRender()->SetRenderFlags(0);
 	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-	GameClient()->m_Tooltips.DoToolTip(&s_RandomSkinButton, &RandomSkinButton, maodieskin ? Localize("Skin is locked to \"maodie\"") : Localize("Create a random skin"));
+	GameClient()->m_Tooltips.DoToolTip(&s_RandomSkinButton, &RandomSkinButton, MaodieSkin ? Localize("Skin is locked to \"maodie\"") : Localize("Create a random skin"));
 
 	// Custom colors button
 	if(DoButton_CheckBox(pUseCustomColor, Localize("Custom colors"), *pUseCustomColor, &CustomColorsButton))
@@ -838,7 +838,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 
 	// M-Client: while the skin is forced, selecting from the list is disabled.
 	const int NewSelected = s_ListBox.DoEnd();
-	if(!maodieskin && OldSelected != NewSelected)
+	if(!MaodieSkin && OldSelected != NewSelected)
 	{
 		str_copy(pSkinName, vSkinList[NewSelected].SkinContainer()->Name(), SkinNameSize);
 		SkinList.ForceRefresh();

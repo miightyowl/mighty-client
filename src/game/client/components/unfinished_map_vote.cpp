@@ -382,7 +382,7 @@ void CUnfinishedMapVote::OnPlayersDone()
 
 	int NumUnfinished = 0;
 	for(const std::string &Map : AllTypeMaps)
-		if(FinishedByAnyone.count(Map) == 0 && str_comp(Map.c_str(), m_aCurrentMap) != 0)
+		if(!FinishedByAnyone.contains(Map) && str_comp(Map.c_str(), m_aCurrentMap) != 0)
 			NumUnfinished++;
 
 	int StarsFilter = -1;
@@ -401,7 +401,7 @@ void CUnfinishedMapVote::OnPlayersDone()
 			if((!pBestMap || Map.length() > pBestMap->length()) && DescriptionMatchesMap(pOption->m_aDescription, Map.c_str()))
 				pBestMap = &Map;
 		}
-		if(pBestMap == nullptr || FinishedByAnyone.count(*pBestMap) != 0 || str_comp(pBestMap->c_str(), m_aCurrentMap) == 0)
+		if(pBestMap == nullptr || FinishedByAnyone.contains(*pBestMap) || str_comp(pBestMap->c_str(), m_aCurrentMap) == 0)
 			continue;
 		if(StarsFilter != -1 && VoteDescriptionStars(pOption->m_aDescription) != StarsFilter)
 		{

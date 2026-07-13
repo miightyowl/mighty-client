@@ -61,19 +61,19 @@ float CMenus::ms_ListheaderHeight = 17.0f;
 
 ColorRGBA CMenus::AccentColor()
 {
-	return color_cast<ColorRGBA>(ColorHSLA((unsigned)g_Config.m_ClMClientColor, false));
+	return color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMClientColor, false));
 }
 
 ColorRGBA CMenus::AccentColorLight()
 {
-	ColorHSLA Hsl((unsigned)g_Config.m_ClMClientColor, false);
+	ColorHSLA Hsl(g_Config.m_ClMClientColor, false);
 	Hsl.l = std::clamp(Hsl.l + 0.08f, 0.0f, 1.0f);
 	return color_cast<ColorRGBA>(Hsl);
 }
 
 ColorRGBA CMenus::AccentColorDark()
 {
-	ColorHSLA Hsl((unsigned)g_Config.m_ClMClientColor, false);
+	ColorHSLA Hsl(g_Config.m_ClMClientColor, false);
 	Hsl.s = std::clamp(Hsl.s + 0.05f, 0.0f, 1.0f);
 	Hsl.l = std::clamp(Hsl.l - 0.30f, 0.0f, 1.0f);
 	return color_cast<ColorRGBA>(Hsl);
