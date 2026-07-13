@@ -26,6 +26,8 @@
 #include <game/client/gameclient.h>
 #include <game/localization.h>
 
+#include <algorithm>
+
 char CChat::ms_aDisplayText[MAX_LINE_LENGTH] = "";
 
 CChat::CLine::CLine()
@@ -1228,12 +1230,9 @@ static bool IsCommonLanguage(const char *pCode)
 		"en", "de", "es", "fr", "pt", "it", "nl", "pl", "ru", "uk", "tr", "ar",
 		"zh-CN", "zh", "zh-TW", "ja", "ko", "vi", "id", "th", "sv", "cs", "el",
 		"hu", "ro", "fi", "da", "no", "sl", "sk", "hr", "sr", "bg"};
-	for(const char *pCommon : s_apCommon)
-	{
-		if(str_comp_nocase(pCode, pCommon) == 0)
-			return true;
-	}
-	return false;
+	return std::ranges::any_of(s_apCommon, [&](const char *pCommon) {
+		return str_comp_nocase(pCode, pCommon) == 0;
+	});
 }
 
 static const char *LanguageName(const char *pCode)
