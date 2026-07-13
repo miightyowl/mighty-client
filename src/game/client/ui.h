@@ -617,6 +617,7 @@ public:
 	 * @param FontSize Size of the font (`10.0f`, `12.0f` and `14.0f` are commonly used here)
 	 * @param Corners Number of corners (default: `IGraphics::CORNER_ALL`)
 	 * @param vColorSplits Sets color splits of the `CTextCursor` to allow multicolored text
+	 * @param pBackgroundColor Optional custom background color drawn behind the input field
 	 *
 	 * @return true if the value of the input field changed since the last call.
 	 */
@@ -635,6 +636,7 @@ public:
 	 * @param FontSize Size of the font (`10.0f`, `12.0f` and `14.0f` are commonly used here)
 	 * @param Corners Number of corners (default: `IGraphics::CORNER_ALL`)
 	 * @param vColorSplits Sets color splits of the `CTextCursor` to allow multicolored text
+	 * @param pBackgroundColor Optional custom background color drawn behind the input field
 	 *
 	 * @return true if the value of the input field changed since the last call.
 	 */
@@ -653,6 +655,7 @@ public:
 	 * @param pRect the UI rect it will attach to
 	 * @param FontSize Size of the font (`10.0f`, `12.0f` and `14.0f` are commonly used here)
 	 * @param HotkeyEnabled Whether the hotkey to enable this editbox is currently enabled.
+	 * @param pBackgroundColor Optional custom background color drawn behind the input field
 	 *
 	 * @return true if the value of the input field changed since the last call.
 	 */

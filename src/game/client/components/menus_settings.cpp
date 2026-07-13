@@ -1946,7 +1946,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 	if(!m_ProfilesLoaded)
 		LoadProfiles();
 
-	CUIRect Headline, TopBar, Divider, Label;
+	CUIRect Headline, TopBar, Divider;
 
 	// renders a tee
 	const auto &&RenderProfileTee = [this](const CUIRect &Rect, const char *pSkin, int UseCustomColor, int ColorBody, int ColorFeet) {
