@@ -1632,6 +1632,8 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFoeAnonymize, Localize("Fully anonymize tees on your foe list"), &g_Config.m_ClFoeAnonymize, &LeftView, LineSize);
 
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFriendsCommunityFilter, Localize("Only show friends in enabled communities"), &g_Config.m_ClMClientFriendsCommunityFilter, &LeftView, LineSize);
+
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFinishRename, Localize("Rename near finish if name has finished"), &g_Config.m_ClFinishRename, &LeftView, LineSize);
 	if(g_Config.m_ClFinishRename)
 	{
@@ -1652,13 +1654,6 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		Ui()->DoScrollbarOption(&g_Config.m_ClMClientFastInputAmount, &g_Config.m_ClMClientFastInputAmount, &Button, Localize("Fast input amount"), 1, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "ms");
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFastInputOthers, Localize("Apply fast input to other tees"), &g_Config.m_ClMClientFastInputOthers, &LeftView, LineSize);
 	}
-
-	// appearance
-	LeftView.HSplitTop(MarginBetweenViews, nullptr, &LeftView);
-	Ui()->DoLabel_AutoLineSize(Localize("Appearance"), HeadlineFontSize, TEXTALIGN_ML, &LeftView, HeadlineHeight);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-	static CButtonContainer s_MClientColorResetId;
-	DoLine_ColorPicker(&s_MClientColorResetId, 25.0f, 13.0f, 2.0f, &LeftView, Localize("Menu accent color"), &g_Config.m_ClMClientColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientColor, false)), false, nullptr, false);
 
 	// funny
 	LeftView.HSplitTop(MarginBetweenViews, nullptr, &LeftView);
@@ -1687,7 +1682,14 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 	Ui()->DoLabel(&Label, Localize("Pick the companion skin in the Tee settings tab."), 11.0f, TEXTALIGN_ML);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
+	// appearance
+	Ui()->DoLabel_AutoLineSize(Localize("Appearance"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	static CButtonContainer s_MClientColorResetId;
+	DoLine_ColorPicker(&s_MClientColorResetId, 25.0f, 13.0f, 2.0f, &RightView, Localize("Menu accent color"), &g_Config.m_ClMClientColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientColor, false)), false, nullptr, false);
+
 	// frozen teammates HUD
+	RightView.HSplitTop(MarginBetweenViews, nullptr, &RightView);
 	Ui()->DoLabel_AutoLineSize(Localize("Frozen teammates HUD"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHud, Localize("Show frozen teammates on HUD"), &g_Config.m_ClMClientFrozenHud, &RightView, LineSize);
