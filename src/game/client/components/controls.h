@@ -40,6 +40,10 @@ public:
 	int m_aInputDirectionRight[NUM_DUMMIES];
 	int m_aShowHookColl[NUM_DUMMIES];
 
+	CNetObj_PlayerInput m_aFastInput[NUM_DUMMIES];
+	bool m_FastInputHookAction = false;
+	bool m_FastInputFireAction = false;
+
 	CControls();
 	int Sizeof() const override { return sizeof(*this); }
 
@@ -53,6 +57,8 @@ public:
 	int SnapInput(int *pData);
 	void ClampMousePos();
 	void ResetInput(int Dummy);
+
+	bool CheckNewInput();
 
 private:
 	static void ConKeyInputState(IConsole::IResult *pResult, void *pUserData);

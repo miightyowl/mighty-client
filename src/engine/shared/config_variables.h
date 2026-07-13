@@ -212,6 +212,9 @@ MACRO_CONFIG_INT(ClMClientInfoBarSpeed, cl_mclient_infobar_speed, 0, 0, 3, CFGFL
 MACRO_CONFIG_COL(ClMClientInfoBarBgColor, cl_mclient_infobar_bg_color, 0, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: info bar background color")
 MACRO_CONFIG_COL(ClMClientInfoBarLabelColor, cl_mclient_infobar_label_color, 160, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: info bar label text color")
 MACRO_CONFIG_COL(ClMClientInfoBarValueColor, cl_mclient_infobar_value_color, 255, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: info bar value text color")
+MACRO_CONFIG_INT(ClMClientFastInput, cl_mclient_fast_input, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: use input for prediction before the next tick, reducing input delay")
+MACRO_CONFIG_INT(ClMClientFastInputAmount, cl_mclient_fast_input_amount, 20, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: how many milliseconds of fast input to apply")
+MACRO_CONFIG_INT(ClMClientFastInputOthers, cl_mclient_fast_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: also apply fast input prediction to other tees")
 
 MACRO_CONFIG_COL(ClPlayer7ColorBody, player7_color_body, 0x1B6F74, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player body color")
 MACRO_CONFIG_COL(ClPlayer7ColorFeet, player7_color_feet, 0x1C873E, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player feet color")

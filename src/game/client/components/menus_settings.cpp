@@ -1607,6 +1607,14 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		Ui()->DoEditBox(&s_FinishRenameNamesInput, &Button, 12.0f);
 	}
 
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFastInput, Localize("Fast input (lower input delay)"), &g_Config.m_ClMClientFastInput, &LeftView, LineSize);
+	if(g_Config.m_ClMClientFastInput)
+	{
+		LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClMClientFastInputAmount, &g_Config.m_ClMClientFastInputAmount, &Button, Localize("Fast input amount"), 1, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "ms");
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFastInputOthers, Localize("Apply fast input to other tees"), &g_Config.m_ClMClientFastInputOthers, &LeftView, LineSize);
+	}
+
 	// appearance
 	LeftView.HSplitTop(MarginBetweenViews, nullptr, &LeftView);
 	Ui()->DoLabel_AutoLineSize(Localize("Appearance"), HeadlineFontSize, TEXTALIGN_ML, &LeftView, HeadlineHeight);

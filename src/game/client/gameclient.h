@@ -506,6 +506,7 @@ public:
 
 		CCharacterCore m_Predicted;
 		CCharacterCore m_PrevPredicted;
+		CCharacterCore m_RegularPredicted;
 
 		std::shared_ptr<CManagedTeeRenderInfo> m_pSkinInfo = nullptr; // this is what the server reports
 		CTeeRenderInfo m_RenderInfo; // this is what we use
@@ -639,6 +640,7 @@ public:
 	void InvalidateSnapshot() override;
 	void OnNewSnapshot(bool DummySwapped) override;
 	void OnPredict() override;
+	bool CheckNewInput() override;
 	void OnActivateEditor() override;
 	void OnDummySwap() override;
 	int OnSnapInput(int *pData, bool Dummy, bool Force) override;
@@ -693,6 +695,9 @@ public:
 
 	void ApplyPreInputs(int Tick, bool Direct, CGameWorld &GameWorld);
 
+	bool GetDummyFastInput(CNetObj_PlayerInput &DummyFastInput, const CNetObj_PlayerInput *pDummyInputData, const class CCharacter *pDummyChar, int LocalTee, int DummyTee) const;
+	vec2 GetFastInputPos(int ClientId);
+
 	int m_aNextChangeInfo[NUM_DUMMIES];
 
 	// DDRace
@@ -731,6 +736,7 @@ public:
 	CGameWorld m_GameWorld;
 	CGameWorld m_PredictedWorld;
 	CGameWorld m_PrevPredictedWorld;
+	CGameWorld m_RegularPredictedWorld;
 
 	std::vector<SSwitchers> &Switchers() { return m_GameWorld.m_Core.m_vSwitchers; }
 	std::vector<SSwitchers> &PredSwitchers() { return m_PredictedWorld.m_Core.m_vSwitchers; }

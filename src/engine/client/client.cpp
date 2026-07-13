@@ -2898,6 +2898,12 @@ void CClient::Update()
 					// send input
 					SendInput();
 				}
+
+				// fast input: repredict whenever the latest input changed so the prediction reflects the newest input immediately
+				if(g_Config.m_ClMClientFastInput && GameClient()->CheckNewInput())
+				{
+					Repredict = true;
+				}
 			}
 
 			// only do sane predictions

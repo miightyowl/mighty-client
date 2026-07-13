@@ -2628,6 +2628,57 @@ void CGameClient::ApplyPreInputs(int Tick, bool Direct, CGameWorld &GameWorld)
 	}
 }
 
+// fast input for dummy
+bool CGameClient::CheckNewInput()
+{
+	return m_Controls.CheckNewInput();
+}
+
+bool CGameClient::GetDummyFastInput(CNetObj_PlayerInput &DummyFastInput, const CNetObj_PlayerInput *pDummyInputData, const CCharacter *pDummyChar, int LocalTee, int DummyTee) const
+{
+	if(!PredictDummy() || !pDummyChar)
+		return false;
+
+	if(g_Config.m_ClDummyHammer)
+	{
+		DummyFastInput = m_HammerInput;
+		return true;
+	}
+
+	if(g_Config.m_ClDummyCopyMoves)
+	{
+		DummyFastInput = m_Controls.m_aFastInput[LocalTee];
+		DummyFastInput.m_Fire = m_Controls.m_aFastInput[DummyTee].m_Fire;
+		DummyFastInput.m_WantedWeapon = m_Controls.m_aFastInput[DummyTee].m_WantedWeapon;
+		DummyFastInput.m_NextWeapon = m_Controls.m_aFastInput[DummyTee].m_NextWeapon;
+		DummyFastInput.m_PrevWeapon = m_Controls.m_aFastInput[DummyTee].m_PrevWeapon;
+		if(g_Config.m_ClDummyControl)
+		{
+			const CNetObj_PlayerInput BaseDummyInput = pDummyInputData ? *pDummyInputData : CNetObj_PlayerInput{};
+			DummyFastInput.m_Jump = BaseDummyInput.m_Jump;
+			DummyFastInput.m_Fire = BaseDummyInput.m_Fire;
+			DummyFastInput.m_Hook = BaseDummyInput.m_Hook;
+		}
+		return true;
+	}
+
+	if(g_Config.m_ClDummyControl)
+	{
+		const CNetObj_PlayerInput BaseDummyInput = pDummyInputData ? *pDummyInputData : CNetObj_PlayerInput{};
+		DummyFastInput = BaseDummyInput;
+		DummyFastInput.m_Direction = m_Controls.m_aFastInput[DummyTee].m_Direction;
+		DummyFastInput.m_PlayerFlags = m_Controls.m_aFastInput[DummyTee].m_PlayerFlags;
+		DummyFastInput.m_TargetX = m_Controls.m_aFastInput[DummyTee].m_TargetX;
+		DummyFastInput.m_TargetY = m_Controls.m_aFastInput[DummyTee].m_TargetY;
+		DummyFastInput.m_WantedWeapon = m_Controls.m_aFastInput[DummyTee].m_WantedWeapon;
+		DummyFastInput.m_NextWeapon = m_Controls.m_aFastInput[DummyTee].m_NextWeapon;
+		DummyFastInput.m_PrevWeapon = m_Controls.m_aFastInput[DummyTee].m_PrevWeapon;
+		return true;
+	}
+
+	return false;
+}
+
 void CGameClient::OnPredict()
 {
 	// store the previous values so we can detect prediction errors
@@ -2689,8 +2740,18 @@ void CGameClient::OnPredict()
 		pDummyChar = m_PredictedWorld.GetCharacterById(m_aLocalIds[!g_Config.m_ClDummy]);
 
 	int PredictionTick = Client()->GetPredictionTick();
+
+	int FastInputTicks = 0;
+	if(g_Config.m_ClMClientFastInput)
+		FastInputTicks = (g_Config.m_ClMClientFastInputAmount + 19) / 20;
+
+	const int FinalTickRegular = Client()->PredGameTick(g_Config.m_ClDummy);
+	const int FinalTickSelf = FinalTickRegular + FastInputTicks;
+	const int LocalTee = g_Config.m_ClDummy ^ m_IsDummySwapping;
+	const int DummyTee = LocalTee ^ 1;
+
 	// predict
-	for(int Tick = Client()->GameTick(g_Config.m_ClDummy) + 1; Tick <= Client()->PredGameTick(g_Config.m_ClDummy); Tick++)
+	for(int Tick = Client()->GameTick(g_Config.m_ClDummy) + 1; Tick <= FinalTickSelf; Tick++)
 	{
 		// fetch the previous characters
 		if(Tick == PredictionTick)
@@ -2700,7 +2761,16 @@ void CGameClient::OnPredict()
 					m_aClients[i].m_PrevPredicted = pChar->GetCore();
 		}
 
-		if(Tick == Client()->PredGameTick(g_Config.m_ClDummy))
+		if(Tick == FinalTickRegular)
+		{
+			m_PredictedPrevChar = pLocalChar->GetCore();
+			m_aClients[m_Snap.m_LocalClientId].m_PrevPredicted = pLocalChar->GetCore();
+
+			if(pDummyChar)
+				m_aClients[m_aLocalIds[!g_Config.m_ClDummy]].m_PrevPredicted = pDummyChar->GetCore();
+		}
+
+		if(FastInputTicks > 0 && Tick == FinalTickSelf)
 		{
 			m_PredictedPrevChar = pLocalChar->GetCore();
 			m_aClients[m_Snap.m_LocalClientId].m_PrevPredicted = pLocalChar->GetCore();
@@ -2716,7 +2786,19 @@ void CGameClient::OnPredict()
 		// apply inputs and tick
 		CNetObj_PlayerInput *pInputData = (CNetObj_PlayerInput *)Client()->GetInput(Tick, m_IsDummySwapping);
 		CNetObj_PlayerInput *pDummyInputData = !pDummyChar ? nullptr : (CNetObj_PlayerInput *)Client()->GetInput(Tick, m_IsDummySwapping ^ 1);
+		CNetObj_PlayerInput DummyFastInput{};
 		bool DummyFirst = pInputData && pDummyInputData && pDummyChar->GetCid() < pLocalChar->GetCid();
+
+		if(FastInputTicks > 0 && Tick > FinalTickRegular)
+		{
+			pInputData = &m_Controls.m_aFastInput[LocalTee];
+			if(GetDummyFastInput(DummyFastInput, pDummyInputData, pDummyChar, LocalTee, DummyTee))
+				pDummyInputData = &DummyFastInput;
+		}
+
+		const bool PredictEventsState = m_PredictedWorld.m_WorldConfig.m_PredictEvents;
+		if(FastInputTicks > 0 && Tick > FinalTickRegular)
+			m_PredictedWorld.m_WorldConfig.m_PredictEvents = false;
 
 		if(DummyFirst)
 			pDummyChar->OnDirectInput(pDummyInputData);
@@ -2737,6 +2819,8 @@ void CGameClient::OnPredict()
 
 		m_PredictedWorld.Tick();
 
+		m_PredictedWorld.m_WorldConfig.m_PredictEvents = PredictEventsState;
+
 		// fetch the current characters
 		if(Tick == PredictionTick)
 		{
@@ -2747,7 +2831,22 @@ void CGameClient::OnPredict()
 					m_aClients[i].m_Predicted = pChar->GetCore();
 		}
 
-		if(Tick == Client()->PredGameTick(g_Config.m_ClDummy))
+		if(Tick == FinalTickRegular)
+		{
+			m_PredictedChar = pLocalChar->GetCore();
+			m_aClients[m_Snap.m_LocalClientId].m_Predicted = pLocalChar->GetCore();
+
+			if(pDummyChar)
+				m_aClients[m_aLocalIds[!g_Config.m_ClDummy]].m_Predicted = pDummyChar->GetCore();
+
+			for(int i = 0; i < MAX_CLIENTS; i++)
+				if(CCharacter *pChar = m_PredictedWorld.GetCharacterById(i))
+					m_aClients[i].m_RegularPredicted = pChar->GetCore();
+			if(FastInputTicks > 0)
+				m_RegularPredictedWorld.CopyWorldClean(&m_PredictedWorld);
+		}
+
+		if(FastInputTicks > 0 && Tick == FinalTickSelf)
 		{
 			m_PredictedChar = pLocalChar->GetCore();
 			m_aClients[m_Snap.m_LocalClientId].m_Predicted = pLocalChar->GetCore();
@@ -2764,7 +2863,7 @@ void CGameClient::OnPredict()
 			}
 
 		// check if we want to trigger effects
-		if(Tick > m_aLastNewPredictedTick[Dummy])
+		if(Tick <= FinalTickRegular && Tick > m_aLastNewPredictedTick[Dummy])
 		{
 			m_aLastNewPredictedTick[Dummy] = Tick;
 			m_NewPredictedTick = true;
@@ -2789,7 +2888,7 @@ void CGameClient::OnPredict()
 		}
 
 		// check if we want to trigger predicted airjump for dummy
-		if(AntiPingPlayers() && pDummyChar && Tick > m_aLastNewPredictedTick[!Dummy])
+		if(Tick <= FinalTickRegular && AntiPingPlayers() && pDummyChar && Tick > m_aLastNewPredictedTick[!Dummy])
 		{
 			m_aLastNewPredictedTick[!Dummy] = Tick;
 			vec2 Pos = pDummyChar->Core()->m_Pos;
@@ -2799,8 +2898,12 @@ void CGameClient::OnPredict()
 					m_Effects.AirJump(Pos, 1.0f, 1.0f);
 		}
 
-		HandlePredictedEvents(Tick);
+		if(Tick <= FinalTickRegular)
+			HandlePredictedEvents(Tick);
 	}
+
+	if(FastInputTicks > 0)
+		m_PredictedWorld.CopyWorld(&m_RegularPredictedWorld);
 
 	// detect mispredictions of other players and make corrections smoother when possible
 	if(g_Config.m_ClAntiPingSmooth && Predict() && AntiPingPlayers() && m_NewTick && m_PredictedTick >= MIN_TICK && absolute(m_PredictedTick - Client()->PredGameTick(g_Config.m_ClDummy)) <= 1 && absolute(Client()->GameTick(g_Config.m_ClDummy) - Client()->PrevGameTick(g_Config.m_ClDummy)) <= 2)
@@ -3076,6 +3179,7 @@ void CGameClient::CClientData::Reset()
 
 	m_Predicted.Reset();
 	m_PrevPredicted.Reset();
+	m_RegularPredicted.Reset();
 
 	if(m_pSkinInfo != nullptr)
 	{
@@ -3846,6 +3950,10 @@ void CGameClient::UpdateRenderedCharacters()
 				vec2(m_aClients[i].m_RenderCur.m_X, m_aClients[i].m_RenderCur.m_Y),
 				m_aClients[i].m_IsPredicted ? Client()->PredIntraGameTick(g_Config.m_ClDummy) : Client()->IntraGameTick(g_Config.m_ClDummy));
 
+			// M-Client: fast input - render our local tee(s) at the extended fast-input position
+			if(g_Config.m_ClMClientFastInput && (i == m_Snap.m_LocalClientId || (PredictDummy() && i == m_aLocalIds[!g_Config.m_ClDummy])))
+				Pos = GetFastInputPos(i);
+
 			if(i == m_Snap.m_LocalClientId || (PredictDummy() && i == m_aLocalIds[!g_Config.m_ClDummy]))
 			{
 				m_aClients[i].m_IsPredictedLocal = true;
@@ -3864,6 +3972,9 @@ void CGameClient::UpdateRenderedCharacters()
 
 				if(g_Config.m_ClAntiPingSmooth)
 					Pos = GetSmoothPos(i);
+
+				if(g_Config.m_ClMClientFastInput && g_Config.m_ClMClientFastInputOthers)
+					Pos = GetFastInputPos(i);
 			}
 		}
 		m_aClients[i].m_RenderPos = Pos;
@@ -4006,6 +4117,7 @@ void CGameClient::DetectStrongHook()
 
 vec2 CGameClient::GetSmoothPos(int ClientId)
 {
+	const int FastInputTicks = g_Config.m_ClMClientFastInput ? (g_Config.m_ClMClientFastInputAmount + 19) / 20 : 0;
 	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 	int64_t Now = time_get();
 	for(int i = 0; i < 2; i++)
@@ -4018,10 +4130,44 @@ vec2 CGameClient::GetSmoothPos(int ClientId)
 			int SmoothTick;
 			float SmoothIntra;
 			Client()->GetSmoothTick(&SmoothTick, &SmoothIntra, MixAmount);
-			if(SmoothTick > 0 && m_aClients[ClientId].m_aPredTick[(SmoothTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) && m_aClients[ClientId].m_aPredTick[SmoothTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy))
+
+			if(ClientId != m_Snap.m_LocalClientId && g_Config.m_ClMClientFastInputOthers && FastInputTicks > 0)
+				SmoothTick += FastInputTicks;
+
+			if(SmoothTick > 0 && m_aClients[ClientId].m_aPredTick[(SmoothTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) && m_aClients[ClientId].m_aPredTick[SmoothTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicks)
 				Pos[i] = mix(m_aClients[ClientId].m_aPredPos[(SmoothTick - 1) % 200][i], m_aClients[ClientId].m_aPredPos[SmoothTick % 200][i], SmoothIntra);
 		}
 	}
+	return Pos;
+}
+
+vec2 CGameClient::GetFastInputPos(int ClientId)
+{
+	const float PredIntraTick = Client()->PredIntraGameTick(g_Config.m_ClDummy);
+	const int PredTick = Client()->PredGameTick(g_Config.m_ClDummy);
+
+	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, PredIntraTick);
+
+	const float FastInputIntra = (g_Config.m_ClMClientFastInputAmount % 20) / 20.0f;
+	int FastInputTicks = g_Config.m_ClMClientFastInputAmount / 20;
+
+	const float CombinedIntra = PredIntraTick + FastInputIntra;
+
+	float IntraRemainder = 0.0f;
+	const float FinalIntra = std::modf(CombinedIntra, &IntraRemainder);
+	const int CarryOverTicks = static_cast<int>(IntraRemainder);
+
+	FastInputTicks += CarryOverTicks;
+
+	const int FinalTick = PredTick + FastInputTicks;
+
+	if(FinalTick > 0 &&
+		m_aClients[ClientId].m_aPredTick[(FinalTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&
+		m_aClients[ClientId].m_aPredTick[FinalTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicks)
+	{
+		Pos = mix(m_aClients[ClientId].m_aPredPos[(FinalTick - 1) % 200], m_aClients[ClientId].m_aPredPos[FinalTick % 200], FinalIntra);
+	}
+
 	return Pos;
 }
 

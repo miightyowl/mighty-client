@@ -55,6 +55,73 @@ void CControls::ResetInput(int Dummy)
 	m_aInputDirectionRight[Dummy] = 0;
 }
 
+// fast input
+bool CControls::CheckNewInput()
+{
+	bool NewInput[2] = {};
+	for(int Dummy = 0; Dummy < NUM_DUMMIES; Dummy++)
+	{
+		CNetObj_PlayerInput TestInput = m_aInputData[Dummy];
+		if(Dummy == g_Config.m_ClDummy)
+		{
+			TestInput.m_Direction = 0;
+			if(m_aInputDirectionLeft[Dummy] && !m_aInputDirectionRight[Dummy])
+				TestInput.m_Direction = -1;
+			if(!m_aInputDirectionLeft[Dummy] && m_aInputDirectionRight[Dummy])
+				TestInput.m_Direction = 1;
+		}
+
+		if(m_aFastInput[Dummy].m_Direction != TestInput.m_Direction)
+			NewInput[Dummy] = true;
+		if(m_aFastInput[Dummy].m_Hook != TestInput.m_Hook)
+			NewInput[Dummy] = true;
+		if(m_aFastInput[Dummy].m_Fire != TestInput.m_Fire)
+			NewInput[Dummy] = true;
+		if(m_aFastInput[Dummy].m_Jump != TestInput.m_Jump)
+			NewInput[Dummy] = true;
+		if(m_aFastInput[Dummy].m_NextWeapon != TestInput.m_NextWeapon)
+			NewInput[Dummy] = true;
+		if(m_aFastInput[Dummy].m_PrevWeapon != TestInput.m_PrevWeapon)
+			NewInput[Dummy] = true;
+		if(m_aFastInput[Dummy].m_WantedWeapon != TestInput.m_WantedWeapon)
+			NewInput[Dummy] = true;
+
+		bool SetMousePos = false;
+		if(Dummy == g_Config.m_ClDummy)
+		{
+			if(m_aFastInput[Dummy].m_Hook == 0 && TestInput.m_Hook == 1)
+			{
+				m_FastInputHookAction = true;
+				SetMousePos = true;
+			}
+			if(m_aFastInput[Dummy].m_Fire != TestInput.m_Fire && TestInput.m_Fire % 2 == 1)
+			{
+				m_FastInputFireAction = true;
+				SetMousePos = true;
+			}
+			if(!m_FastInputHookAction && !m_FastInputFireAction)
+			{
+				SetMousePos = true;
+			}
+		}
+
+		if(SetMousePos)
+		{
+			TestInput.m_TargetX = (int)m_aMousePos[Dummy].x;
+			TestInput.m_TargetY = (int)m_aMousePos[Dummy].y;
+		}
+		else
+		{
+			TestInput.m_TargetX = m_aFastInput[Dummy].m_TargetX;
+			TestInput.m_TargetY = m_aFastInput[Dummy].m_TargetY;
+		}
+
+		m_aFastInput[Dummy] = TestInput;
+	}
+
+	return NewInput[0] || NewInput[1];
+}
+
 void CControls::OnPlayerDeath()
 {
 	for(int &AmmoCount : m_aAmmoCount)
@@ -242,6 +309,10 @@ int CControls::SnapInput(int *pData)
 	}
 	else
 	{
+		// reset per frame action latches used by CheckNewInput()
+		m_FastInputHookAction = false;
+		m_FastInputFireAction = false;
+
 		m_aInputData[g_Config.m_ClDummy].m_TargetX = (int)m_aMousePos[g_Config.m_ClDummy].x;
 		m_aInputData[g_Config.m_ClDummy].m_TargetY = (int)m_aMousePos[g_Config.m_ClDummy].y;
 
