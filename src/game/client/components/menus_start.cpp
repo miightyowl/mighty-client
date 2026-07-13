@@ -165,18 +165,9 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	Label(MakeRect(Logo.x, Logo.y, MightyW + 4.0f, Logo.h), "mighty", LogoSize, TEXTALIGN_ML, ColorRGBA(0.96f, 0.96f, 0.96f, 1.0f));
 	Label(MakeRect(Logo.x + MightyW + 2.0f, Logo.y, Logo.w, Logo.h), "client", LogoSize, TEXTALIGN_ML, CMenus::AccentColorLight().WithAlpha(1.0f));
 
+	// Show the version this build actually is, not the latest release fetched from GitHub.
 	char aVersion[32];
-	if(m_aReleaseTag[0] != '\0')
-	{
-		const char *pTag = m_aReleaseTag;
-		if(pTag[0] == 'v' || pTag[0] == 'V')
-			++pTag;
-		str_format(aVersion, sizeof(aVersion), "v%s", pTag);
-	}
-	else
-	{
-		str_copy(aVersion, "dev");
-	}
+	str_format(aVersion, sizeof(aVersion), "v%s", MCLIENT_VERSION);
 	Label(MakeRect(Header.x, Header.y, Header.w, 28.0f), aVersion, 9.0f, TEXTALIGN_MR, ColorRGBA(0.45f, 0.45f, 0.45f, 1.0f));
 
 	// running tee
@@ -490,6 +481,43 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	}
 #endif
 
+	// new-version popup
+	if(m_UpdateAvailable)
+	{
+		static CButtonContainer s_UpdatePopup;
+		const float Hover = HoverProgress(&s_UpdatePopup);
+
+		const float PopupW = 252.0f;
+		const float PopupH = 56.0f;
+		CUIRect Popup = MakeRect(MainView.x + MainView.w - PopupW - 16.0f, MainView.y + 16.0f, PopupW, PopupH);
+
+		// accent rim + card
+		CUIRect Rim;
+		Popup.Margin(-1.5f, &Rim);
+		Rim.Draw(CMenus::AccentColorDark().WithAlpha(1.0f), IGraphics::CORNER_ALL, 9.0f);
+		Popup.Draw(Mix(ColorRGBA(0.09f, 0.09f, 0.09f, 0.98f), ColorRGBA(0.13f, 0.13f, 0.13f, 0.98f), Hover), IGraphics::CORNER_ALL, 7.5f);
+
+		CUIRect Icon, Text;
+		Popup.VSplitLeft(48.0f, &Icon, &Text);
+		IconLabel(Icon, FontIcon::CIRCLE_CHEVRON_DOWN, 19.0f, TEXTALIGN_MC, CMenus::AccentColorLight().WithAlpha(1.0f));
+
+		Text.VSplitRight(8.0f, &Text, nullptr);
+		CUIRect TitleRow, DescRow;
+		Text.HMargin(9.0f, &Text);
+		Text.HSplitTop(20.0f, &TitleRow, &DescRow);
+		Label(TitleRow, Localize("New version available!"), 13.0f, TEXTALIGN_ML, ColorRGBA(0.97f, 0.97f, 0.97f, 1.0f), Text.w);
+
+		const char *pTag = m_aReleaseTag;
+		if(pTag[0] == 'v' || pTag[0] == 'V')
+			++pTag;
+		char aSub[64];
+		str_format(aSub, sizeof(aSub), Localize("v%s - click to download"), pTag);
+		Label(DescRow, aSub, 10.0f, TEXTALIGN_ML, Mix(ColorRGBA(0.60f, 0.60f, 0.60f, 1.0f), ColorRGBA(0.86f, 0.86f, 0.86f, 1.0f), Hover), Text.w);
+
+		if(Ui()->DoButtonLogic(&s_UpdatePopup, 0, &Popup, BUTTONFLAG_LEFT))
+			Client()->ViewLink(m_aReleaseUrl[0] != '\0' ? m_aReleaseUrl : "https://github.com/miightyowl/mighty-client/releases");
+	}
+
 	if(NewPage != -1)
 	{
 		GameClient()->m_Menus.SetShowStart(false);
@@ -502,6 +530,36 @@ bool CMenusStart::CheckHotKey(int Key) const
 	return !Input()->ShiftIsPressed() && !Input()->ModifierIsPressed() && !Input()->AltIsPressed() && // no modifier
 	       Input()->KeyPress(Key) &&
 	       !GameClient()->m_GameConsole.IsActive();
+}
+
+bool CMenusStart::VersionNewer(const char *pLatest, const char *pCurrent)
+{
+	const auto Parse = [](const char *p, int aOut[4]) {
+		for(int i = 0; i < 4; i++)
+			aOut[i] = 0;
+		if(p[0] == 'v' || p[0] == 'V')
+			++p;
+		for(int i = 0; i < 4; i++)
+		{
+			int Value = 0;
+			while(*p >= '0' && *p <= '9')
+				Value = Value * 10 + (*p++ - '0');
+			aOut[i] = Value;
+			if(*p != '.')
+				break;
+			++p;
+		}
+	};
+
+	int aLatest[4], aCurrent[4];
+	Parse(pLatest, aLatest);
+	Parse(pCurrent, aCurrent);
+	for(int i = 0; i < 4; i++)
+	{
+		if(aLatest[i] != aCurrent[i])
+			return aLatest[i] > aCurrent[i];
+	}
+	return false;
 }
 
 void CMenusStart::UpdateLatestRelease()
@@ -538,6 +596,11 @@ void CMenusStart::UpdateLatestRelease()
 
 			if(Tag.type == json_string && ((const char *)Tag)[0] != '\0')
 				str_copy(m_aReleaseTag, Tag);
+
+			const json_value &HtmlUrl = Release["html_url"];
+			if(HtmlUrl.type == json_string && ((const char *)HtmlUrl)[0] != '\0')
+				str_copy(m_aReleaseUrl, HtmlUrl);
+			m_UpdateAvailable = m_aReleaseTag[0] != '\0' && VersionNewer(m_aReleaseTag, MCLIENT_VERSION);
 
 			const json_value &Body = Release["body"];
 			if(Body.type == json_string)

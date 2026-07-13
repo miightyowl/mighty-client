@@ -20,12 +20,15 @@ private:
 	bool CheckHotKey(int Key) const;
 
 	void UpdateLatestRelease();
+	static bool VersionNewer(const char *pLatest, const char *pCurrent);
 	std::shared_ptr<CHttpRequest> m_pReleaseTask = nullptr;
 	bool m_ReleaseRequested = false;
 	bool m_ReleaseLoaded = false;
+	bool m_UpdateAvailable = false;
 	char m_aReleaseTitle[128] = "";
 	char m_aReleaseDesc[1024] = "";
 	char m_aReleaseTag[32] = "";
+	char m_aReleaseUrl[256] = "";
 	struct SReleaseEmphasis
 	{
 		int m_Start;
