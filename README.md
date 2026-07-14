@@ -9,7 +9,7 @@ The **mighty client** is a fork of the [DDraceNetwork](https://github.com/ddnet/
 
 ## Full List Of Features
 - **Redesigned UI**: menus, browser, settings and loading screen have all been modernized, with the option to adjust the accent color.
-- **Chat translation**: incoming foreign chat is auto-translated into your language and you can answer back in any language too.
+- **Chat translation**: incoming foreign chat is auto-translated into your language and you can answer back in any language too (via googles translation endpoint `translate.googleapis.com` with usernames anonymized in the process).
 - **Bind wheel**: a radial quick bind menu with configurable slots up to 16 (reworked from [TClient](https://github.com/TaterClient/TClient)).
 - **Fast input**: applies your input for prediction before the next tick, noticeably reducing input delay (copied from [TClient](https://github.com/TaterClient/TClient))
 - **Companion pet**: a little tee that floats along next to you in-game (reworked from [TClient](https://github.com/TaterClient/TClient)).
