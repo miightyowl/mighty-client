@@ -173,9 +173,7 @@ void CAds::OnRender()
 	Layout.m_Window.Draw(ColorRGBA(0.85f, 0.85f, 0.88f, 1.0f), IGraphics::CORNER_T, 8.0f);
 	Layout.m_TitleBar.Draw(ColorRGBA(0.12f, 0.16f, 0.30f, 1.0f), IGraphics::CORNER_T, 8.0f);
 
-	// title text
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
-	TextRender()->Text(Layout.m_TitleBar.x + 10.0f, Layout.m_TitleBar.y + (TITLE_BAR_HEIGHT - FONT_SIZE) / 2.0f, FONT_SIZE, "Advertisement", -1.0f);
 
 	// close button
 	const bool Hovered = Layout.m_CloseButton.Inside(m_MousePos);
