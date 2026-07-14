@@ -4230,14 +4230,10 @@ int CGameClient::NextFreeFoeAliasIndex(int ExcludeClientId) const
 	return Index;
 }
 
-bool CGameClient::ReplaceFoeNames(const char *pText, char *pBuffer, int BufferSize, bool AliasToReal)
+bool CGameClient::ReplaceFoeNames(const char *pText, char *pBuffer, int BufferSize)
 {
 	if(!g_Config.m_ClFoeAnonymize)
 		return false;
-
-	char aPredictedAlias[MAX_NAME_LENGTH];
-	if(!AliasToReal)
-		FoeAliasName(NextFreeFoeAliasIndex(-1), aPredictedAlias, sizeof(aPredictedAlias));
 
 	int Written = 0;
 	bool Changed = false;
@@ -4250,25 +4246,12 @@ bool CGameClient::ReplaceFoeNames(const char *pText, char *pBuffer, int BufferSi
 		{
 			if(!Client.m_Active || Client.m_FoeAliasIndex < 1)
 				continue;
-			const char *pFrom = AliasToReal ? Client.m_aName : Client.m_aRealName;
+			const char *pFrom = Client.m_aName;
 			const int FromLength = str_length(pFrom);
 			if(FromLength > BestLength && str_startswith(pRead, pFrom) != nullptr)
 			{
-				pBestTo = AliasToReal ? Client.m_aRealName : Client.m_aName;
+				pBestTo = Client.m_aRealName;
 				BestLength = FromLength;
-			}
-		}
-		if(!AliasToReal)
-		{
-			for(int Foe = 0; Foe < Foes()->NumFriends(); Foe++)
-			{
-				const char *pFoeName = Foes()->GetFriend(Foe)->m_aName;
-				const int FromLength = str_length(pFoeName);
-				if(FromLength > BestLength && str_startswith(pRead, pFoeName) != nullptr)
-				{
-					pBestTo = aPredictedAlias;
-					BestLength = FromLength;
-				}
 			}
 		}
 		if(BestLength > 0)

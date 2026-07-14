@@ -581,12 +581,7 @@ void CChat::OnMessage(int MsgType, void *pRawMsg)
 			AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage);
 		*/
 
-		// hide the real names of foes
-		char aMasked[1024];
-		if(GameClient()->ReplaceFoeNames(pMsg->m_pMessage, aMasked, sizeof(aMasked), false))
-			AddLine(pMsg->m_ClientId, pMsg->m_Team, aMasked);
-		else
-			AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage);
+		AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage);
 
 		if(Client()->State() != IClient::STATE_DEMOPLAYBACK &&
 			pMsg->m_ClientId == SERVER_MSG)
@@ -1975,7 +1970,7 @@ void CChat::SendChat(int Team, const char *pLine)
 
 	// the user types "nameless tee" foe aliases, everyone else should read the real names
 	char aRewritten[1024];
-	if(GameClient()->ReplaceFoeNames(pLine, aRewritten, sizeof(aRewritten), true))
+	if(GameClient()->ReplaceFoeNames(pLine, aRewritten, sizeof(aRewritten)))
 		pLine = aRewritten;
 
 	m_LastChatSend = time();
