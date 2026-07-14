@@ -44,6 +44,8 @@ If you want to **enhance your gameplay** even more, these are the **most importa
 
 ![Ingame](data/ingame.png)
 
+## Download
+Get the **latest version** of the mighty client from the **[releases page](https://github.com/miightyowl/mighty-client/releases)**.
 
 ## Building
 
