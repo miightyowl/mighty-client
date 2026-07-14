@@ -10,6 +10,7 @@
 #include <game/client/gameclient.h>
 
 #include <algorithm>
+#include <map>
 #include <set>
 
 static bool IsWordChar(char c)
@@ -328,8 +329,7 @@ void CUnfinishedMapVote::StartPlayerRequests()
 void CUnfinishedMapVote::OnPlayersDone()
 {
 	std::set<std::string> AllTypeMaps;
-	std::set<std::string> FinishedByAnyone;
-	std::vector<std::string> vFullFinishers;
+	std::map<std::string, std::vector<std::string>> MapFinishers;
 
 	for(const SPlayerRequest &Request : m_vPlayerRequests)
 	{
@@ -351,8 +351,6 @@ void CUnfinishedMapVote::OnPlayersDone()
 		}
 
 		const json_value *pTypes = json_object_get(pJson, "types");
-		bool HasMapList = false;
-		int NumUnfinishedByPlayer = 0;
 		if(pTypes->type == json_object)
 		{
 			for(unsigned TypeIndex = 0; TypeIndex < pTypes->u.object.length; TypeIndex++)
@@ -362,34 +360,35 @@ void CUnfinishedMapVote::OnPlayersDone()
 				const json_value *pMaps = json_object_get(pTypes->u.object.values[TypeIndex].value, "maps");
 				if(pMaps->type != json_object)
 					continue;
-				HasMapList = true;
 				for(unsigned MapIndex = 0; MapIndex < pMaps->u.object.length; MapIndex++)
 				{
 					const char *pMapName = pMaps->u.object.values[MapIndex].name;
 					const json_value *pFinishes = json_object_get(pMaps->u.object.values[MapIndex].value, "finishes");
 					AllTypeMaps.emplace(pMapName);
 					if(pFinishes->type == json_integer && json_int_get(pFinishes) > 0)
-						FinishedByAnyone.emplace(pMapName);
-					else if(str_comp(pMapName, m_aCurrentMap) != 0)
-						NumUnfinishedByPlayer++;
+						MapFinishers[pMapName].push_back(Request.m_Name);
 				}
 			}
 		}
-		if(HasMapList && NumUnfinishedByPlayer == 0)
-			vFullFinishers.push_back(Request.m_Name);
 		json_value_free(pJson);
 	}
-
-	int NumUnfinished = 0;
-	for(const std::string &Map : AllTypeMaps)
-		if(!FinishedByAnyone.contains(Map) && str_comp(Map.c_str(), m_aCurrentMap) != 0)
-			NumUnfinished++;
 
 	int StarsFilter = -1;
 	if(m_aReason[0] >= '1' && m_aReason[0] <= '5' && m_aReason[1] == '\0')
 		StarsFilter = m_aReason[0] - '0';
 
-	std::vector<std::pair<std::string, int>> vCandidates;
+	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
+	const char *pLocalName = LocalId >= 0 ? GameClient()->m_aClients[LocalId].m_aRealName : "";
+	const bool LocalSelected = pLocalName[0] && std::find(m_vPlayerNames.begin(), m_vPlayerNames.end(), pLocalName) != m_vPlayerNames.end();
+
+	struct SVotableMap
+	{
+		const std::string *m_pMap;
+		int m_OptionIndex;
+		int m_Unfinished;
+		bool m_LocalUnfinished;
+	};
+	std::vector<SVotableMap> vVotable;
 	std::set<std::string> TakenMaps;
 	int NumWrongStars = 0;
 	int OptionIndex = 0;
@@ -401,7 +400,7 @@ void CUnfinishedMapVote::OnPlayersDone()
 			if((!pBestMap || Map.length() > pBestMap->length()) && DescriptionMatchesMap(pOption->m_aDescription, Map.c_str()))
 				pBestMap = &Map;
 		}
-		if(pBestMap == nullptr || FinishedByAnyone.contains(*pBestMap) || str_comp(pBestMap->c_str(), m_aCurrentMap) == 0)
+		if(pBestMap == nullptr || str_comp(pBestMap->c_str(), m_aCurrentMap) == 0)
 			continue;
 		if(StarsFilter != -1 && VoteDescriptionStars(pOption->m_aDescription) != StarsFilter)
 		{
@@ -410,45 +409,100 @@ void CUnfinishedMapVote::OnPlayersDone()
 		}
 		if(!TakenMaps.emplace(*pBestMap).second)
 			continue;
-		vCandidates.emplace_back(*pBestMap, OptionIndex);
+
+		const auto FinisherIt = MapFinishers.find(*pBestMap);
+		const int FinishedCount = FinisherIt == MapFinishers.end() ? 0 : (int)FinisherIt->second.size();
+		const bool LocalUnfinished = !pLocalName[0] || FinisherIt == MapFinishers.end() ||
+					     std::find(FinisherIt->second.begin(), FinisherIt->second.end(), pLocalName) == FinisherIt->second.end();
+		vVotable.push_back({pBestMap, OptionIndex, (int)m_vPlayerRequests.size() - FinishedCount, LocalUnfinished});
 	}
 
-	if(vCandidates.empty())
+	if(vVotable.empty())
 	{
-		char aBuf[512] = "";
-		if(NumUnfinished == 0)
-		{
-			if(!vFullFinishers.empty())
-			{
-				char aNames[256] = "";
-				for(size_t Finisher = 0; Finisher < vFullFinishers.size(); Finisher++)
-				{
-					if(Finisher > 0)
-						str_append(aNames, Finisher == vFullFinishers.size() - 1 ? " and " : ", ");
-					str_append(aNames, "'");
-					str_append(aNames, vFullFinishers[Finisher].c_str());
-					str_append(aNames, "'");
-				}
-				str_format(aBuf, sizeof(aBuf), "Unfinished map vote: every %s map has been finished by %s on this server.", m_aServerType, aNames);
-			}
-		}
-		else if(NumWrongStars > 0)
-		{
-			const int NumPlayers = m_vPlayerRequests.size();
-			char aWho[64];
-			if(m_SelectedPlayersOnly)
-				str_format(aWho, sizeof(aWho), "the %d selected player%s", NumPlayers, NumPlayers == 1 ? "" : "s");
-			else
-				str_format(aWho, sizeof(aWho), "all %d player%s on the server", NumPlayers, NumPlayers == 1 ? "" : "s");
-			str_format(aBuf, sizeof(aBuf), "Unfinished map vote: %d %s maps are unfinished by %s, but none of them has %d★.", NumWrongStars, m_aServerType, aWho, StarsFilter);
-		}
-		Stop(aBuf[0] ? aBuf : nullptr);
+		char aBuf[256];
+		if(NumWrongStars > 0)
+			str_format(aBuf, sizeof(aBuf), "Unfinished map vote: no %s map in the vote list has %d★.", m_aServerType, StarsFilter);
+		else
+			str_format(aBuf, sizeof(aBuf), "Unfinished map vote: couldn't find any %s maps in the vote list.", m_aServerType);
+		Stop(aBuf);
 		return;
 	}
 
-	const auto &Pick = vCandidates[secure_rand_below((int)vCandidates.size())];
-	GameClient()->m_Voting.CallvoteOption(Pick.second, m_aReason);
-	Stop(nullptr);
+	const int PoolSize = (int)m_vPlayerRequests.size();
+
+	// every selected player has unfinished
+	std::vector<int> vCommon;
+	for(int i = 0; i < (int)vVotable.size(); i++)
+		if(vVotable[i].m_Unfinished == PoolSize)
+			vCommon.push_back(i);
+	if(!vCommon.empty())
+	{
+		const SVotableMap &Pick = vVotable[vCommon[secure_rand_below((int)vCommon.size())]];
+		GameClient()->m_Voting.CallvoteOption(Pick.m_OptionIndex, m_aReason);
+		Stop(nullptr);
+		return;
+	}
+
+	// no map is unfinished by everyone
+	std::map<std::string, int> FinishedVotableCount;
+	for(const SVotableMap &Votable : vVotable)
+	{
+		const auto FinisherIt = MapFinishers.find(*Votable.m_pMap);
+		if(FinisherIt == MapFinishers.end())
+			continue;
+		for(const std::string &Finisher : FinisherIt->second)
+			FinishedVotableCount[Finisher]++;
+	}
+	std::vector<std::string> vFullFinishers;
+	for(const std::string &Name : m_vPlayerNames)
+	{
+		const auto CountIt = FinishedVotableCount.find(Name);
+		if(CountIt != FinishedVotableCount.end() && CountIt->second == (int)vVotable.size())
+			vFullFinishers.push_back(Name);
+	}
+	if(!vFullFinishers.empty())
+	{
+		char aNames[256] = "";
+		for(size_t Finisher = 0; Finisher < vFullFinishers.size(); Finisher++)
+		{
+			if(Finisher > 0)
+				str_append(aNames, Finisher == vFullFinishers.size() - 1 ? " and " : ", ");
+			str_append(aNames, "'");
+			str_append(aNames, vFullFinishers[Finisher].c_str());
+			str_append(aNames, "'");
+		}
+		char aBuf[512];
+		str_format(aBuf, sizeof(aBuf), "Unfinished map vote: %s finished every votable %s map, exclude %s to vote an unfinished one.", aNames, m_aServerType, vFullFinishers.size() == 1 ? "that player" : "those players");
+		Stop(aBuf);
+		return;
+	}
+
+	// nobody shares an unfinished map, vote the one the most selected players still have unfinished
+	int BestUnfinished = -1;
+	std::vector<int> vBestMaps;
+	for(int i = 0; i < (int)vVotable.size(); i++)
+	{
+		if(LocalSelected && !vVotable[i].m_LocalUnfinished)
+			continue;
+		if(vVotable[i].m_Unfinished > BestUnfinished)
+		{
+			BestUnfinished = vVotable[i].m_Unfinished;
+			vBestMaps.assign(1, i);
+		}
+		else if(vVotable[i].m_Unfinished == BestUnfinished)
+			vBestMaps.push_back(i);
+	}
+	if(vBestMaps.empty())
+	{
+		Stop("Unfinished map vote: couldn't find a suitable map to vote.");
+		return;
+	}
+
+	const SVotableMap &Pick = vVotable[vBestMaps[secure_rand_below((int)vBestMaps.size())]];
+	GameClient()->m_Voting.CallvoteOption(Pick.m_OptionIndex, m_aReason);
+	char aBuf[256];
+	str_format(aBuf, sizeof(aBuf), "Unfinished map vote: no map is unfinished by everyone, voting '%s' which %d of %d players haven't finished.", Pick.m_pMap->c_str(), BestUnfinished, PoolSize);
+	Stop(aBuf);
 }
 
 void CUnfinishedMapVote::Stop(const char *pErrorMessage)
