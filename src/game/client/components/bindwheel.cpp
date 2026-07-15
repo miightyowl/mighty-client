@@ -104,18 +104,27 @@ void CBindWheel::OnRender()
 	const float SizeScale = g_Config.m_ClMClientBindWheelSize / 100.0f;
 	const float RingRadius = 215.0f * SizeScale;
 	const float BackgroundRadius = RingRadius + 20.0f;
-	const float DeadZone = 55.0f;
+
+	const float ButtonWidth = (float)g_Config.m_ClMClientBindWheelBoxWidth;
+	const float ButtonHeight = (float)g_Config.m_ClMClientBindWheelBoxHeight;
 
 	if(length(m_SelectorMouse) > RingRadius)
 		m_SelectorMouse = normalize(m_SelectorMouse) * RingRadius;
 
-	float SelectedAngle = angle(m_SelectorMouse) + pi / (float)SliceCount;
-	if(SelectedAngle < 0)
-		SelectedAngle += 2 * pi;
-
 	m_SelectedBind = -1;
-	if(length(m_SelectorMouse) > DeadZone)
-		m_SelectedBind = (int)(SelectedAngle / (2 * pi) * (float)SliceCount);
+	for(int i = 0; i < SliceCount; i++)
+	{
+		float Angle = 2 * pi * i / (float)SliceCount;
+		if(Angle > pi)
+			Angle -= 2 * pi;
+		const vec2 Off = direction(Angle) * RingRadius;
+		if(m_SelectorMouse.x >= Off.x - ButtonWidth / 2.0f && m_SelectorMouse.x <= Off.x + ButtonWidth / 2.0f &&
+			m_SelectorMouse.y >= Off.y - ButtonHeight / 2.0f && m_SelectorMouse.y <= Off.y + ButtonHeight / 2.0f)
+		{
+			m_SelectedBind = i;
+			break;
+		}
+	}
 
 	Ui()->MapScreen();
 
@@ -128,8 +137,6 @@ void CBindWheel::OnRender()
 	Graphics()->DrawCircle(Center.x, Center.y, BackgroundRadius, 64);
 	Graphics()->QuadsEnd();
 
-	const float ButtonWidth = (float)g_Config.m_ClMClientBindWheelBoxWidth;
-	const float ButtonHeight = (float)g_Config.m_ClMClientBindWheelBoxHeight;
 	const float Rounding = 8.0f;
 	const float BoxAlpha = g_Config.m_ClMClientBindWheelBoxAlpha / 100.0f;
 
