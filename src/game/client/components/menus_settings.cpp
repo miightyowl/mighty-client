@@ -1904,6 +1904,8 @@ void CMenus::SaveMClient()
 		Writer.WriteStrValue(Bind.m_aName);
 		Writer.WriteAttribute("command");
 		Writer.WriteStrValue(Bind.m_aCommand);
+		Writer.WriteAttribute("emoji");
+		Writer.WriteStrValue(Bind.m_aEmoji);
 		Writer.EndObject();
 	}
 	Writer.EndArray();
@@ -2173,24 +2175,47 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 	}
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
+	MainView.VSplitLeft(330.0f, &Left, &Right);
+	Right.VSplitLeft(20.0f, nullptr, &Right);
+
 	// number of slices
-	MainView.HSplitTop(20.0f, &SlotRow, &MainView);
-	SlotRow.VSplitLeft(280.0f, &SlotRow, nullptr);
+	Left.HSplitTop(20.0f, &SlotRow, &Left);
 	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelSlots, &g_Config.m_ClMClientBindWheelSlots, &SlotRow, Localize("Number of slices"), CBindWheel::MIN_BINDS, CBindWheel::MAX_BINDS);
-	MainView.HSplitTop(6.0f, nullptr, &MainView);
+	Left.HSplitTop(6.0f, nullptr, &Left);
 
 	// background opacity
 	CUIRect AlphaRow;
-	MainView.HSplitTop(20.0f, &AlphaRow, &MainView);
-	AlphaRow.VSplitLeft(280.0f, &AlphaRow, nullptr);
+	Left.HSplitTop(20.0f, &AlphaRow, &Left);
 	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelAlpha, &g_Config.m_ClMClientBindWheelAlpha, &AlphaRow, Localize("Background opacity"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
-	MainView.HSplitTop(12.0f, nullptr, &MainView);
+	Left.HSplitTop(6.0f, nullptr, &Left);
 
-	MainView.VSplitMid(&Left, &Right, 20.0f);
+	// circle size
+	CUIRect SizeRow;
+	Left.HSplitTop(20.0f, &SizeRow, &Left);
+	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelSize, &g_Config.m_ClMClientBindWheelSize, &SizeRow, Localize("Circle size"), 50, 200, &CUi::ms_LinearScrollbarScale, 0u, "%");
+	Left.HSplitTop(6.0f, nullptr, &Left);
+
+	// box width
+	CUIRect BoxWidthRow;
+	Left.HSplitTop(20.0f, &BoxWidthRow, &Left);
+	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelBoxWidth, &g_Config.m_ClMClientBindWheelBoxWidth, &BoxWidthRow, Localize("Box width"), 60, 160);
+	Left.HSplitTop(6.0f, nullptr, &Left);
+
+	// box height
+	CUIRect BoxHeightRow;
+	Left.HSplitTop(20.0f, &BoxHeightRow, &Left);
+	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelBoxHeight, &g_Config.m_ClMClientBindWheelBoxHeight, &BoxHeightRow, Localize("Box height"), 24, 64);
+	Left.HSplitTop(6.0f, nullptr, &Left);
+
+	// box opacity
+	CUIRect BoxAlphaRow;
+	Left.HSplitTop(20.0f, &BoxAlphaRow, &Left);
+	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelBoxAlpha, &g_Config.m_ClMClientBindWheelBoxAlpha, &BoxAlphaRow, Localize("Box opacity"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+	Left.HSplitTop(30.0f, nullptr, &Left);
 
 	// wheel preview
-	const float Radius = std::min(Left.w, Left.h) / 2.0f - 55.0f;
-	const vec2 Center = vec2(Left.x + Left.w / 2.0f, Left.y + Left.h / 2.0f);
+	const float Radius = std::min(Right.w, Right.h) / 2.0f - 55.0f;
+	const vec2 Center = vec2(Right.x + Right.w / 2.0f, Right.y + Right.h / 2.0f);
 
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
@@ -2198,6 +2223,45 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 	Graphics()->DrawCircle(Center.x, Center.y, Radius + 28.0f, 64);
 	Graphics()->QuadsEnd();
 
+	// draws the icon
+	const auto &&DrawSlotContents = [&](const CUIRect &Box, const CBindWheel::CBind &Bind) {
+		const bool HasEmoji = Bind.m_aEmoji[0] != '\0';
+		const char *pName;
+		if(Bind.m_aName[0] != '\0')
+			pName = Bind.m_aName;
+		else if(HasEmoji)
+			pName = "";
+		else if(Bind.m_aCommand[0] != '\0')
+			pName = Bind.m_aCommand;
+		else
+			pName = "-";
+		const bool HasText = pName[0] != '\0';
+		CUIRect Text = Box;
+		if(HasEmoji)
+		{
+			CUIRect IconRect = Box;
+			if(HasText)
+				Text.VSplitLeft(16.0f, &IconRect, &Text);
+			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING);
+			Ui()->DoLabel(&IconRect, Bind.m_aEmoji, HasText ? 10.0f : 13.0f, TEXTALIGN_MC);
+			TextRender()->SetRenderFlags(0);
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		}
+		if(HasText)
+		{
+			SLabelProperties Props;
+			Props.m_MaxWidth = Text.w - 8.0f;
+			Props.m_EllipsisAtEnd = true;
+			Ui()->DoLabel(&Text, pName, 10.0f, TEXTALIGN_MC, Props);
+		}
+	};
+
+	static int s_DragSource = -1;
+	static vec2 s_DragStart = vec2(0.0f, 0.0f);
+	const bool Dragging = s_DragSource >= 0 && length(Ui()->MousePos() - s_DragStart) > 5.0f;
+
+	int HoverIndex = -1;
 	for(int i = 0; i < SliceCount; i++)
 	{
 		float Angle = 2 * pi * i / (float)SliceCount;
@@ -2205,50 +2269,90 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 			Angle -= 2 * pi;
 		const vec2 Pos = Center + direction(Angle) * Radius;
 		CUIRect Slot = {Pos.x - 46.0f, Pos.y - 12.0f, 92.0f, 24.0f};
+		const bool Hovered = Ui()->MouseHovered(&Slot);
+		if(Hovered)
+			HoverIndex = i;
 		const bool Sel = s_Selected == i;
-		Slot.Draw(Sel ? AccentColor().WithAlpha(1.0f) : ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &BindWheel.m_vBinds[i].m_aName ? 0.16f : 0.08f), IGraphics::CORNER_ALL, 5.0f);
+		ColorRGBA SlotColor = Sel ? AccentColor().WithAlpha(1.0f) : ColorRGBA(1.0f, 1.0f, 1.0f, Hovered ? 0.16f : 0.08f);
+		if(Dragging && s_DragSource == i)
+			SlotColor = SlotColor.WithMultipliedAlpha(0.35f);
+		Slot.Draw(SlotColor, IGraphics::CORNER_ALL, 5.0f);
 
-		const CBindWheel::CBind &Bind = BindWheel.m_vBinds[i];
-		const char *pName = Bind.m_aName[0] != '\0' ? Bind.m_aName : (Bind.m_aCommand[0] != '\0' ? Bind.m_aCommand : "-");
-		SLabelProperties Props;
-		Props.m_MaxWidth = Slot.w - 8.0f;
-		Props.m_EllipsisAtEnd = true;
-		Ui()->DoLabel(&Slot, pName, 10.0f, TEXTALIGN_MC, Props);
-		if(Ui()->DoButtonLogic(&BindWheel.m_vBinds[i].m_aName, 0, &Slot, BUTTONFLAG_LEFT))
-			s_Selected = i;
+		DrawSlotContents(Slot, BindWheel.m_vBinds[i]);
+	}
+
+	// start a drag
+	if(s_DragSource < 0 && HoverIndex >= 0 && Ui()->MouseButtonClicked(0))
+	{
+		s_DragSource = HoverIndex;
+		s_DragStart = Ui()->MousePos();
+		s_Selected = HoverIndex;
+	}
+	// finish on release
+	if(s_DragSource >= 0 && !Ui()->MouseButton(0))
+	{
+		if(Dragging && HoverIndex >= 0 && HoverIndex != s_DragSource)
+		{
+			std::swap(BindWheel.m_vBinds[s_DragSource], BindWheel.m_vBinds[HoverIndex]);
+			s_Selected = HoverIndex;
+			SaveMClient();
+		}
+		s_DragSource = -1;
+	}
+
+	if(Dragging && s_DragSource >= 0)
+	{
+		const vec2 M = Ui()->MousePos();
+		CUIRect Ghost = {M.x - 46.0f, M.y - 12.0f, 92.0f, 24.0f};
+		Ghost.Draw(AccentColor().WithAlpha(0.85f), IGraphics::CORNER_ALL, 5.0f);
+		DrawSlotContents(Ghost, BindWheel.m_vBinds[s_DragSource]);
 	}
 
 	// editor for the selected slice
 	char aTitle[64];
 	str_format(aTitle, sizeof(aTitle), "%s %d", Localize("Slice"), s_Selected + 1);
-	Right.HSplitTop(24.0f, &Label, &Right);
+	Left.HSplitTop(24.0f, &Label, &Left);
 	Ui()->DoLabel(&Label, aTitle, 16.0f, TEXTALIGN_ML);
-	Right.HSplitTop(12.0f, nullptr, &Right);
+	Left.HSplitTop(12.0f, nullptr, &Left);
 
-	Right.HSplitTop(16.0f, &Label, &Right);
+	Left.HSplitTop(16.0f, &Label, &Left);
 	Ui()->DoLabel(&Label, Localize("Label"), 12.0f, TEXTALIGN_ML);
-	Right.HSplitTop(24.0f, &Field, &Right);
+	Left.HSplitTop(24.0f, &Field, &Left);
+
+	CUIRect EmojiBox;
+	Field.VSplitLeft(24.0f, &EmojiBox, &Field);
+	Field.VSplitLeft(6.0f, nullptr, &Field);
+	static CButtonContainer s_EmojiButton;
+	const char *pCurEmoji = BindWheel.m_vBinds[s_Selected].m_aEmoji;
+	if(Ui()->DoButton_FontIcon(&s_EmojiButton, pCurEmoji[0] != '\0' ? pCurEmoji : FontIcon::PLUS, 0, &EmojiBox, BUTTONFLAG_LEFT))
+	{
+		static SPopupBindWheelIconContext s_PopupIconContext;
+		s_PopupIconContext.m_pMenus = this;
+		s_PopupIconContext.m_Slice = s_Selected;
+		Ui()->DoPopupMenu(&s_PopupIconContext, EmojiBox.x, EmojiBox.y + EmojiBox.h, 232.0f, 210.0f, &s_PopupIconContext, PopupBindWheelIcon);
+	}
+
 	static CLineInput s_NameInput;
 	s_NameInput.SetBuffer(BindWheel.m_vBinds[s_Selected].m_aName, sizeof(BindWheel.m_vBinds[s_Selected].m_aName));
 	s_NameInput.SetEmptyText(Localize("e.g. Kill"));
 	if(Ui()->DoClearableEditBox(&s_NameInput, &Field, 12.0f))
 		SaveMClient();
 
-	Right.HSplitTop(12.0f, nullptr, &Right);
-	Right.HSplitTop(16.0f, &Label, &Right);
+	Left.HSplitTop(12.0f, nullptr, &Left);
+	Left.HSplitTop(16.0f, &Label, &Left);
 	Ui()->DoLabel(&Label, Localize("Console command (as typed in the F1 console)"), 12.0f, TEXTALIGN_ML);
-	Right.HSplitTop(24.0f, &Field, &Right);
+	Left.HSplitTop(24.0f, &Field, &Left);
 	static CLineInput s_CommandInput;
 	s_CommandInput.SetBuffer(BindWheel.m_vBinds[s_Selected].m_aCommand, sizeof(BindWheel.m_vBinds[s_Selected].m_aCommand));
 	s_CommandInput.SetEmptyText(Localize("e.g. kill"));
 	if(Ui()->DoClearableEditBox(&s_CommandInput, &Field, 12.0f))
 		SaveMClient();
 
-	Right.HSplitTop(16.0f, nullptr, &Right);
-	Right.HSplitTop(16.0f, &Row, &Right);
+	Left.HSplitTop(16.0f, nullptr, &Left);
+	Left.HSplitTop(16.0f, &Row, &Left);
 	SLabelProperties TipProps;
 	TipProps.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
-	Ui()->DoLabel(&Row, Localize("Click a slice on the left to edit it."), 11.0f, TEXTALIGN_ML, TipProps);
+	Ui()->DoLabel(&Row, Localize("Click a slice on the right to edit it, or drag it onto another to swap them."), 11.0f, TEXTALIGN_ML, TipProps);
 }
 
 // customizable bar
@@ -4062,6 +4166,66 @@ CUi::EPopupMenuFunctionResult CMenus::PopupMapPicker(void *pContext, CUIRect Vie
 			pMenus->GameClient()->m_Background.LoadBackground();
 			return CUi::POPUP_CLOSE_CURRENT;
 		}
+	}
+
+	return CUi::POPUP_KEEP_OPEN;
+}
+
+CUi::EPopupMenuFunctionResult CMenus::PopupBindWheelIcon(void *pContext, CUIRect View, bool Active)
+{
+	SPopupBindWheelIconContext *pPopupContext = static_cast<SPopupBindWheelIconContext *>(pContext);
+	CMenus *pMenus = pPopupContext->m_pMenus;
+	CBindWheel &BindWheel = pMenus->GameClient()->m_BindWheel;
+	if(pPopupContext->m_Slice < 0 || pPopupContext->m_Slice >= (int)BindWheel.m_vBinds.size())
+		return CUi::POPUP_CLOSE_CURRENT;
+	CBindWheel::CBind &Bind = BindWheel.m_vBinds[pPopupContext->m_Slice];
+
+	static const char *const s_apIcons[] = {
+		FontIcon::HEART, FontIcon::HEART_CRACK, FontIcon::STAR, FontIcon::FLAG_CHECKERED,
+		FontIcon::XMARK, FontIcon::BAN, FontIcon::BOOKMARK, FontIcon::CAMERA,
+		FontIcon::COMMENT, FontIcon::COMMENT_SLASH, FontIcon::EYE, FontIcon::EYE_SLASH,
+		FontIcon::GEAR, FontIcon::HOUSE, FontIcon::KEY, FontIcon::LOCK,
+		FontIcon::MAGNIFYING_GLASS, FontIcon::MAP, FontIcon::MUSIC, FontIcon::PAUSE,
+		FontIcon::PLAY, FontIcon::STOP, FontIcon::POWER_OFF, FontIcon::QUESTION,
+		FontIcon::INFO, FontIcon::TRIANGLE_EXCLAMATION, FontIcon::TRASH, FontIcon::USER,
+		FontIcon::VIDEO, FontIcon::TERMINAL, FontIcon::EARTH_AMERICAS, FontIcon::CIRCLE};
+	const int NumIcons = (int)(sizeof(s_apIcons) / sizeof(s_apIcons[0]));
+
+	View.Margin(6.0f, &View);
+
+	CUIRect ClearButton;
+	View.HSplitTop(20.0f, &ClearButton, &View);
+	static CButtonContainer s_ClearButton;
+	if(pMenus->DoButton_Menu(&s_ClearButton, Localize("No icon"), 0, &ClearButton))
+	{
+		Bind.m_aEmoji[0] = '\0';
+		pMenus->SaveMClient();
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+	View.HSplitTop(6.0f, nullptr, &View);
+
+	const int Columns = 8;
+	const float Spacing = 2.0f;
+	const float CellSize = (View.w - (Columns - 1) * Spacing) / Columns;
+
+	static CButtonContainer s_aIconButtons[64];
+	CUIRect Row;
+	for(int i = 0; i < NumIcons; i++)
+	{
+		if(i % Columns == 0)
+			View.HSplitTop(CellSize, &Row, &View);
+		CUIRect Cell;
+		Row.VSplitLeft(CellSize, &Cell, &Row);
+		Row.VSplitLeft(Spacing, nullptr, &Row);
+		const bool Selected = str_comp(Bind.m_aEmoji, s_apIcons[i]) == 0;
+		if(pMenus->Ui()->DoButton_FontIcon(&s_aIconButtons[i], s_apIcons[i], Selected, &Cell, BUTTONFLAG_LEFT))
+		{
+			str_copy(Bind.m_aEmoji, s_apIcons[i]);
+			pMenus->SaveMClient();
+			return CUi::POPUP_CLOSE_CURRENT;
+		}
+		if(i % Columns == Columns - 1)
+			View.HSplitTop(Spacing, nullptr, &View);
 	}
 
 	return CUi::POPUP_KEEP_OPEN;

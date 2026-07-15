@@ -101,49 +101,91 @@ void CBindWheel::OnRender()
 
 	const int SliceCount = NumSlots();
 
-	const float WheelRadius = 170.0f;
-	if(length(m_SelectorMouse) > WheelRadius)
-		m_SelectorMouse = normalize(m_SelectorMouse) * WheelRadius;
+	const float SizeScale = g_Config.m_ClMClientBindWheelSize / 100.0f;
+	const float RingRadius = 215.0f * SizeScale;
+	const float BackgroundRadius = RingRadius + 20.0f;
+	const float DeadZone = 55.0f;
+
+	if(length(m_SelectorMouse) > RingRadius)
+		m_SelectorMouse = normalize(m_SelectorMouse) * RingRadius;
 
 	float SelectedAngle = angle(m_SelectorMouse) + pi / (float)SliceCount;
 	if(SelectedAngle < 0)
 		SelectedAngle += 2 * pi;
 
 	m_SelectedBind = -1;
-	if(length(m_SelectorMouse) > 60.0f)
+	if(length(m_SelectorMouse) > DeadZone)
 		m_SelectedBind = (int)(SelectedAngle / (2 * pi) * (float)SliceCount);
 
 	Ui()->MapScreen();
 
 	const float BackgroundAlpha = g_Config.m_ClMClientBindWheelAlpha / 100.0f;
+	const ColorRGBA Accent = CMenus::AccentColor();
 
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(0.0f, 0.0f, 0.0f, BackgroundAlpha);
-	Graphics()->DrawCircle(Center.x, Center.y, 190.0f, 64);
+	Graphics()->DrawCircle(Center.x, Center.y, BackgroundRadius, 64);
 	Graphics()->QuadsEnd();
+
+	const float ButtonWidth = (float)g_Config.m_ClMClientBindWheelBoxWidth;
+	const float ButtonHeight = (float)g_Config.m_ClMClientBindWheelBoxHeight;
+	const float Rounding = 8.0f;
+	const float BoxAlpha = g_Config.m_ClMClientBindWheelBoxAlpha / 100.0f;
 
 	for(int i = 0; i < SliceCount; i++)
 	{
 		float Angle = 2 * pi * i / (float)SliceCount;
 		if(Angle > pi)
 			Angle -= 2 * pi;
-		const vec2 Pos = Center + direction(Angle) * 130.0f;
+		const vec2 Pos = Center + direction(Angle) * RingRadius;
 		const bool Selected = m_SelectedBind == i;
 
+		CUIRect Button = {Pos.x - ButtonWidth / 2.0f, Pos.y - ButtonHeight / 2.0f, ButtonWidth, ButtonHeight};
 		if(Selected)
-		{
-			Graphics()->TextureClear();
-			Graphics()->QuadsBegin();
-			const ColorRGBA Accent = CMenus::AccentColor();
-			Graphics()->SetColor(Accent.r, Accent.g, Accent.b, 0.85f);
-			Graphics()->DrawCircle(Pos.x, Pos.y, 34.0f, 32);
-			Graphics()->QuadsEnd();
-		}
+			Button.Draw(ColorRGBA(Accent.r, Accent.g, Accent.b, BoxAlpha), IGraphics::CORNER_ALL, Rounding);
+		else
+			Button.Draw(ColorRGBA(0.04f, 0.045f, 0.055f, BoxAlpha), IGraphics::CORNER_ALL, Rounding);
 
 		const CBind &Bind = m_vBinds[i];
-		const char *pName = Bind.m_aName[0] != '\0' ? Bind.m_aName : (Bind.m_aCommand[0] != '\0' ? Bind.m_aCommand : "-");
-		CUIRect Label = {Pos.x - 65.0f, Pos.y - 10.0f, 130.0f, 20.0f};
+		const bool HasEmoji = Bind.m_aEmoji[0] != '\0';
+		const char *pName;
+		if(Bind.m_aName[0] != '\0')
+			pName = Bind.m_aName;
+		else if(HasEmoji)
+			pName = "";
+		else if(Bind.m_aCommand[0] != '\0')
+			pName = Bind.m_aCommand;
+		else
+			pName = "-";
+		const bool HasText = pName[0] != '\0';
+		const ColorRGBA TextColor = Selected ? ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f) : ColorRGBA(0.9f, 0.9f, 0.9f, 1.0f);
+
+		CUIRect Label = {Button.x + 6.0f, Pos.y - 10.0f, ButtonWidth - 12.0f, 20.0f};
+		if(HasEmoji)
+		{
+			CUIRect IconRect = Label;
+			if(HasText)
+			{
+				IconRect.w = 16.0f;
+				Label.x += 18.0f;
+				Label.w -= 18.0f;
+			}
+
+			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING);
+			TextRender()->TextColor(TextColor);
+			TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, Selected ? 0.0f : 0.3f);
+			Ui()->DoLabel(&IconRect, Bind.m_aEmoji, HasText ? 12.0f : 16.0f, TEXTALIGN_MC);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+			TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+			TextRender()->SetRenderFlags(0);
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		}
+
+		if(!HasText)
+			continue;
+
 		SLabelProperties Props;
 		Props.m_MaxWidth = Label.w;
 		Props.m_EllipsisAtEnd = true;
@@ -164,12 +206,6 @@ void CBindWheel::OnRender()
 			Ui()->DoLabel(&Label, pName, 12.0f, TEXTALIGN_MC, Props);
 		}
 	}
-
-	Graphics()->TextureClear();
-	Graphics()->QuadsBegin();
-	Graphics()->SetColor(0.0f, 0.0f, 0.0f, BackgroundAlpha);
-	Graphics()->DrawCircle(Center.x, Center.y, 40.0f, 32);
-	Graphics()->QuadsEnd();
 
 	RenderTools()->RenderCursor(Center + m_SelectorMouse, 24.0f);
 }
@@ -200,10 +236,13 @@ void CBindWheel::LoadBinds()
 				continue;
 			const json_value &Name = Entry["name"];
 			const json_value &Command = Entry["command"];
+			const json_value &Emoji = Entry["emoji"];
 			if(Name.type == json_string)
 				str_copy(m_vBinds[i].m_aName, Name);
 			if(Command.type == json_string)
 				str_copy(m_vBinds[i].m_aCommand, Command);
+			if(Emoji.type == json_string)
+				str_copy(m_vBinds[i].m_aEmoji, Emoji);
 		}
 	}
 	json_value_free(pData);

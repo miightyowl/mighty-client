@@ -13,13 +13,14 @@
 class CBindWheel : public CComponent
 {
 public:
-	static constexpr int MIN_BINDS = 8;
+	static constexpr int MIN_BINDS = 4;
 	static constexpr int MAX_BINDS = 16;
 
 	struct CBind
 	{
 		char m_aName[64] = "";
 		char m_aCommand[256] = "";
+		char m_aEmoji[16] = "";
 	};
 
 	std::vector<CBind> m_vBinds;

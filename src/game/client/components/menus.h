@@ -671,6 +671,14 @@ protected:
 
 	static CUi::EPopupMenuFunctionResult PopupMapPicker(void *pContext, CUIRect View, bool Active);
 
+	// icon picker
+	struct SPopupBindWheelIconContext : public SPopupMenuId
+	{
+		CMenus *m_pMenus;
+		int m_Slice;
+	};
+	static CUi::EPopupMenuFunctionResult PopupBindWheelIcon(void *pContext, CUIRect View, bool Active);
+
 	void SetNeedSendInfo();
 	void UpdateColors();
 
