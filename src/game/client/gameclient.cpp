@@ -83,6 +83,7 @@
 #include <game/version.h>
 
 #include <chrono>
+#include <cmath>
 #include <limits>
 
 using namespace std::chrono_literals;
@@ -638,6 +639,9 @@ void CGameClient::OnReset()
 
 	m_PredictedTick = -1;
 	std::fill(std::begin(m_aLastNewPredictedTick), std::end(m_aLastNewPredictedTick), -1);
+
+	for(SFastInputSmooth &FastInputSmooth : m_aFastInputSmooth)
+		FastInputSmooth.m_Active = false;
 
 	m_LastRoundStartTick = -1;
 	m_LastRaceTick = -1;
@@ -2743,7 +2747,7 @@ void CGameClient::OnPredict()
 
 	int FastInputTicks = 0;
 	if(g_Config.m_ClMClientFastInput)
-		FastInputTicks = (g_Config.m_ClMClientFastInputAmount + 19) / 20;
+		FastInputTicks = 1;
 
 	const int FinalTickRegular = Client()->PredGameTick(g_Config.m_ClDummy);
 	const int FinalTickSelf = FinalTickRegular + FastInputTicks;
@@ -4117,7 +4121,7 @@ void CGameClient::DetectStrongHook()
 
 vec2 CGameClient::GetSmoothPos(int ClientId)
 {
-	const int FastInputTicks = g_Config.m_ClMClientFastInput ? (g_Config.m_ClMClientFastInputAmount + 19) / 20 : 0;
+	const int FastInputTicks = g_Config.m_ClMClientFastInput ? 1 : 0;
 	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 	int64_t Now = time_get();
 	for(int i = 0; i < 2; i++)
@@ -4146,10 +4150,10 @@ vec2 CGameClient::GetFastInputPos(int ClientId)
 	const float PredIntraTick = Client()->PredIntraGameTick(g_Config.m_ClDummy);
 	const int PredTick = Client()->PredGameTick(g_Config.m_ClDummy);
 
-	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, PredIntraTick);
+	const vec2 BasePos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, PredIntraTick);
 
-	const float FastInputIntra = (g_Config.m_ClMClientFastInputAmount % 20) / 20.0f;
-	int FastInputTicks = g_Config.m_ClMClientFastInputAmount / 20;
+	const float FastInputIntra = 0.0f;
+	int FastInputTicks = 1;
 
 	const float CombinedIntra = PredIntraTick + FastInputIntra;
 
@@ -4165,10 +4169,46 @@ vec2 CGameClient::GetFastInputPos(int ClientId)
 		m_aClients[ClientId].m_aPredTick[(FinalTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&
 		m_aClients[ClientId].m_aPredTick[FinalTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicks)
 	{
-		Pos = mix(m_aClients[ClientId].m_aPredPos[(FinalTick - 1) % 200], m_aClients[ClientId].m_aPredPos[FinalTick % 200], FinalIntra);
+		const vec2 FastPos = mix(m_aClients[ClientId].m_aPredPos[(FinalTick - 1) % 200], m_aClients[ClientId].m_aPredPos[FinalTick % 200], FinalIntra);
+		return SmoothFastInputPos(ClientId, BasePos, FastPos);
 	}
 
-	return Pos;
+	m_aFastInputSmooth[ClientId].m_Active = false;
+	return BasePos;
+}
+
+vec2 CGameClient::SmoothFastInputPos(int ClientId, vec2 BasePos, vec2 FastPos)
+{
+	SFastInputSmooth &Smooth = m_aFastInputSmooth[ClientId];
+	const vec2 Offset = FastPos - BasePos;
+
+	const float SmoothingMs = 0.0f;
+	if(SmoothingMs <= 0.0f)
+	{
+		Smooth.m_Active = false;
+		return FastPos;
+	}
+
+	const int64_t Now = time_get();
+	const int64_t Freq = time_freq();
+
+	if(!Smooth.m_Active ||
+		Now - Smooth.m_LastTime > Freq / 4 ||
+		distance(Smooth.m_Offset, Offset) > 200.0f)
+	{
+		Smooth.m_Offset = Offset;
+	}
+	else
+	{
+		const float Dt = (Now - Smooth.m_LastTime) / (float)Freq;
+		const float Alpha = 1.0f - std::exp(-Dt / (SmoothingMs / 1000.0f));
+		Smooth.m_Offset = mix(Smooth.m_Offset, Offset, std::clamp(Alpha, 0.0f, 1.0f));
+	}
+
+	Smooth.m_Active = true;
+	Smooth.m_LastTime = Now;
+
+	return BasePos + Smooth.m_Offset;
 }
 
 void CGameClient::Echo(const char *pString)
@@ -4272,6 +4312,28 @@ bool CGameClient::ReplaceFoeNames(const char *pText, char *pBuffer, int BufferSi
 	pBuffer[Written] = '\0';
 	str_utf8_fix_truncation(pBuffer);
 	return Changed;
+}
+
+bool CGameClient::IsHoldingFire(int ClientId) const
+{
+	if(!in_range(ClientId, 0, MAX_CLIENTS - 1))
+		return false;
+
+	for(int Dummy = 0; Dummy < NUM_DUMMIES; Dummy++)
+		if(ClientId == m_aLocalIds[Dummy])
+			return (m_Controls.m_aInputData[Dummy].m_Fire & 1) != 0;
+
+	int LatestTick = 0;
+	int Fire = 0;
+	for(const CNetMsg_Sv_PreInput &PreInput : m_aClients[ClientId].m_aPreInputs)
+	{
+		if(PreInput.m_IntendedTick > LatestTick)
+		{
+			LatestTick = PreInput.m_IntendedTick;
+			Fire = PreInput.m_Fire;
+		}
+	}
+	return (Fire & 1) != 0;
 }
 
 bool CGameClient::IsOtherTeam(int ClientId) const

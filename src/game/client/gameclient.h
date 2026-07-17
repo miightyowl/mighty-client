@@ -698,6 +698,15 @@ public:
 	bool GetDummyFastInput(CNetObj_PlayerInput &DummyFastInput, const CNetObj_PlayerInput *pDummyInputData, const class CCharacter *pDummyChar, int LocalTee, int DummyTee) const;
 	vec2 GetFastInputPos(int ClientId);
 
+	struct SFastInputSmooth
+	{
+		vec2 m_Offset = vec2(0.0f, 0.0f);
+		int64_t m_LastTime = 0;
+		bool m_Active = false;
+	};
+	SFastInputSmooth m_aFastInputSmooth[MAX_CLIENTS];
+	vec2 SmoothFastInputPos(int ClientId, vec2 BasePos, vec2 FastPos);
+
 	int m_aNextChangeInfo[NUM_DUMMIES];
 
 	// DDRace
@@ -749,6 +758,7 @@ public:
 	int NextFreeFoeAliasIndex(int ExcludeClientId) const;
 	bool ReplaceFoeNames(const char *pText, char *pBuffer, int BufferSize);
 	bool IsOtherTeam(int ClientId) const;
+	bool IsHoldingFire(int ClientId) const;
 	int SwitchStateTeam() const;
 	bool IsLocalCharSuper() const;
 	bool CanDisplayWarning() const override;
