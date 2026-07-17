@@ -655,6 +655,26 @@ void CPlayers::RenderPlayer(
 	if(!InAir && WantOtherDir && length(Vel * 50) > 500.0f)
 		GameClient()->m_Effects.SkidTrail(Position, Vel, Player.m_Direction, Alpha, Volume);
 
+	// recolor when the tee holds fire
+	const bool IsLocalTee = ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1];
+	const bool FrozenFiring = g_Config.m_ClMClientFrozenWeapon && ClientId >= 0 &&
+				  !(g_Config.m_ClMClientFrozenWeaponNotSelf && IsLocalTee) &&
+				  (!g_Config.m_ClMClientFrozenWeaponHammerOnly || Player.m_Weapon == WEAPON_HAMMER) &&
+				  (RenderInfo.m_TeeRenderFlags & TEE_EFFECT_FROZEN) && GameClient()->IsHoldingFire(ClientId);
+
+	const auto &&RecolorFrozenWeapon = [&](vec2 Pos, int Offset) {
+		if(!FrozenFiring)
+			return;
+		const ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMClientFrozenHammerColor, false));
+		const float ColorAlpha = Alpha * g_Config.m_ClMClientFrozenHammerColorAlpha / 100.0f;
+		Graphics()->SetColor(Color.r, Color.g, Color.b, ColorAlpha);
+		Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, Offset, Pos.x, Pos.y);
+		Graphics()->BlendAdditive();
+		Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, Offset, Pos.x, Pos.y);
+		Graphics()->BlendNormal();
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
+	};
+
 	// draw gun
 	if(Player.m_Weapon >= 0)
 	{
@@ -695,6 +715,7 @@ void CPlayers::RenderPlayer(
 				}
 
 				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, WeaponPosition.x, WeaponPosition.y);
+				RecolorFrozenWeapon(WeaponPosition, QuadOffset);
 			}
 			else if(Player.m_Weapon == WEAPON_NINJA)
 			{
@@ -715,6 +736,7 @@ void CPlayers::RenderPlayer(
 					GameClient()->m_Effects.PowerupShine(WeaponPosition - vec2(32.0f, 0.0f), vec2(32.0f, 12.0f), Alpha);
 				}
 				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, WeaponPosition.x, WeaponPosition.y);
+				RecolorFrozenWeapon(WeaponPosition, QuadOffset);
 
 				// HADOKEN
 				if(AttackTime <= 1.0f / 6.0f && g_pData->m_Weapons.m_aId[CurrentWeapon].m_NumSpriteMuzzles)
@@ -771,6 +793,7 @@ void CPlayers::RenderPlayer(
 					WeaponPosition.y -= 8.0f;
 				Graphics()->QuadsSetRotation(State.GetAttach()->m_Angle * pi * 2.0f + Angle);
 				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, WeaponPosition.x, WeaponPosition.y);
+				RecolorFrozenWeapon(WeaponPosition, QuadOffset);
 			}
 
 			if(Player.m_Weapon == WEAPON_GUN || Player.m_Weapon == WEAPON_SHOTGUN)
@@ -927,6 +950,7 @@ void CPlayers::OnRender()
 	// update render info for ninja
 	CTeeRenderInfo aRenderInfo[MAX_CLIENTS];
 	const bool IsTeamPlay = GameClient()->IsTeamPlay();
+	const int FrozenTeeFlags = g_Config.m_ClMClientFrozenWeapon ? TEE_EFFECT_FROZEN : (TEE_EFFECT_FROZEN | TEE_NO_WEAPON);
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
 		aRenderInfo[i] = GameClient()->m_aClients[i].m_RenderInfo;
@@ -937,7 +961,7 @@ void CPlayers::OnRender()
 		if(i == GameClient()->m_aLocalIds[0] || i == GameClient()->m_aLocalIds[1])
 		{
 			if(GameClient()->m_aClients[i].m_Predicted.m_FreezeEnd != 0)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
+				aRenderInfo[i].m_TeeRenderFlags |= FrozenTeeFlags;
 			if(GameClient()->m_aClients[i].m_Predicted.m_LiveFrozen)
 				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 			if(GameClient()->m_aClients[i].m_Predicted.m_Invincible)
@@ -950,7 +974,7 @@ void CPlayers::OnRender()
 		else
 		{
 			if(GameClient()->m_aClients[i].m_FreezeEnd != 0)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
+				aRenderInfo[i].m_TeeRenderFlags |= FrozenTeeFlags;
 			if(GameClient()->m_aClients[i].m_LiveFrozen)
 				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 			if(GameClient()->m_aClients[i].m_Invincible)
