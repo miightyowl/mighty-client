@@ -624,7 +624,7 @@ void CLineInput::RenderCandidates()
 		const float PosY = Position.y + Margin / 2.0f + i * (FontSize + 2.0f * Padding) + Padding;
 		TextRender()->TextColor(0.6f, 0.6f, 0.6f, 1.0f);
 		TextRender()->Text(PosX, PosY, FontSize, aBuf);
-		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
 		TextRender()->Text(PosX + NumOffset, PosY, FontSize, Input()->GetCandidate(i));
 	}
 }

@@ -1891,7 +1891,7 @@ void CMenus::RenderGhost(CUIRect MainView)
 			}
 		}
 
-		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 
 	s_SelectedIndex = s_ListBox.DoEnd();

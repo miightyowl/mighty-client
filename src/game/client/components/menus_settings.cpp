@@ -187,7 +187,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 		{
 			TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
 			Ui()->DoLabel(&RestartWarning, Localize("DDNet Client needs to be restarted to complete update!"), 14.0f, TEXTALIGN_ML);
-			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
 		}
 		else
 		{

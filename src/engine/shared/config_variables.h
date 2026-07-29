@@ -182,6 +182,7 @@ MACRO_CONFIG_INT(ClFatSkins, cl_fat_skins, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAV
 // m-client
 MACRO_CONFIG_COL(ClMClientColor, cl_mclient_color, 10518912, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: accent color used throughout the UI")
 MACRO_CONFIG_INT(ClMClientIntro, cl_mclient_intro, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show the M-Client welcome/intro popups on the next launch")
+MACRO_CONFIG_INT(ClMClientTextBrightness, cl_mclient_text_brightness, 100, 30, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: brightness of default white UI text in percent")
 MACRO_CONFIG_INT(ClMClientForceSkin, cl_mclient_force_skin, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: force every tee to render as the maodie skin")
 MACRO_CONFIG_INT(ClMClientAds, cl_mclient_ads, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: randomly show advertisement pop-ups while playing")
 MACRO_CONFIG_INT(ClMClientAdsInterval, cl_mclient_ads_interval, 120, 5, 3600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: average seconds between random advertisement/quote pop-ups")

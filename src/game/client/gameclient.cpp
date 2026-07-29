@@ -814,6 +814,8 @@ void CGameClient::UpdatePositions()
 
 void CGameClient::OnRender()
 {
+	TextRender()->SetDefaultTextBrightness(g_Config.m_ClMClientTextBrightness / 100.0f);
+
 	const ColorRGBA ClearColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClOverlayEntities ? g_Config.m_ClBackgroundEntitiesColor : g_Config.m_ClBackgroundColor));
 	Graphics()->Clear(ClearColor.r, ClearColor.g, ClearColor.b);
 
