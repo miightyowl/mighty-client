@@ -322,7 +322,7 @@ void CMenus::RenderSettingsDDNet(CUIRect MainView)
 			}
 		}
 		Ui()->DoLabel(&UpdaterRect, aBuf, 14.0f, TEXTALIGN_ML);
-		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 #endif
 }

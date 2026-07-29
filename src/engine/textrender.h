@@ -8,6 +8,7 @@
 
 #include <engine/graphics.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 
@@ -201,9 +202,11 @@ public:
 	virtual void SetRenderFlags(unsigned Flags) = 0;
 	virtual unsigned GetRenderFlags() const = 0;
 
-	ColorRGBA DefaultTextColor() const { return ColorRGBA(1, 1, 1, 1); }
+	ColorRGBA DefaultTextColor() const { return ColorRGBA(m_DefaultTextBrightness, m_DefaultTextBrightness, m_DefaultTextBrightness, 1); }
 	ColorRGBA DefaultTextOutlineColor() const { return ColorRGBA(0, 0, 0, 0.3f); }
 	ColorRGBA DefaultTextSelectionColor() const { return ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f); }
+
+	void SetDefaultTextBrightness(float Brightness) { m_DefaultTextBrightness = std::clamp(Brightness, 0.0f, 1.0f); }
 
 	//
 	virtual void TextEx(CTextCursor *pCursor, const char *pText, int Length = -1) = 0;
@@ -245,6 +248,9 @@ public:
 
 	virtual void OnPreWindowResize() = 0;
 	virtual void OnWindowResize() = 0;
+
+protected:
+	float m_DefaultTextBrightness = 1.0f;
 };
 
 class IEngineTextRender : public ITextRender

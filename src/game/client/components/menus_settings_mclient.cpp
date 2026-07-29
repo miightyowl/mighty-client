@@ -252,6 +252,11 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
 		static CButtonContainer s_MClientColorResetId;
 		DoLine_ColorPicker(&s_MClientColorResetId, 25.0f, 13.0f, 2.0f, &LeftView, Localize("Menu accent color"), &g_Config.m_ClMClientColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientColor, false)), false, nullptr, false);
+
+		Ui()->DoLabel_AutoLineSize(Localize("Accessibility"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+		RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClMClientTextBrightness, &g_Config.m_ClMClientTextBrightness, &Button, Localize("UI text brightness"), 30, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
 	}
 }
 void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
