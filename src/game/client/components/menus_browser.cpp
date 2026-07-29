@@ -522,22 +522,43 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 	CUIRect Row;
 	StatusBox.HMargin((StatusBox.h - 21.0f) / 2.0f, &Row);
 
-	const auto &&IconField = [&](CLineInput &Input, const CUIRect &Rect, const char *pIcon, const char *pPlaceholder) -> bool {
+	const auto &&IconField = [&](CLineInput &Input, const CUIRect &Rect, const char *pIcon, const char *pPlaceholder, CButtonContainer *pClearId = nullptr) -> bool {
 		Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f), IGraphics::CORNER_ALL, 6.0f);
-		CUIRect Inner, IconRect, Field;
+		CUIRect Inner, IconRect, Field, ClearRect;
 		Rect.VMargin(9.0f, &Inner);
 		Inner.VSplitLeft(13.0f, &IconRect, &Field);
 		Field.VSplitLeft(5.0f, nullptr, &Field);
+		const bool ShowClear = pClearId != nullptr && !Input.IsEmpty();
+		if(ShowClear)
+		{
+			Field.VSplitRight(13.0f, &Field, &ClearRect);
+			Field.VSplitRight(5.0f, &Field, nullptr);
+		}
 		SLabelProperties IconProps;
 		IconProps.SetColor(ColorRGBA(0.5f, 0.5f, 0.5f, 1.0f));
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
 		Ui()->DoLabel(&IconRect, pIcon, 10.5f, TEXTALIGN_ML, IconProps);
+		if(ShowClear)
+		{
+			SLabelProperties ClearProps;
+			ClearProps.SetColor(Ui()->HotItem() == pClearId ? ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f) : ColorRGBA(0.5f, 0.5f, 0.5f, 1.0f));
+			Ui()->DoLabel(&ClearRect, FontIcon::XMARK, 10.5f, TEXTALIGN_MC, ClearProps);
+		}
 		TextRender()->SetRenderFlags(0);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		Input.SetEmptyText(pPlaceholder);
 		static const ColorRGBA s_Transparent(0.0f, 0.0f, 0.0f, 0.0f);
-		return Ui()->DoEditBox(&Input, &Field, 10.5f, IGraphics::CORNER_NONE, {}, &s_Transparent);
+		bool Cleared = false;
+		if(ShowClear && Ui()->DoButtonLogic(pClearId, 0, &ClearRect, BUTTONFLAG_LEFT))
+		{
+			Input.Clear();
+			Cleared = true;
+		}
+		const bool Changed = Ui()->DoEditBox(&Input, &Field, 10.5f, IGraphics::CORNER_NONE, {}, &s_Transparent);
+		if(Cleared)
+			Ui()->SetActiveItem(&Input);
+		return Changed || Cleared;
 	};
 
 	// helper: square icon button
@@ -582,7 +603,8 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 			Ui()->SetActiveItem(&s_FilterInput);
 			s_FilterInput.SelectAll();
 		}
-		if(IconField(s_FilterInput, Search, FontIcon::MAGNIFYING_GLASS, Localize("Search")))
+		static CButtonContainer s_FilterClearButton;
+		if(IconField(s_FilterInput, Search, FontIcon::MAGNIFYING_GLASS, Localize("Search"), &s_FilterClearButton))
 			Client()->ServerBrowserUpdate();
 	}
 
