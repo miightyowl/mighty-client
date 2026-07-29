@@ -3,9 +3,9 @@
 
 #include <base/str.h>
 
+#include <engine/http.h>
 #include <engine/serverbrowser.h>
 #include <engine/shared/config.h>
-#include <engine/shared/http.h>
 #include <engine/shared/json.h>
 
 #include <game/client/gameclient.h>
@@ -158,8 +158,7 @@ void CFinishRename::OnRender()
 
 	if(m_aMap[0] == '\0')
 	{
-		CServerInfo ServerInfo;
-		Client()->GetServerInfo(&ServerInfo);
+		const CServerInfo &ServerInfo = Client()->ServerInfo();
 		if(!ServerInfo.m_aMap[0])
 			return;
 		str_copy(m_aMap, ServerInfo.m_aMap);

@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-class CHttpRequest;
+class IHttpRequest;
 struct _json_value;
 
 class CFinishRename : public CComponent
@@ -27,7 +27,7 @@ class CFinishRename : public CComponent
 	};
 	struct SLookup
 	{
-		std::shared_ptr<CHttpRequest> m_pRequest;
+		std::shared_ptr<IHttpRequest> m_pRequest;
 		EStatus m_Status = STATUS_PENDING;
 	};
 	std::map<std::string, SLookup> m_Lookups;

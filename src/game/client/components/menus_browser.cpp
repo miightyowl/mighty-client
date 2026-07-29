@@ -1268,12 +1268,12 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 	s_ListBox.DoAutoSpacing(2.0f);
 	s_ListBox.SetScrollbarWidth(16.0f);
 	s_ListBox.SetScrollbarMargin(5.0f);
-	s_ListBox.DoStart(25.0f, pSelectedServer->m_NumReceivedClients, 1, 3, -1, &View, false, IGraphics::CORNER_NONE, true);
+	s_ListBox.DoStart(25.0f, (int)pSelectedServer->m_vClients.size(), 1, 3, -1, &View, false, IGraphics::CORNER_NONE, true);
 
 	int NumFoeAliases = 0;
-	for(int i = 0; i < pSelectedServer->m_NumReceivedClients; i++)
+	for(size_t i = 0; i < pSelectedServer->m_vClients.size(); i++)
 	{
-		const CServerInfo::CClient &CurrentClient = pSelectedServer->m_aClients[i];
+		const CServerInfo::CClient &CurrentClient = pSelectedServer->m_vClients[i];
 
 		char aFoeAlias[MAX_NAME_LENGTH];
 		const bool IsFoe = g_Config.m_ClFoeAnonymize && GameClient()->Foes()->IsFriend(CurrentClient.m_aName, CurrentClient.m_aClan, true);
@@ -1285,8 +1285,8 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 				NumFoeAliases++;
 				CGameClient::FoeAliasName(NumFoeAliases, aFoeAlias, sizeof(aFoeAlias));
 				Taken = false;
-				for(int j = 0; j < pSelectedServer->m_NumReceivedClients && !Taken; j++)
-					Taken = str_comp(pSelectedServer->m_aClients[j].m_aName, aFoeAlias) == 0;
+				for(size_t j = 0; j < pSelectedServer->m_vClients.size() && !Taken; j++)
+					Taken = str_comp(pSelectedServer->m_vClients[j].m_aName, aFoeAlias) == 0;
 			} while(Taken);
 		}
 
@@ -1427,7 +1427,7 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 	const int NewSelected = s_ListBox.DoEnd();
 	if(s_ListBox.WasItemSelected())
 	{
-		const CServerInfo::CClient &SelectedClient = pSelectedServer->m_aClients[NewSelected];
+		const CServerInfo::CClient &SelectedClient = pSelectedServer->m_vClients[NewSelected];
 		if(!g_Config.m_ClFoeAnonymize || !GameClient()->Foes()->IsFriend(SelectedClient.m_aName, SelectedClient.m_aClan, true))
 		{
 			if(SelectedClient.m_FriendState == IFriends::FRIEND_PLAYER)
@@ -1478,9 +1478,8 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 		if(g_Config.m_ClMClientFriendsCommunityFilter && ServerBrowser()->CommunitiesFilter().Filtered(pEntry->m_aCommunityId))
 			continue;
 
-		for(int ClientIndex = 0; ClientIndex < pEntry->m_NumClients; ++ClientIndex)
+		for(const CServerInfo::CClient &CurrentClient : pEntry->m_vClients)
 		{
-			const CServerInfo::CClient &CurrentClient = pEntry->m_aClients[ClientIndex];
 			if(CurrentClient.m_FriendState == IFriends::FRIEND_NO)
 				continue;
 

@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-class CHttpRequest;
+class IHttpRequest;
 
 class CUnfinishedMapVote : public CComponent
 {
@@ -29,12 +29,12 @@ class CUnfinishedMapVote : public CComponent
 	char m_aServerType[32] = "";
 	bool m_SelectedPlayersOnly = false;
 
-	std::shared_ptr<CHttpRequest> m_pMapInfoRequest;
+	std::shared_ptr<IHttpRequest> m_pMapInfoRequest;
 
 	struct SPlayerRequest
 	{
 		std::string m_Name;
-		std::shared_ptr<CHttpRequest> m_pRequest;
+		std::shared_ptr<IHttpRequest> m_pRequest;
 	};
 	std::vector<SPlayerRequest> m_vPlayerRequests;
 	std::vector<std::string> m_vPlayerNames;
@@ -46,7 +46,7 @@ class CUnfinishedMapVote : public CComponent
 	void Launch(const char *pReason);
 	bool DetermineServerTypeFromVoteList();
 	void StartPlayerRequests();
-	std::shared_ptr<CHttpRequest> RunRequest(const char *pUrl);
+	std::shared_ptr<IHttpRequest> RunRequest(const char *pUrl);
 	void OnMapInfoDone();
 	void OnPlayersDone();
 	void Stop(const char *pErrorMessage);

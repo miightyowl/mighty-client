@@ -77,6 +77,7 @@ jobs:
           -DANTIBOT=ON \
           -DAUTOUPDATE=ON \
           -DDISCORD=ON \
+          -DDOWNLOAD_GTEST=ON \
           -DMYSQL=ON \
           -DSTEAM=ON \
           -DUPNP=ON \
@@ -84,4 +85,4 @@ jobs:
           -DVULKAN=ON \
           -DWEBSOCKETS=ON \
           -Werror=dev ..
-        cmake --build . --config Debug --target everything -- -k 0
+        cmake --build . --config Debug --target everything testrunner -- -k 0
