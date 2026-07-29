@@ -392,6 +392,15 @@ float CInput::GetUpdateTime() const
 	return m_UpdateTime;
 }
 
+bool CInput::ModifierIsPressed() const
+{
+#if defined(CONF_PLATFORM_MACOS)
+	return KeyIsPressed(KEY_LGUI) || KeyIsPressed(KEY_RGUI);
+#else
+	return KeyIsPressed(KEY_LCTRL) || KeyIsPressed(KEY_RCTRL);
+#endif
+}
+
 bool CInput::KeyIsPressed(int Key) const
 {
 	dbg_assert(Key >= KEY_FIRST && Key < KEY_LAST, "Key invalid: %d", Key);

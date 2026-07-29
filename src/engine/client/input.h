@@ -122,7 +122,7 @@ public:
 	void Clear() override;
 	float GetUpdateTime() const override;
 
-	bool ModifierIsPressed() const override { return KeyIsPressed(KEY_LCTRL) || KeyIsPressed(KEY_RCTRL) || KeyIsPressed(KEY_LGUI) || KeyIsPressed(KEY_RGUI); }
+	bool ModifierIsPressed() const override;
 	bool ShiftIsPressed() const override { return KeyIsPressed(KEY_LSHIFT) || KeyIsPressed(KEY_RSHIFT); }
 	bool AltIsPressed() const override { return KeyIsPressed(KEY_LALT) || KeyIsPressed(KEY_RALT); }
 	bool KeyIsPressed(int Key) const override;
