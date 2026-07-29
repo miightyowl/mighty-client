@@ -1304,6 +1304,8 @@ void CChat::MaybeTranslateLine(CLine &Line)
 		return;
 	if(Line.m_ClientId == GameClient()->m_aLocalIds[0] || Line.m_ClientId == GameClient()->m_aLocalIds[1])
 		return;
+	if(Line.m_TeamNumber == TEAM_WHISPER_SEND)
+		return;
 
 	const int PrefixLen = NameTagPrefixLength(Line.m_aText);
 	const char *pBody = Line.m_aText + PrefixLen;
