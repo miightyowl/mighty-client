@@ -257,6 +257,12 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 		RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
 		Ui()->DoScrollbarOption(&g_Config.m_ClMClientTextBrightness, &g_Config.m_ClMClientTextBrightness, &Button, Localize("UI text brightness"), 30, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+
+		static int s_ChatBackgroundDarkness;
+		s_ChatBackgroundDarkness = round_to_int(ColorHSLA(g_Config.m_ClChatBackgroundColor, true).a * 100.0f);
+		RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
+		if(Ui()->DoScrollbarOption(&s_ChatBackgroundDarkness, &s_ChatBackgroundDarkness, &Button, Localize("Chat background darkness"), 0, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%"))
+			g_Config.m_ClChatBackgroundColor = ColorHSLA(0.0f, 0.0f, 0.0f, s_ChatBackgroundDarkness / 100.0f).Pack(true);
 	}
 }
 void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
