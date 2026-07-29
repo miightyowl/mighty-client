@@ -5,10 +5,10 @@
 #include <engine/client/updater.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
+#include <engine/http.h>
 #include <engine/keys.h>
 #include <engine/serverbrowser.h>
 #include <engine/shared/config.h>
-#include <engine/shared/http.h>
 #include <engine/shared/json.h>
 #include <engine/textrender.h>
 

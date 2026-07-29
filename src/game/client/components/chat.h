@@ -21,7 +21,7 @@
 #include <unordered_map>
 #include <vector>
 
-class CHttpRequest;
+class IHttpRequest;
 
 constexpr auto SAVES_FILE = "ddnet-saves.txt";
 
@@ -81,7 +81,7 @@ class CChat : public CComponent
 	// chat translation
 	struct CPendingTranslation
 	{
-		std::shared_ptr<CHttpRequest> m_pRequest;
+		std::shared_ptr<IHttpRequest> m_pRequest;
 		bool m_Outgoing;
 		int m_LineId;
 		int m_PrefixLen = 0;
@@ -100,7 +100,7 @@ class CChat : public CComponent
 	static bool IsTranslatableText(const char *pText);
 	int NameTagPrefixLength(const char *pText) const;
 	void ProtectPlayerNames(const char *pIn, char *pOut, int OutSize, std::vector<std::string> &vNames) const;
-	std::shared_ptr<CHttpRequest> CreateTranslateRequest(const char *pText, const char *pSourceLang, const char *pTargetLang);
+	std::shared_ptr<IHttpRequest> CreateTranslateRequest(const char *pText, const char *pSourceLang, const char *pTargetLang);
 	void MaybeTranslateLine(CLine &Line);
 	void SendChatTranslated(const char *pLine);
 	void PollTranslations();

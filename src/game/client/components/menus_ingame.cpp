@@ -634,8 +634,7 @@ void CMenus::RenderServerInfo(CUIRect MainView)
 	const float FontSizeTitle = 32.0f;
 	const float FontSizeBody = 20.0f;
 
-	CServerInfo CurrentServerInfo;
-	Client()->GetServerInfo(&CurrentServerInfo);
+	const CServerInfo &CurrentServerInfo = Client()->ServerInfo();
 
 	CUIRect ServerInfo, GameInfo, Motd;
 	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.8f), IGraphics::CORNER_B, 10.0f);
@@ -950,9 +949,7 @@ void CMenus::RenderUnfinishedVoteTeeSelection(CUIRect *pMainView)
 
 bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 {
-	CServerInfo ServerInfo;
-	Client()->GetServerInfo(&ServerInfo);
-	const bool DDNetCommunity = str_comp(ServerInfo.m_aCommunityId, IServerBrowser::COMMUNITY_DDNET) == 0;
+	const bool DDNetCommunity = str_comp(Client()->ServerInfo().m_aCommunityId, IServerBrowser::COMMUNITY_DDNET) == 0;
 
 	if(DDNetCommunity)
 		RenderUnfinishedVoteTeeSelection(&MainView);

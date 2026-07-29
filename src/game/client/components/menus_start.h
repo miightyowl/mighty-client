@@ -9,7 +9,7 @@
 #include <memory>
 #include <vector>
 
-class CHttpRequest;
+class IHttpRequest;
 
 class CMenusStart : public CComponentInterfaces
 {
@@ -21,7 +21,7 @@ private:
 
 	void UpdateLatestRelease();
 	static bool VersionNewer(const char *pLatest, const char *pCurrent);
-	std::shared_ptr<CHttpRequest> m_pReleaseTask = nullptr;
+	std::shared_ptr<IHttpRequest> m_pReleaseTask = nullptr;
 	bool m_ReleaseRequested = false;
 	bool m_ReleaseLoaded = false;
 	bool m_UpdateAvailable = false;

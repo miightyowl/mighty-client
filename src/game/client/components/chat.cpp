@@ -8,10 +8,10 @@
 
 #include <engine/editor.h>
 #include <engine/graphics.h>
+#include <engine/http.h>
 #include <engine/keys.h>
 #include <engine/shared/config.h>
 #include <engine/shared/csv.h>
-#include <engine/shared/http.h>
 #include <engine/shared/json.h>
 #include <engine/textrender.h>
 
@@ -1340,7 +1340,7 @@ void CChat::MaybeTranslateLine(CLine &Line)
 	m_vPendingTranslations.push_back(std::move(Pending));
 }
 
-std::shared_ptr<CHttpRequest> CChat::CreateTranslateRequest(const char *pText, const char *pSourceLang, const char *pTargetLang)
+std::shared_ptr<IHttpRequest> CChat::CreateTranslateRequest(const char *pText, const char *pSourceLang, const char *pTargetLang)
 {
 	char aEscaped[1024];
 	EscapeUrl(aEscaped, pText);
@@ -1348,7 +1348,7 @@ std::shared_ptr<CHttpRequest> CChat::CreateTranslateRequest(const char *pText, c
 	char aUrl[2048];
 	str_format(aUrl, sizeof(aUrl), "https://translate.googleapis.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=%s", pSourceLang, pTargetLang, aEscaped);
 
-	std::shared_ptr<CHttpRequest> pRequest = HttpGet(aUrl);
+	std::shared_ptr<IHttpRequest> pRequest = HttpGet(aUrl);
 	pRequest->Timeout(CTimeout{4000, 8000, 500, 5});
 	pRequest->LogProgress(HTTPLOG::FAILURE);
 	pRequest->HeaderString("User-Agent", "Mozilla/5.0 (compatible; DDNet)");

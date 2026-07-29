@@ -3,8 +3,8 @@
 #include <base/secure.h>
 #include <base/str.h>
 
+#include <engine/http.h>
 #include <engine/serverbrowser.h>
-#include <engine/shared/http.h>
 #include <engine/shared/json.h>
 
 #include <game/client/gameclient.h>
@@ -146,9 +146,7 @@ bool CUnfinishedMapVote::CanStart()
 		return false;
 	}
 
-	CServerInfo ServerInfo;
-	Client()->GetServerInfo(&ServerInfo);
-	str_copy(m_aCurrentMap, ServerInfo.m_aMap);
+	str_copy(m_aCurrentMap, Client()->ServerInfo().m_aMap);
 	if(!m_aCurrentMap[0])
 	{
 		GameClient()->Echo("Unfinished map vote: couldn't determine the current map.");
@@ -261,9 +259,9 @@ bool CUnfinishedMapVote::DetermineServerTypeFromVoteList()
 	return false;
 }
 
-std::shared_ptr<CHttpRequest> CUnfinishedMapVote::RunRequest(const char *pUrl)
+std::shared_ptr<IHttpRequest> CUnfinishedMapVote::RunRequest(const char *pUrl)
 {
-	std::shared_ptr<CHttpRequest> pRequest = HttpGet(pUrl);
+	std::shared_ptr<IHttpRequest> pRequest = HttpGet(pUrl);
 	pRequest->Timeout(CTimeout{10000, 0, 500, 10});
 	pRequest->LogProgress(HTTPLOG::FAILURE);
 	Http()->Run(pRequest);
