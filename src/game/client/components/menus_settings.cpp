@@ -26,7 +26,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 {
 	// content panel only (not full-screen); translucent in-game so the match
 	// stays visible around the panel
-	const float BackgroundAlpha = Client()->State() == IClient::STATE_OFFLINE ? 1.0f : 0.8f;
+	const float BackgroundAlpha = MenuPanelBackgroundAlpha();
 	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, BackgroundAlpha), IGraphics::CORNER_B, 10.0f);
 
 	CUIRect Button, TabBar, RestartBar;

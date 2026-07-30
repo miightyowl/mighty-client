@@ -149,6 +149,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 
 	// dark background
 	Ui()->Screen()->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f), IGraphics::CORNER_NONE, 0.0f);
+	GameClient()->m_Menus.RenderMenuBackgroundAnimation();
 
 	const float PanelW = std::min(880.0f, MainView.w - 120.0f);
 	const float PanelH = 396.0f;

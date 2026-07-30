@@ -79,6 +79,60 @@ ColorRGBA CMenus::AccentColorDark()
 	return color_cast<ColorRGBA>(Hsl);
 }
 
+float CMenus::MenuPanelBackgroundAlpha() const
+{
+	if(Client()->State() != IClient::STATE_OFFLINE)
+		return 0.8f;
+	return g_Config.m_ClMClientMenuAnimation ? 0.0f : 1.0f;
+}
+
+void CMenus::RenderMenuBackgroundAnimation()
+{
+	if(!g_Config.m_ClMClientMenuAnimation)
+		return;
+
+	const CUIRect Screen = *Ui()->Screen();
+	const float Bottom = Screen.y + Screen.h;
+
+	Graphics()->TextureClear();
+	Graphics()->TrianglesBegin();
+
+	static const int s_NumStreaks = 14;
+	for(int i = 0; i < s_NumStreaks; i++)
+	{
+		const float Seed = i / (float)s_NumStreaks;
+		const float Progress = std::fmod(Client()->LocalTime() * 0.015f + Seed, 1.0f);
+
+		const float BaseX = Screen.x - Screen.w * 0.3f + Progress * Screen.w * 1.6f;
+		const float Slant = Screen.h * (0.25f + Seed * 0.35f);
+		const float Thickness = 40.0f + Seed * 70.0f;
+
+		const ColorRGBA Tint(0.72f, 0.76f, 0.85f, 0.0f);
+		const ColorRGBA Core = Tint.WithAlpha(0.05f * std::sin(Progress * pi));
+
+		const auto &&LeftEdgeAt = [&](float Y) { return BaseX + (Bottom - Y) / Screen.h * Slant; };
+		const float MidY = Screen.y + Screen.h * 0.5f;
+
+		Graphics()->SetColor4(Tint, Tint, Core, Core);
+		const IGraphics::CFreeformItem UpperHalf(
+			LeftEdgeAt(Screen.y), Screen.y,
+			LeftEdgeAt(Screen.y) + Thickness, Screen.y,
+			LeftEdgeAt(MidY), MidY,
+			LeftEdgeAt(MidY) + Thickness, MidY);
+		Graphics()->QuadsDrawFreeform(&UpperHalf, 1);
+
+		Graphics()->SetColor4(Core, Core, Tint, Tint);
+		const IGraphics::CFreeformItem LowerHalf(
+			LeftEdgeAt(MidY), MidY,
+			LeftEdgeAt(MidY) + Thickness, MidY,
+			LeftEdgeAt(Bottom), Bottom,
+			LeftEdgeAt(Bottom) + Thickness, Bottom);
+		Graphics()->QuadsDrawFreeform(&LowerHalf, 1);
+	}
+
+	Graphics()->TrianglesEnd();
+}
+
 CMenus::CMenus()
 {
 	m_Popup = POPUP_NONE;
@@ -1067,6 +1121,7 @@ void CMenus::Render()
 	{
 		Ui()->MapScreen();
 		Ui()->Screen()->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f), IGraphics::CORNER_NONE, 0.0f);
+		RenderMenuBackgroundAnimation();
 		ms_ColorTabbarInactive = ms_ColorTabbarInactiveOutgame;
 		ms_ColorTabbarActive = ms_ColorTabbarActiveOutgame;
 		ms_ColorTabbarHover = ms_ColorTabbarHoverOutgame;
@@ -2760,7 +2815,7 @@ void CMenus::OnRender()
 	if(IsActive())
 	{
 		Ui()->RenderBackButton();
-		RenderTools()->RenderCursor(Ui()->MousePos(), 24.0f);
+		RenderTools()->RenderCursor(Ui()->MousePos(), 24.0f * g_Config.m_ClMClientMenuCursorSize / 100.0f);
 	}
 
 	// render debug information
