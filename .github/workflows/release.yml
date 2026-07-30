@@ -156,6 +156,9 @@ jobs:
           export ANDROID_HOME="/home/runner/Android/Sdk"
           unset ANDROID_SDK_ROOT
           export PATH=/home/runner/cmake/bin:$PATH
+          MCLIENT_VERSION="$(grep '#define MCLIENT_VERSION' src/game/version.h | cut -d'"' -f2)"
+          export TW_VERSION_NAME="$MCLIENT_VERSION"
+          export TW_VERSION_CODE="$(echo "$MCLIENT_VERSION" | awk -F. '{print $1 * 10000 + $2 * 100 + $3}')"
           scripts/android/cmake_android.sh all MClient org.mighty.client Release build-android
           mkdir artifacts
           mv build-android/MClient.apk artifacts
