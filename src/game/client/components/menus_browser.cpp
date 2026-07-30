@@ -1905,7 +1905,7 @@ void CMenus::RenderServerbrowser(CUIRect MainView)
 	// clang-format on
 
 	CUIRect ServerList, StatusBox, ToolBox, TabBar, Content;
-	const float BackgroundAlpha = Client()->State() == IClient::STATE_OFFLINE ? 1.0f : 0.8f;
+	const float BackgroundAlpha = MenuPanelBackgroundAlpha();
 	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, BackgroundAlpha), IGraphics::CORNER_B, 10.0f);
 	MainView.Margin(10.0f, &MainView);
 

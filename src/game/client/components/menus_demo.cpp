@@ -1113,7 +1113,7 @@ void CMenus::RenderDemoBrowser(CUIRect MainView)
 	GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_DEMOS);
 
 	CUIRect ListView, DetailsView, ButtonsView;
-	const float BackgroundAlpha = Client()->State() == IClient::STATE_OFFLINE ? 1.0f : 0.8f;
+	const float BackgroundAlpha = MenuPanelBackgroundAlpha();
 	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, BackgroundAlpha), IGraphics::CORNER_B, 10.0f);
 	MainView.Margin(10.0f, &MainView);
 	MainView.HSplitBottom(22.0f * 2.0f + 5.0f, &ListView, &ButtonsView);
