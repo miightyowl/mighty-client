@@ -17,7 +17,7 @@ jobs:
         include:
           - name: linux-x86_64
             os: ubuntu-22.04
-            cmake-args: -G Ninja
+            cmake-args: -G Ninja -DVIDEORECORDER=OFF
             package-file: "*-linux_x86_64.tar.xz"
           - name: macos
             os: macos-latest
@@ -38,9 +38,8 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y \
-            glslang-tools libavcodec-dev libavformat-dev libavutil-dev libfreetype6-dev \
-            libglew-dev libnotify-dev libpng-dev libsdl2-dev libsqlite3-dev \
-            libswresample-dev libswscale-dev libvulkan-dev libx264-dev ninja-build pkg-config
+            glslang-tools libfreetype6-dev libglew-dev libnotify-dev libpng-dev \
+            libsdl2-dev libsqlite3-dev libvulkan-dev ninja-build pkg-config
 
       - name: Prepare macOS
         if: contains(matrix.os, 'macos')
