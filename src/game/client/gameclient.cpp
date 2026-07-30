@@ -4183,7 +4183,6 @@ vec2 CGameClient::GetFastInputPos(int ClientId)
 vec2 CGameClient::SmoothFastInputPos(int ClientId, vec2 BasePos, vec2 FastPos)
 {
 	SFastInputSmooth &Smooth = m_aFastInputSmooth[ClientId];
-	const vec2 Offset = FastPos - BasePos;
 
 	const float SmoothingMs = 0.0f;
 	if(SmoothingMs <= 0.0f)
@@ -4192,6 +4191,7 @@ vec2 CGameClient::SmoothFastInputPos(int ClientId, vec2 BasePos, vec2 FastPos)
 		return FastPos;
 	}
 
+	const vec2 Offset = FastPos - BasePos;
 	const int64_t Now = time_get();
 	const int64_t Freq = time_freq();
 
