@@ -65,6 +65,7 @@
 #include "components/pet_tee.h"
 #include "components/petting.h"
 #include "components/players.h"
+#include "components/practice_setup.h"
 #include "components/race_demo.h"
 #include "components/scoreboard.h"
 #include "components/skins.h"
@@ -184,6 +185,7 @@ public:
 	CSpectator m_Spectator;
 
 	CPlayers m_Players;
+	CPracticeSetup m_PracticeSetup;
 	CPetting m_Petting;
 	CPetTee m_PetTee;
 	CAds m_Ads;

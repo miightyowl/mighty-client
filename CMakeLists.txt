@@ -2626,6 +2626,8 @@ if(CLIENT)
     components/petting.h
     components/players.cpp
     components/players.h
+    components/practice_setup.cpp
+    components/practice_setup.h
     components/race_demo.cpp
     components/race_demo.h
     components/scoreboard.cpp
