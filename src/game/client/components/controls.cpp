@@ -256,8 +256,8 @@ int CControls::SnapInput(int *pData)
 	// update player state
 	if(GameClient()->m_Chat.IsActive())
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_CHATTING;
-	else if(GameClient()->m_Menus.IsActive() || GameClient()->m_Ads.IsActive())
-		// active advertisement freezes input
+	else if(GameClient()->m_Menus.IsActive() || GameClient()->m_Ads.IsActive() || GameClient()->m_PracticeSetup.IsActive())
+		// active advertisement or practice setup modal freezes input
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_IN_MENU;
 	else
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_PLAYING;
