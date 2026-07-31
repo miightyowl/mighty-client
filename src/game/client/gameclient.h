@@ -758,7 +758,9 @@ public:
 	static void FoeAliasName(int Index, char *pBuffer, int BufferSize);
 	bool FoeAliasIndexTaken(int Index, int ExcludeClientId) const;
 	int NextFreeFoeAliasIndex(int ExcludeClientId) const;
+	bool IsClientNameKnown(const char *pName) const;
 	bool ReplaceFoeNames(const char *pText, char *pBuffer, int BufferSize);
+	bool MaskFoeNames(const char *pText, char *pBuffer, int BufferSize);
 	bool IsOtherTeam(int ClientId) const;
 	bool IsHoldingFire(int ClientId) const;
 	int SwitchStateTeam() const;
