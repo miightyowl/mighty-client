@@ -85,6 +85,7 @@ MACRO_CONFIG_INT(ClShowEmotes, cl_showemotes, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_
 MACRO_CONFIG_INT(ClShowChat, cl_showchat, 1, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show chat (2 to always show large chat area)")
 MACRO_CONFIG_INT(ClShowChatFriends, cl_show_chat_friends, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show only chat messages from friends")
 MACRO_CONFIG_INT(ClFoeAnonymize, cl_foe_anonymize, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fully anonymize tees on your foe list")
+MACRO_CONFIG_INT(ClFoeAnonymizeRealNamesInChat, cl_foe_anonymize_real_names_in_chat, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep the real names of anonymized foes in chat messages written by other players")
 MACRO_CONFIG_INT(ClFinishRename, cl_finish_rename, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Near the finish, switch to the first alternative name without a finish if the current name already finished the map")
 MACRO_CONFIG_STR(ClFinishRenameNames, cl_finish_rename_names, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Comma-separated alternative names for cl_finish_rename, tried in order")
 MACRO_CONFIG_INT(ClFinishRenameDistance, cl_finish_rename_distance, 20, 5, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Distance to the finish line in tiles at which cl_finish_rename renames")
