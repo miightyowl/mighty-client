@@ -170,6 +170,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Statboard,
 					      &m_Motd,
 					      &m_Ads,
+					      &m_MaodieWalk,
 					      &m_PracticeSetup,
 					      &m_Menus,
 					      &m_Tooltips,

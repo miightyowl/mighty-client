@@ -57,6 +57,7 @@
 #include "components/mapimages.h"
 #include "components/maplayers.h"
 #include "components/mapsounds.h"
+#include "components/maodie_walk.h"
 #include "components/menu_background.h"
 #include "components/menus.h"
 #include "components/motd.h"
@@ -189,6 +190,7 @@ public:
 	CPetting m_Petting;
 	CPetTee m_PetTee;
 	CAds m_Ads;
+	CMaodieWalk m_MaodieWalk;
 	CBindWheel m_BindWheel;
 	CNamePlates m_NamePlates;
 	CFreezeBars m_FreezeBars;
