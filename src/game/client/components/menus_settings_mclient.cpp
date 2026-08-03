@@ -105,6 +105,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPet, Localize("Show petting hand"), &g_Config.m_ClMClientPet, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientAds, Localize("Random advertisement/quote pop-ups"), &g_Config.m_ClMClientAds, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFatChat, Localize("Fat skins when someone writes \"fat\""), &g_Config.m_ClMClientFatChat, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMaodieWalk, Localize("Giant maodie walks across the screen"), &g_Config.m_ClMClientMaodieWalk, &LeftView, LineSize);
 
 		// experimental
 		LeftView.HSplitTop(MarginBetweenViews, nullptr, &LeftView);

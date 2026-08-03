@@ -2620,6 +2620,8 @@ if(CLIENT)
     components/nameplates.h
     components/particles.cpp
     components/particles.h
+    components/maodie_walk.cpp
+    components/maodie_walk.h
     components/pet_tee.cpp
     components/pet_tee.h
     components/petting.cpp
