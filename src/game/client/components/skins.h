@@ -253,6 +253,8 @@ public:
 
 	static bool IsSpecialSkin(const char *pName);
 
+	static bool IsBlockedSkin(const char *pName);
+
 private:
 	static bool IsVanillaSkin(const char *pName);
 
@@ -261,6 +263,13 @@ private:
 	 *
 	 * The names have to be in lower case for efficient comparison.
 	 */
+	/**
+	 * Names of skins that are blocked from being loaded, downloaded and listed.
+	 */
+	constexpr static const char *BLOCKED_SKINS[] = {"skunky", "penis_tee", "penis",
+		"penistee", "penis_2", "penis_1", "justin-penev2-2", "justinbieberw",
+		"geiletitten", "geilerpimmel", "geilerarsch", "doll", "93"};
+
 	constexpr static const char *VANILLA_SKINS[] = {"bluekitty", "bluestripe", "brownbear",
 		"cammo", "cammostripes", "coala", "default", "limekitty",
 		"pinky", "redbopp", "redstripe", "saddo", "toptri",
