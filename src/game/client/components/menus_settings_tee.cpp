@@ -392,15 +392,41 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	MainView.HSplitTop(5.0f, nullptr, &MainView);
 
 	// Layout bottom controls and use remainder for skin selector
-	CUIRect QuickSearch, DatabaseButton, DirectoryButton, RefreshButton;
-	MainView.HSplitBottom(20.0f, &MainView, &QuickSearch);
+	CUIRect BottomBar, QuickSearch, SortDropDown, DatabaseButton, DdstatsButton, DirectoryButton, RefreshButton;
+	MainView.HSplitBottom(20.0f, &MainView, &BottomBar);
 	MainView.HSplitBottom(5.0f, &MainView, nullptr);
-	QuickSearch.VSplitLeft(220.0f, &QuickSearch, &DatabaseButton);
-	DatabaseButton.VSplitLeft(10.0f, nullptr, &DatabaseButton);
-	DatabaseButton.VSplitLeft(150.0f, &DatabaseButton, &DirectoryButton);
-	DirectoryButton.VSplitRight(175.0f, nullptr, &DirectoryButton);
-	DirectoryButton.VSplitRight(25.0f, &DirectoryButton, &RefreshButton);
-	DirectoryButton.VSplitRight(10.0f, &DirectoryButton, nullptr);
+	BottomBar.VSplitLeft(220.0f, &QuickSearch, &SortDropDown);
+	SortDropDown.VSplitLeft(10.0f, nullptr, &SortDropDown);
+	SortDropDown.VSplitLeft(150.0f, &SortDropDown, nullptr);
+	BottomBar.VSplitRight(25.0f, &BottomBar, &RefreshButton);
+	BottomBar.VSplitRight(10.0f, &BottomBar, nullptr);
+	BottomBar.VSplitRight(150.0f, &BottomBar, &DdstatsButton);
+	BottomBar.VSplitRight(10.0f, &BottomBar, nullptr);
+	BottomBar.VSplitRight(150.0f, &BottomBar, &DatabaseButton);
+	BottomBar.VSplitRight(10.0f, &BottomBar, nullptr);
+	BottomBar.VSplitRight(150.0f, nullptr, &DirectoryButton);
+
+	CUIRect ViewTabs;
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+	MainView.HSplitTop(20.0f, &ViewTabs, &MainView);
+	MainView.HSplitTop(5.0f, nullptr, &MainView);
+	{
+		const char *apViewNames[] = {Localize("All skins"), Localize("Hidden skins"), Localize("Blocked skins")};
+		static CButtonContainer s_aViewButtons[std::size(apViewNames)];
+		const float TabWidth = ViewTabs.w / std::size(apViewNames);
+		for(size_t i = 0; i < std::size(apViewNames); ++i)
+		{
+			CUIRect Tab;
+			ViewTabs.VSplitLeft(TabWidth, &Tab, &ViewTabs);
+			const int Corners = i == 0 ? IGraphics::CORNER_L : (i == std::size(apViewNames) - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
+			if(DoButton_MenuTab(&s_aViewButtons[i], apViewNames[i], g_Config.m_ClSkinListView == (int)i, &Tab, Corners, nullptr, nullptr, nullptr, nullptr, 5.0f) &&
+				g_Config.m_ClSkinListView != (int)i)
+			{
+				g_Config.m_ClSkinListView = i;
+				SkinList.ForceRefresh();
+			}
+		}
+	}
 
 	// Skin selector
 	static CListBox s_ListBox;
@@ -464,11 +490,13 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 			Graphics()->QuadsEnd();
 		}
 
-		// render skin favorite icon
+		// render skin favorite, hide and block icons
 		{
-			CUIRect FavIcon;
-			Item.m_Rect.HSplitTop(20.0f, &FavIcon, nullptr);
-			FavIcon.VSplitRight(20.0f, nullptr, &FavIcon);
+			CUIRect IconBar, FavIcon, HideIcon, BlockIcon;
+			Item.m_Rect.HSplitTop(20.0f, &IconBar, nullptr);
+			IconBar.VSplitRight(20.0f, &IconBar, &FavIcon);
+			IconBar.VSplitRight(20.0f, &IconBar, &HideIcon);
+			IconBar.VSplitRight(20.0f, nullptr, &BlockIcon);
 			if(DoButton_Favorite(SkinListEntry.FavoriteButtonId(), SkinListEntry.ListItemId(), SkinListEntry.IsFavorite(), &FavIcon))
 			{
 				if(SkinListEntry.IsFavorite())
@@ -480,9 +508,22 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 					GameClient()->m_Skins.AddFavorite(pSkinContainer->Name());
 				}
 			}
+			if(DoButton_SkinListIcon(SkinListEntry.HideButtonId(), SkinListEntry.ListItemId(), SkinListEntry.IsHidden(), &HideIcon, FontIcon::EYE_SLASH, ColorRGBA(0.6f, 0.8f, 1.0f, 1.0f)))
+			{
+				GameClient()->m_Skins.SetHidden(pSkinContainer->Name(), !SkinListEntry.IsHidden());
+			}
+			GameClient()->m_Tooltips.DoToolTip(SkinListEntry.HideButtonId(), &HideIcon, SkinListEntry.IsHidden() ? Localize("Show this skin again") : Localize("Hide this skin from the list"));
+			if(DoButton_SkinListIcon(SkinListEntry.BlockButtonId(), SkinListEntry.ListItemId(), SkinListEntry.IsBlocked(), &BlockIcon, FontIcon::BAN, ColorRGBA(1.0f, 0.4f, 0.4f, 1.0f)))
+			{
+				GameClient()->m_Skins.SetBlocked(pSkinContainer->Name(), !SkinListEntry.IsBlocked());
+			}
+			GameClient()->m_Tooltips.DoToolTip(SkinListEntry.BlockButtonId(), &BlockIcon, SkinListEntry.IsBlocked() ? Localize("Unblock this skin") : Localize("Block this skin, players using it show the default skin"));
 		}
 
-		RenderSkinStatus(Item.m_Rect, pSkinContainer, SkinListEntry.ErrorTooltipId());
+		if(!SkinListEntry.IsBlocked())
+		{
+			RenderSkinStatus(Item.m_Rect, pSkinContainer, SkinListEntry.ErrorTooltipId());
+		}
 	}
 
 	// M-Client: while the skin is forced, selecting from the list is disabled.
@@ -516,10 +557,30 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		SkinList.ForceRefresh();
 	}
 
+	{
+		const char *apSortNames[] = {Localize("Name (A-Z)"), Localize("Name (Z-A)"), Localize("Recently added")};
+		static CUi::SDropDownState s_SortDropDownState;
+		static CScrollRegion s_SortScrollRegion;
+		s_SortDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_SortScrollRegion;
+		const int OldSort = std::clamp(g_Config.m_ClSkinListSort, 0, (int)std::size(apSortNames) - 1);
+		const int NewSort = Ui()->DoDropDown(&SortDropDown, OldSort, apSortNames, std::size(apSortNames), s_SortDropDownState);
+		if(NewSort != OldSort)
+		{
+			g_Config.m_ClSkinListSort = NewSort;
+			SkinList.ForceRefresh();
+		}
+	}
+
 	static CButtonContainer s_SkinDatabaseButton;
-	if(DoButton_Menu(&s_SkinDatabaseButton, Localize("Skin Database"), 0, &DatabaseButton))
+	if(DoButton_Menu(&s_SkinDatabaseButton, Localize("DDNet Database"), 0, &DatabaseButton))
 	{
 		Client()->ViewLink("https://ddnet.org/skins/");
+	}
+
+	static CButtonContainer s_DdstatsDatabaseButton;
+	if(DoButton_Menu(&s_DdstatsDatabaseButton, Localize("DDStats Database"), 0, &DdstatsButton))
+	{
+		Client()->ViewLink("https://skins.ddstats.tw/");
 	}
 
 	static CButtonContainer s_DirectoryButton;

@@ -538,6 +538,15 @@ void CPlayers::RenderHook(
 	RenderHand(&RenderInfo, Position, normalize(HookPos - Pos), -pi / 2, vec2(20, 0), Alpha);
 }
 
+bool CPlayers::IsFrozenInteracting(int ClientId, int Weapon) const
+{
+	if(ClientId < 0)
+		return false;
+	if(g_Config.m_ClMClientFrozenWeaponHammerOnly && Weapon != WEAPON_HAMMER)
+		return false;
+	return GameClient()->IsHoldingFire(ClientId);
+}
+
 void CPlayers::RenderPlayer(
 	const CNetObj_Character *pPrevChar,
 	const CNetObj_Character *pPlayerChar,
@@ -657,10 +666,10 @@ void CPlayers::RenderPlayer(
 
 	// recolor when the tee holds fire
 	const bool IsLocalTee = ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1];
-	const bool FrozenFiring = g_Config.m_ClMClientFrozenWeapon && ClientId >= 0 &&
+	const bool FrozenFiring = g_Config.m_ClMClientFrozenWeapon &&
 				  !(g_Config.m_ClMClientFrozenWeaponNotSelf && IsLocalTee) &&
-				  (!g_Config.m_ClMClientFrozenWeaponHammerOnly || Player.m_Weapon == WEAPON_HAMMER) &&
-				  (RenderInfo.m_TeeRenderFlags & TEE_EFFECT_FROZEN) && GameClient()->IsHoldingFire(ClientId);
+				  (RenderInfo.m_TeeRenderFlags & TEE_EFFECT_FROZEN) &&
+				  IsFrozenInteracting(ClientId, Player.m_Weapon);
 
 	const auto &&RecolorFrozenWeapon = [&](vec2 Pos, int Offset) {
 		if(!FrozenFiring)
@@ -950,7 +959,18 @@ void CPlayers::OnRender()
 	// update render info for ninja
 	CTeeRenderInfo aRenderInfo[MAX_CLIENTS];
 	const bool IsTeamPlay = GameClient()->IsTeamPlay();
-	const int FrozenTeeFlags = g_Config.m_ClMClientFrozenWeapon ? TEE_EFFECT_FROZEN : (TEE_EFFECT_FROZEN | TEE_NO_WEAPON);
+	const auto &&FrozenTeeFlags = [&](int ClientId) -> int {
+		if(!g_Config.m_ClMClientFrozenWeapon)
+			return TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
+		const bool IsLocalTee = ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1];
+		if(g_Config.m_ClMClientFrozenWeaponHideSelf && IsLocalTee)
+			return TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
+		if(g_Config.m_ClMClientFrozenWeaponInteractOnly &&
+			!(g_Config.m_ClMClientFrozenWeaponNotSelf && IsLocalTee) &&
+			!IsFrozenInteracting(ClientId, GameClient()->m_aClients[ClientId].m_RenderCur.m_Weapon))
+			return TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
+		return TEE_EFFECT_FROZEN;
+	};
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
 		aRenderInfo[i] = GameClient()->m_aClients[i].m_RenderInfo;
@@ -961,7 +981,7 @@ void CPlayers::OnRender()
 		if(i == GameClient()->m_aLocalIds[0] || i == GameClient()->m_aLocalIds[1])
 		{
 			if(GameClient()->m_aClients[i].m_Predicted.m_FreezeEnd != 0)
-				aRenderInfo[i].m_TeeRenderFlags |= FrozenTeeFlags;
+				aRenderInfo[i].m_TeeRenderFlags |= FrozenTeeFlags(i);
 			if(GameClient()->m_aClients[i].m_Predicted.m_LiveFrozen)
 				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 			if(GameClient()->m_aClients[i].m_Predicted.m_Invincible)
@@ -974,7 +994,7 @@ void CPlayers::OnRender()
 		else
 		{
 			if(GameClient()->m_aClients[i].m_FreezeEnd != 0)
-				aRenderInfo[i].m_TeeRenderFlags |= FrozenTeeFlags;
+				aRenderInfo[i].m_TeeRenderFlags |= FrozenTeeFlags(i);
 			if(GameClient()->m_aClients[i].m_LiveFrozen)
 				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 			if(GameClient()->m_aClients[i].m_Invincible)

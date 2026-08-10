@@ -15,6 +15,11 @@ class CPlayers : public CComponent
 	void RenderHand7(const CTeeRenderInfo *pInfo, vec2 HandPos, float HandAngle, float Alpha);
 
 	void RenderHand(const CTeeRenderInfo *pInfo, vec2 CenterPos, vec2 Dir, float AngleOffset, vec2 PostRotOffset, float Alpha);
+	/**
+	 * M-Client: whether a frozen tee counts as trying to interact, which decides both whether its
+	 * weapon is shown and whether it is recolored.
+	 */
+	bool IsFrozenInteracting(int ClientId, int Weapon) const;
 	void RenderPlayer(
 		const CNetObj_Character *pPrevChar,
 		const CNetObj_Character *pPlayerChar,

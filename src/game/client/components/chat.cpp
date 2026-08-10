@@ -1065,10 +1065,9 @@ static bool IsTranslatableWord(const char *pWord)
 		return false;
 	if(NonAsciiLetter)
 		return true;
-	if(NumLetters <= 1)
+	if(NumLetters <= 1 && !g_Config.m_ClChatTranslateShortWords)
 		return false;
 
-	// common chat emotes that shouldn't trigger a translation
 	static const char *s_apEmoteWords[] = {
 		"xd", "xdd", "xddd", "lol", "lmao", "rofl", "gg", "ggs", "gl", "hf",
 		"glhf", "wp", "ez", "nt", "ns", "ok", "kk", "o7", "uwu", "owo", "afk",
