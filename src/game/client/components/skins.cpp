@@ -214,6 +214,13 @@ bool CSkins::IsVanillaSkin(const char *pName)
 	});
 }
 
+bool CSkins::IsBlockedSkin(const char *pName)
+{
+	return std::any_of(std::begin(BLOCKED_SKINS), std::end(BLOCKED_SKINS), [pName](const char *pBlockedSkin) {
+		return str_comp_nocase(pName, pBlockedSkin) == 0;
+	});
+}
+
 class CSkinScanUser
 {
 public:
@@ -243,6 +250,11 @@ int CSkins::SkinScan(const char *pName, int IsDir, int StorageType, void *pUser)
 	{
 		log_error("skins", "Skin name is not valid: %s", aSkinName);
 		log_error("skins", "%s", CSkin::m_aSkinNameRestrictions);
+		return 0;
+	}
+
+	if(IsBlockedSkin(aSkinName))
+	{
 		return 0;
 	}
 
@@ -457,7 +469,7 @@ void CSkins::LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData 
 
 void CSkins::LoadSkinDirect(const char *pName)
 {
-	if(m_Skins.contains(pName))
+	if(m_Skins.contains(pName) || IsBlockedSkin(pName))
 	{
 		return;
 	}
@@ -830,7 +842,7 @@ const CSkins::CSkinContainer *CSkins::FindContainerOrNullptr(const char *pName)
 
 const CSkins::CSkinContainer *CSkins::FindContainerImpl(const char *pName)
 {
-	if(!CSkin::IsValidName(pName))
+	if(!CSkin::IsValidName(pName) || IsBlockedSkin(pName))
 	{
 		return nullptr;
 	}
