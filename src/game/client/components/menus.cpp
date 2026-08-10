@@ -525,7 +525,8 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 		dbg_assert_failed("Client state %d is invalid for RenderMenubar", ClientState);
 	}
 
-	Box.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.6f), IGraphics::CORNER_NONE, 0.0f);
+	const float BarAlpha = ClientState == IClient::STATE_OFFLINE ? 0.6f : MenuPanelBackgroundAlpha();
+	Box.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, BarAlpha), IGraphics::CORNER_NONE, 0.0f);
 
 	// First render buttons aligned from right side so remaining
 	// width is known when rendering buttons from left side.
@@ -536,11 +537,11 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 	const auto &&IconTab = [&](CButtonContainer *pId, const char *pIcon, bool Active, const CUIRect &Rect) -> bool {
 		const bool Hovered = Ui()->HotItem() == pId;
 		if(Active)
-			Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.10f), IGraphics::CORNER_ALL, 6.0f);
+			Rect.Draw(AccentColor().WithAlpha(1.0f), IGraphics::CORNER_ALL, 6.0f);
 		else if(Hovered)
 			Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f), IGraphics::CORNER_ALL, 6.0f);
 		SLabelProperties Props;
-		Props.SetColor(Active ? ColorRGBA(0.92f, 0.92f, 0.92f, 1.0f) : (Hovered ? ColorRGBA(0.85f, 0.85f, 0.85f, 1.0f) : ColorRGBA(0.50f, 0.50f, 0.50f, 1.0f)));
+		Props.SetColor(Active ? ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f) : (Hovered ? ColorRGBA(0.92f, 0.92f, 0.92f, 1.0f) : ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f)));
 		CUIRect Label = Rect;
 		Ui()->DoLabel(&Label, pIcon, 13.0f, TEXTALIGN_MC, Props);
 		return Ui()->DoButtonLogic(pId, 0, &Rect, BUTTONFLAG_LEFT);
@@ -553,7 +554,7 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 		if(Hovered)
 			Button.Draw(ColorRGBA(1.0f, 0.25f, 0.25f, 0.18f), IGraphics::CORNER_ALL, 6.0f);
 		SLabelProperties Props;
-		Props.SetColor(Hovered ? ColorRGBA(0.95f, 0.45f, 0.45f, 1.0f) : ColorRGBA(0.50f, 0.50f, 0.50f, 1.0f));
+		Props.SetColor(Hovered ? ColorRGBA(0.95f, 0.45f, 0.45f, 1.0f) : ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
 		CUIRect Label = Button;
 		Ui()->DoLabel(&Label, FontIcon::POWER_OFF, 13.0f, TEXTALIGN_MC, Props);
 		if(Ui()->DoButtonLogic(&s_QuitButton, 0, &Button, BUTTONFLAG_LEFT))

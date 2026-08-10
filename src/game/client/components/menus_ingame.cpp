@@ -49,7 +49,7 @@ void CMenus::RenderGame(CUIRect MainView)
 	CUIRect Button, ButtonBars, ButtonBar, ButtonBar2;
 	bool ShowDDRaceButtons = MainView.w > 855.0f;
 	MainView.HSplitTop(45.0f + (g_Config.m_ClTouchControls ? 35.0f : 0.0f), &ButtonBars, &MainView);
-	ButtonBars.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.6f), IGraphics::CORNER_B, 10.0f);
+	ButtonBars.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, MenuPanelBackgroundAlpha()), IGraphics::CORNER_B, 10.0f);
 	ButtonBars.Margin(10.0f, &ButtonBars);
 	ButtonBars.HSplitTop(25.0f, &ButtonBar, &ButtonBars);
 	if(g_Config.m_ClTouchControls)
