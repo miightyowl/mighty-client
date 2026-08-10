@@ -700,7 +700,7 @@ protected:
 	struct SPopupBindWheelIconContext : public SPopupMenuId
 	{
 		CMenus *m_pMenus;
-		int m_Slice;
+		int m_BindIndex;
 	};
 	static CUi::EPopupMenuFunctionResult PopupBindWheelIcon(void *pContext, CUIRect View, bool Active);
 
