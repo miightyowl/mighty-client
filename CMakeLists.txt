@@ -2583,6 +2583,8 @@ if(CLIENT)
     components/key_binder.h
     components/local_server.cpp
     components/local_server.h
+    components/maodie_walk.cpp
+    components/maodie_walk.h
     components/mapimages.cpp
     components/mapimages.h
     components/maplayers.cpp
@@ -2620,8 +2622,6 @@ if(CLIENT)
     components/nameplates.h
     components/particles.cpp
     components/particles.h
-    components/maodie_walk.cpp
-    components/maodie_walk.h
     components/pet_tee.cpp
     components/pet_tee.h
     components/petting.cpp

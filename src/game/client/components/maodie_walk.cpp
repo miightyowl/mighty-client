@@ -15,7 +15,8 @@
 
 #include <cmath>
 
-namespace {
+namespace
+{
 	constexpr float SIZE_FRACTION = 0.9f;
 	constexpr float FLOOR_OFFSET_FRACTION = 0.25f;
 	constexpr float CROSS_TIME = 7.0f;

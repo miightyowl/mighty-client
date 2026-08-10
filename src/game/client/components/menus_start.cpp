@@ -685,7 +685,8 @@ void CMenusStart::UpdateDownloadState()
 	if(DownloadedSize < MCLIENT_UPDATE_MIN_SIZE)
 	{
 		log_error("mclient", "The downloaded update is too small to be a client, discarding it");
-		fs_remove(aDownloaded);
+		if(fs_remove(aDownloaded) != 0)
+			log_error("mclient", "Could not remove the incomplete download '%s'", aDownloaded);
 		m_UpdateState = EUpdateState::FAILED;
 		return;
 	}
