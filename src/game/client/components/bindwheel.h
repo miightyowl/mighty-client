@@ -14,7 +14,9 @@ class CBindWheel : public CComponent
 {
 public:
 	static constexpr int MIN_BINDS = 4;
-	static constexpr int MAX_BINDS = 16;
+	static constexpr int MAX_BINDS = 20;
+	static constexpr int MAX_PAGES = 16;
+	static constexpr int TOTAL_BINDS = MAX_BINDS * MAX_PAGES;
 
 	struct CBind
 	{
@@ -26,6 +28,8 @@ public:
 	std::vector<CBind> m_vBinds;
 
 	static int NumSlots();
+	static int NumPages();
+	static int BindIndex(int Page, int Slot) { return Page * MAX_BINDS + Slot; }
 
 private:
 	bool m_WasActive = false;
@@ -33,6 +37,8 @@ private:
 
 	vec2 m_SelectorMouse = vec2(0.0f, 0.0f);
 	int m_SelectedBind = -1;
+	int m_Page = 0;
+	int m_SelectedPage = 0;
 
 	static void ConKeyBindWheel(IConsole::IResult *pResult, void *pUserData);
 

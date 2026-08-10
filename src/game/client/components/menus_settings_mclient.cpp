@@ -417,14 +417,41 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 {
 	CBindWheel &BindWheel = GameClient()->m_BindWheel;
-	if((int)BindWheel.m_vBinds.size() != CBindWheel::MAX_BINDS)
-		BindWheel.m_vBinds.resize(CBindWheel::MAX_BINDS);
+	if((int)BindWheel.m_vBinds.size() != CBindWheel::TOTAL_BINDS)
+		BindWheel.m_vBinds.resize(CBindWheel::TOTAL_BINDS);
 
 	const int SliceCount = CBindWheel::NumSlots();
+	const int PageCount = CBindWheel::NumPages();
 	static int s_Selected = 0;
+	static int s_Page = 0;
 	s_Selected = std::clamp(s_Selected, 0, SliceCount - 1);
+	s_Page = std::clamp(s_Page, 0, PageCount - 1);
+	const auto &&SelectedBind = [&]() -> CBindWheel::CBind & {
+		return BindWheel.m_vBinds[CBindWheel::BindIndex(s_Page, s_Selected)];
+	};
 
-	CUIRect Headline, Hint, SlotRow, Left, Right, Row, Label, Field;
+	CUIRect Headline, Hint, Left, Right, Label, Field;
+
+	const auto &&DoOptionRow = [&](int *pValue, const char *pText, int Min, int Max, const char *pSuffix) {
+		CUIRect Row, OptionLabel, ScrollBar;
+		Left.HSplitTop(20.0f, &Row, &Left);
+		Left.HSplitTop(6.0f, nullptr, &Left);
+		Row.VSplitLeft(Row.w * 0.55f, &OptionLabel, &ScrollBar);
+		ScrollBar.VSplitLeft(10.0f, nullptr, &ScrollBar);
+
+		char aBuf[128];
+		str_format(aBuf, sizeof(aBuf), "%s: %d%s", pText, *pValue, pSuffix);
+		SLabelProperties Props;
+		Props.m_EnableWidthCheck = false;
+		Ui()->DoLabel(&OptionLabel, aBuf, 12.8f, TEXTALIGN_ML, Props);
+
+		const float Relative = CUi::ms_LinearScrollbarScale.ToRelative(*pValue, Min, Max);
+		const int NewValue = CUi::ms_LinearScrollbarScale.ToAbsolute(Ui()->DoScrollbarH(pValue, &ScrollBar, Relative), Min, Max);
+		if(NewValue == *pValue)
+			return false;
+		*pValue = NewValue;
+		return true;
+	};
 
 	MainView.HSplitTop(30.0f, &Headline, &MainView);
 	Ui()->DoLabel(&Headline, Localize("Bind Wheel"), 20.0f, TEXTALIGN_ML);
@@ -433,7 +460,7 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 	{
 		SLabelProperties Props;
 		Props.SetColor(ColorRGBA(0.6f, 0.6f, 0.6f, 1.0f));
-		Ui()->DoLabel(&Hint, Localize("Bind a key to \"Bind wheel\" under Controls, then hold it in-game and release over a slice."), 11.0f, TEXTALIGN_ML, Props);
+		Ui()->DoLabel(&Hint, Localize("Bind a key to \"Bind wheel\" under Controls, then hold it in-game and release over a slice. Scroll to switch pages."), 11.0f, TEXTALIGN_ML, Props);
 	}
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
@@ -441,49 +468,112 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 	Right.VSplitLeft(20.0f, nullptr, &Right);
 
 	// number of slices
-	Left.HSplitTop(20.0f, &SlotRow, &Left);
-	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelSlots, &g_Config.m_ClMClientBindWheelSlots, &SlotRow, Localize("Number of slices"), CBindWheel::MIN_BINDS, CBindWheel::MAX_BINDS);
+	DoOptionRow(&g_Config.m_ClMClientBindWheelSlots, Localize("Number of slices"), CBindWheel::MIN_BINDS, CBindWheel::MAX_BINDS, "");
+
+	// number of pages
+	DoOptionRow(&g_Config.m_ClMClientBindWheelPages, Localize("Number of pages"), 1, CBindWheel::MAX_PAGES, "");
+
+	// size of the page number in the middle
+	DoOptionRow(&g_Config.m_ClMClientBindWheelPageNumberSize, Localize("Page number size"), 0, 60, "");
+
+	// opacity of the page number
+	DoOptionRow(&g_Config.m_ClMClientBindWheelPageNumberAlpha, Localize("Page number opacity"), 0, 100, "%");
+
+	// invert the scroll direction
+	CUIRect InvertRow;
+	Left.HSplitTop(20.0f, &InvertRow, &Left);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientBindWheelScrollInvert, Localize("Invert page scroll direction"), g_Config.m_ClMClientBindWheelScrollInvert, &InvertRow))
+		g_Config.m_ClMClientBindWheelScrollInvert ^= 1;
 	Left.HSplitTop(6.0f, nullptr, &Left);
 
 	// background opacity
-	CUIRect AlphaRow;
-	Left.HSplitTop(20.0f, &AlphaRow, &Left);
-	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelAlpha, &g_Config.m_ClMClientBindWheelAlpha, &AlphaRow, Localize("Background opacity"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
-	Left.HSplitTop(6.0f, nullptr, &Left);
+	DoOptionRow(&g_Config.m_ClMClientBindWheelAlpha, Localize("Background opacity"), 0, 100, "%");
 
 	// circle size
-	CUIRect SizeRow;
-	Left.HSplitTop(20.0f, &SizeRow, &Left);
-	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelSize, &g_Config.m_ClMClientBindWheelSize, &SizeRow, Localize("Circle size"), 50, 200, &CUi::ms_LinearScrollbarScale, 0u, "%");
-	Left.HSplitTop(6.0f, nullptr, &Left);
+	DoOptionRow(&g_Config.m_ClMClientBindWheelSize, Localize("Circle size"), 50, 120, "%");
 
 	// box width
-	CUIRect BoxWidthRow;
-	Left.HSplitTop(20.0f, &BoxWidthRow, &Left);
-	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelBoxWidth, &g_Config.m_ClMClientBindWheelBoxWidth, &BoxWidthRow, Localize("Box width"), 60, 160);
-	Left.HSplitTop(6.0f, nullptr, &Left);
+	DoOptionRow(&g_Config.m_ClMClientBindWheelBoxWidth, Localize("Box width"), 30, 160, "");
 
 	// box height
-	CUIRect BoxHeightRow;
-	Left.HSplitTop(20.0f, &BoxHeightRow, &Left);
-	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelBoxHeight, &g_Config.m_ClMClientBindWheelBoxHeight, &BoxHeightRow, Localize("Box height"), 24, 64);
-	Left.HSplitTop(6.0f, nullptr, &Left);
+	DoOptionRow(&g_Config.m_ClMClientBindWheelBoxHeight, Localize("Box height"), 24, 64, "");
 
 	// box opacity
-	CUIRect BoxAlphaRow;
-	Left.HSplitTop(20.0f, &BoxAlphaRow, &Left);
-	Ui()->DoScrollbarOption(&g_Config.m_ClMClientBindWheelBoxAlpha, &g_Config.m_ClMClientBindWheelBoxAlpha, &BoxAlphaRow, Localize("Box opacity"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
-	Left.HSplitTop(30.0f, nullptr, &Left);
+	DoOptionRow(&g_Config.m_ClMClientBindWheelBoxAlpha, Localize("Box opacity"), 0, 100, "%");
+
+	// color of the selected box
+	static CButtonContainer s_BoxColorResetId;
+	DoLine_ColorPicker(&s_BoxColorResetId, 20.0f, 12.0f, 6.0f, &Left, Localize("Selected box color"), &g_Config.m_ClMClientBindWheelBoxColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientBindWheelBoxColor, false)), false, nullptr, false);
+	Left.HSplitTop(24.0f, nullptr, &Left);
+
+	static int s_DragSource = -1;
+	static int s_DragPage = 0;
+	static vec2 s_DragStart = vec2(0.0f, 0.0f);
+	const bool Dragging = s_DragSource >= 0 && length(Ui()->MousePos() - s_DragStart) > 5.0f;
+
+	const float TabHeight = 20.0f;
+	if(PageCount > 1)
+	{
+		CUIRect Tabs = Right;
+		Tabs.h = TabHeight;
+		static CButtonContainer s_aPageButtons[CBindWheel::MAX_PAGES];
+		const float Spacing = 3.0f;
+		const float TabWidth = (Tabs.w - (PageCount - 1) * Spacing) / PageCount;
+		for(int Page = 0; Page < PageCount; Page++)
+		{
+			CUIRect Tab;
+			Tabs.VSplitLeft(TabWidth, &Tab, &Tabs);
+			Tabs.VSplitLeft(Spacing, nullptr, &Tabs);
+			char aLabel[8];
+			str_format(aLabel, sizeof(aLabel), "%d", Page + 1);
+			if(DoButton_MenuTab(&s_aPageButtons[Page], aLabel, s_Page == Page, &Tab, IGraphics::CORNER_ALL, nullptr, nullptr, nullptr, nullptr, 5.0f))
+				s_Page = Page;
+			else if(Dragging && Ui()->MouseHovered(&Tab))
+				s_Page = Page;
+		}
+		if(Ui()->MouseHovered(&Right))
+		{
+			const int Forward = g_Config.m_ClMClientBindWheelScrollInvert ? PageCount - 1 : 1;
+			if(Input()->KeyPress(KEY_MOUSE_WHEEL_UP))
+				s_Page = (s_Page + Forward) % PageCount;
+			else if(Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN))
+				s_Page = (s_Page + PageCount - Forward) % PageCount;
+		}
+	}
+
+	const ColorRGBA HighlightColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMClientBindWheelBoxColor, false));
 
 	// wheel preview
-	const float Radius = std::min(Right.w, Right.h) / 2.0f - 55.0f;
+	const float GameRadius = 215.0f * (g_Config.m_ClMClientBindWheelSize / 100.0f);
+	const float BoxWidth = (float)g_Config.m_ClMClientBindWheelBoxWidth;
+	const float BoxHeight = (float)g_Config.m_ClMClientBindWheelBoxHeight;
+	const float WheelExtent = GameRadius + 20.0f + std::max(BoxWidth, BoxHeight) / 2.0f;
+	const float FitExtent = std::min(Right.w, Right.h - 2.0f * (TabHeight + 6.0f)) / 2.0f;
+	const float Scale = std::min(Right.h / Ui()->Screen()->h, FitExtent / WheelExtent);
+	const float Radius = GameRadius * Scale;
+	const float SlotWidth = BoxWidth * Scale;
+	const float SlotHeight = BoxHeight * Scale;
 	const vec2 Center = vec2(Right.x + Right.w / 2.0f, Right.y + Right.h / 2.0f);
 
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.04f);
-	Graphics()->DrawCircle(Center.x, Center.y, Radius + 28.0f, 64);
+	Graphics()->DrawCircle(Center.x, Center.y, Radius + 20.0f * Scale, 64);
 	Graphics()->QuadsEnd();
+
+	const float PageNumberSize = g_Config.m_ClMClientBindWheelPageNumberSize * Scale;
+	if(PageNumberSize > 0.0f)
+	{
+		char aPage[8];
+		str_format(aPage, sizeof(aPage), "%d", s_Page + 1);
+		CUIRect PageLabel = {Center.x - PageNumberSize * 1.5f, Center.y - PageNumberSize * 0.65f, PageNumberSize * 3.0f, PageNumberSize * 1.3f};
+		const float PageNumberAlpha = g_Config.m_ClMClientBindWheelPageNumberAlpha / 100.0f;
+		TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.35f * PageNumberAlpha);
+		SLabelProperties Props;
+		Props.SetColor(ColorRGBA(1.0f, 1.0f, 1.0f, PageNumberAlpha));
+		Ui()->DoLabel(&PageLabel, aPage, PageNumberSize, TEXTALIGN_MC, Props);
+		TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+	}
 
 	// draws the icon
 	const auto &&DrawSlotContents = [&](const CUIRect &Box, const CBindWheel::CBind &Bind) {
@@ -497,31 +587,32 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 			pName = Bind.m_aCommand;
 		else
 			pName = "-";
-		const bool HasText = pName[0] != '\0';
 		CUIRect Text = Box;
+		Text.VMargin(6.0f * Scale, &Text);
+		const bool HasText = pName[0] != '\0' && (!HasEmoji || Text.w >= 44.0f * Scale);
 		if(HasEmoji)
 		{
-			CUIRect IconRect = Box;
+			CUIRect IconRect = Text;
 			if(HasText)
-				Text.VSplitLeft(16.0f, &IconRect, &Text);
+			{
+				IconRect.w = 16.0f * Scale;
+				Text.x += 18.0f * Scale;
+				Text.w -= 18.0f * Scale;
+			}
 			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING);
-			Ui()->DoLabel(&IconRect, Bind.m_aEmoji, HasText ? 10.0f : 13.0f, TEXTALIGN_MC);
+			Ui()->DoLabel(&IconRect, Bind.m_aEmoji, (HasText ? 12.0f : 16.0f) * Scale, TEXTALIGN_MC);
 			TextRender()->SetRenderFlags(0);
 			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		}
 		if(HasText)
 		{
 			SLabelProperties Props;
-			Props.m_MaxWidth = Text.w - 8.0f;
+			Props.m_MaxWidth = Text.w;
 			Props.m_EllipsisAtEnd = true;
-			Ui()->DoLabel(&Text, pName, 10.0f, TEXTALIGN_MC, Props);
+			Ui()->DoLabel(&Text, pName, 12.0f * Scale, TEXTALIGN_MC, Props);
 		}
 	};
-
-	static int s_DragSource = -1;
-	static vec2 s_DragStart = vec2(0.0f, 0.0f);
-	const bool Dragging = s_DragSource >= 0 && length(Ui()->MousePos() - s_DragStart) > 5.0f;
 
 	int HoverIndex = -1;
 	for(int i = 0; i < SliceCount; i++)
@@ -530,34 +621,40 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 		if(Angle > pi)
 			Angle -= 2 * pi;
 		const vec2 Pos = Center + direction(Angle) * Radius;
-		CUIRect Slot = {Pos.x - 46.0f, Pos.y - 12.0f, 92.0f, 24.0f};
+		CUIRect Slot = {Pos.x - SlotWidth / 2.0f, Pos.y - SlotHeight / 2.0f, SlotWidth, SlotHeight};
 		const bool Hovered = Ui()->MouseHovered(&Slot);
 		if(Hovered)
 			HoverIndex = i;
 		const bool Sel = s_Selected == i;
-		ColorRGBA SlotColor = Sel ? AccentColor().WithAlpha(1.0f) : ColorRGBA(1.0f, 1.0f, 1.0f, Hovered ? 0.16f : 0.08f);
-		if(Dragging && s_DragSource == i)
+		ColorRGBA SlotColor = Sel ? HighlightColor.WithAlpha(1.0f) : ColorRGBA(1.0f, 1.0f, 1.0f, Hovered ? 0.16f : 0.08f);
+		if(Dragging && s_DragSource == i && s_DragPage == s_Page)
 			SlotColor = SlotColor.WithMultipliedAlpha(0.35f);
-		Slot.Draw(SlotColor, IGraphics::CORNER_ALL, 5.0f);
+		Slot.Draw(SlotColor, IGraphics::CORNER_ALL, 8.0f * Scale);
 
-		DrawSlotContents(Slot, BindWheel.m_vBinds[i]);
+		DrawSlotContents(Slot, BindWheel.m_vBinds[CBindWheel::BindIndex(s_Page, i)]);
 	}
 
 	// start a drag
 	if(s_DragSource < 0 && HoverIndex >= 0 && Ui()->MouseButtonClicked(0))
 	{
 		s_DragSource = HoverIndex;
+		s_DragPage = s_Page;
 		s_DragStart = Ui()->MousePos();
 		s_Selected = HoverIndex;
 	}
 	// finish on release
 	if(s_DragSource >= 0 && !Ui()->MouseButton(0))
 	{
-		if(Dragging && HoverIndex >= 0 && HoverIndex != s_DragSource)
+		if(Dragging && HoverIndex >= 0)
 		{
-			std::swap(BindWheel.m_vBinds[s_DragSource], BindWheel.m_vBinds[HoverIndex]);
-			s_Selected = HoverIndex;
-			SaveMClient();
+			const int Source = CBindWheel::BindIndex(s_DragPage, s_DragSource);
+			const int Target = CBindWheel::BindIndex(s_Page, HoverIndex);
+			if(Source != Target)
+			{
+				std::swap(BindWheel.m_vBinds[Source], BindWheel.m_vBinds[Target]);
+				s_Selected = HoverIndex;
+				SaveMClient();
+			}
 		}
 		s_DragSource = -1;
 	}
@@ -565,14 +662,17 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 	if(Dragging && s_DragSource >= 0)
 	{
 		const vec2 M = Ui()->MousePos();
-		CUIRect Ghost = {M.x - 46.0f, M.y - 12.0f, 92.0f, 24.0f};
-		Ghost.Draw(AccentColor().WithAlpha(0.85f), IGraphics::CORNER_ALL, 5.0f);
-		DrawSlotContents(Ghost, BindWheel.m_vBinds[s_DragSource]);
+		CUIRect Ghost = {M.x - SlotWidth / 2.0f, M.y - SlotHeight / 2.0f, SlotWidth, SlotHeight};
+		Ghost.Draw(HighlightColor.WithAlpha(0.85f), IGraphics::CORNER_ALL, 8.0f * Scale);
+		DrawSlotContents(Ghost, BindWheel.m_vBinds[CBindWheel::BindIndex(s_DragPage, s_DragSource)]);
 	}
 
 	// editor for the selected slice
 	char aTitle[64];
-	str_format(aTitle, sizeof(aTitle), "%s %d", Localize("Slice"), s_Selected + 1);
+	if(PageCount > 1)
+		str_format(aTitle, sizeof(aTitle), "%s %d \xe2\x80\x93 %s %d", Localize("Page"), s_Page + 1, Localize("Slice"), s_Selected + 1);
+	else
+		str_format(aTitle, sizeof(aTitle), "%s %d", Localize("Slice"), s_Selected + 1);
 	Left.HSplitTop(24.0f, &Label, &Left);
 	Ui()->DoLabel(&Label, aTitle, 16.0f, TEXTALIGN_ML);
 	Left.HSplitTop(12.0f, nullptr, &Left);
@@ -585,17 +685,17 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 	Field.VSplitLeft(24.0f, &EmojiBox, &Field);
 	Field.VSplitLeft(6.0f, nullptr, &Field);
 	static CButtonContainer s_EmojiButton;
-	const char *pCurEmoji = BindWheel.m_vBinds[s_Selected].m_aEmoji;
+	const char *pCurEmoji = SelectedBind().m_aEmoji;
 	if(Ui()->DoButton_FontIcon(&s_EmojiButton, pCurEmoji[0] != '\0' ? pCurEmoji : FontIcon::PLUS, 0, &EmojiBox, BUTTONFLAG_LEFT))
 	{
 		static SPopupBindWheelIconContext s_PopupIconContext;
 		s_PopupIconContext.m_pMenus = this;
-		s_PopupIconContext.m_Slice = s_Selected;
+		s_PopupIconContext.m_BindIndex = CBindWheel::BindIndex(s_Page, s_Selected);
 		Ui()->DoPopupMenu(&s_PopupIconContext, EmojiBox.x, EmojiBox.y + EmojiBox.h, 232.0f, 210.0f, &s_PopupIconContext, PopupBindWheelIcon);
 	}
 
 	static CLineInput s_NameInput;
-	s_NameInput.SetBuffer(BindWheel.m_vBinds[s_Selected].m_aName, sizeof(BindWheel.m_vBinds[s_Selected].m_aName));
+	s_NameInput.SetBuffer(SelectedBind().m_aName, sizeof(SelectedBind().m_aName));
 	s_NameInput.SetEmptyText(Localize("e.g. Kill"));
 	if(Ui()->DoClearableEditBox(&s_NameInput, &Field, 12.0f))
 		SaveMClient();
@@ -605,25 +705,19 @@ void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 	Ui()->DoLabel(&Label, Localize("Console command (as typed in the F1 console)"), 12.0f, TEXTALIGN_ML);
 	Left.HSplitTop(24.0f, &Field, &Left);
 	static CLineInput s_CommandInput;
-	s_CommandInput.SetBuffer(BindWheel.m_vBinds[s_Selected].m_aCommand, sizeof(BindWheel.m_vBinds[s_Selected].m_aCommand));
+	s_CommandInput.SetBuffer(SelectedBind().m_aCommand, sizeof(SelectedBind().m_aCommand));
 	s_CommandInput.SetEmptyText(Localize("e.g. kill"));
 	if(Ui()->DoClearableEditBox(&s_CommandInput, &Field, 12.0f))
 		SaveMClient();
-
-	Left.HSplitTop(16.0f, nullptr, &Left);
-	Left.HSplitTop(16.0f, &Row, &Left);
-	SLabelProperties TipProps;
-	TipProps.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
-	Ui()->DoLabel(&Row, Localize("Click a slice on the right to edit it, or drag it onto another to swap them."), 11.0f, TEXTALIGN_ML, TipProps);
 }
 CUi::EPopupMenuFunctionResult CMenus::PopupBindWheelIcon(void *pContext, CUIRect View, bool Active)
 {
 	SPopupBindWheelIconContext *pPopupContext = static_cast<SPopupBindWheelIconContext *>(pContext);
 	CMenus *pMenus = pPopupContext->m_pMenus;
 	CBindWheel &BindWheel = pMenus->GameClient()->m_BindWheel;
-	if(pPopupContext->m_Slice < 0 || pPopupContext->m_Slice >= (int)BindWheel.m_vBinds.size())
+	if(pPopupContext->m_BindIndex < 0 || pPopupContext->m_BindIndex >= (int)BindWheel.m_vBinds.size())
 		return CUi::POPUP_CLOSE_CURRENT;
-	CBindWheel::CBind &Bind = BindWheel.m_vBinds[pPopupContext->m_Slice];
+	CBindWheel::CBind &Bind = BindWheel.m_vBinds[pPopupContext->m_BindIndex];
 
 	static const char *const s_apIcons[] = {
 		FontIcon::HEART, FontIcon::HEART_CRACK, FontIcon::STAR, FontIcon::FLAG_CHECKERED,
@@ -1009,10 +1103,8 @@ void CMenus::SaveMClient()
 	}
 	Writer.EndArray();
 
-	Writer.WriteAttribute("bindwheel");
-	Writer.BeginArray();
-	for(const CBindWheel::CBind &Bind : GameClient()->m_BindWheel.m_vBinds)
-	{
+	const std::vector<CBindWheel::CBind> &vBinds = GameClient()->m_BindWheel.m_vBinds;
+	const auto &&WriteBind = [&](const CBindWheel::CBind &Bind) {
 		Writer.BeginObject();
 		Writer.WriteAttribute("name");
 		Writer.WriteStrValue(Bind.m_aName);
@@ -1021,6 +1113,38 @@ void CMenus::SaveMClient()
 		Writer.WriteAttribute("emoji");
 		Writer.WriteStrValue(Bind.m_aEmoji);
 		Writer.EndObject();
+	};
+
+	Writer.WriteAttribute("bindwheel");
+	Writer.BeginArray();
+	for(int i = 0; i < CBindWheel::MAX_BINDS; i++)
+		WriteBind(vBinds[i]);
+	Writer.EndArray();
+
+	int NumPagesWritten = CBindWheel::NumPages();
+	for(int Page = CBindWheel::MAX_PAGES - 1; Page >= NumPagesWritten; Page--)
+	{
+		bool Used = false;
+		for(int i = 0; i < CBindWheel::MAX_BINDS && !Used; i++)
+		{
+			const CBindWheel::CBind &Bind = vBinds[CBindWheel::BindIndex(Page, i)];
+			Used = Bind.m_aName[0] != '\0' || Bind.m_aCommand[0] != '\0' || Bind.m_aEmoji[0] != '\0';
+		}
+		if(Used)
+		{
+			NumPagesWritten = Page + 1;
+			break;
+		}
+	}
+
+	Writer.WriteAttribute("bindwheel_pages");
+	Writer.BeginArray();
+	for(int Page = 0; Page < NumPagesWritten; Page++)
+	{
+		Writer.BeginArray();
+		for(int i = 0; i < CBindWheel::MAX_BINDS; i++)
+			WriteBind(vBinds[CBindWheel::BindIndex(Page, i)]);
+		Writer.EndArray();
 	}
 	Writer.EndArray();
 

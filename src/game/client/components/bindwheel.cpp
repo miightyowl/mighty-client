@@ -14,10 +14,16 @@
 #include <algorithm>
 
 static const char *const MCLIENT_FILE = "mclient.json";
+static constexpr int LEGACY_PAGE_BINDS = 16;
 
 int CBindWheel::NumSlots()
 {
 	return std::clamp(g_Config.m_ClMClientBindWheelSlots, MIN_BINDS, MAX_BINDS);
+}
+
+int CBindWheel::NumPages()
+{
+	return std::clamp(g_Config.m_ClMClientBindWheelPages, 1, MAX_PAGES);
 }
 
 void CBindWheel::ConKeyBindWheel(IConsole::IResult *pResult, void *pUserData)
@@ -29,12 +35,15 @@ void CBindWheel::ConKeyBindWheel(IConsole::IResult *pResult, void *pUserData)
 	// don't open while the emote wheel is open
 	if(Activate && pSelf->GameClient()->m_Emoticon.IsActive())
 		return;
+	// the wheel always opens on the first page
+	if(Activate && !pSelf->m_Active)
+		pSelf->m_Page = 0;
 	pSelf->m_Active = Activate;
 }
 
 void CBindWheel::OnConsoleInit()
 {
-	m_vBinds.assign(MAX_BINDS, CBind());
+	m_vBinds.assign(TOTAL_BINDS, CBind());
 	LoadBinds();
 	Console()->Register("+bindwheel", "", CFGFLAG_CLIENT, ConKeyBindWheel, this, "M-Client: hold to open the bind wheel");
 }
@@ -44,9 +53,11 @@ void CBindWheel::OnReset()
 	m_WasActive = false;
 	m_Active = false;
 	m_SelectedBind = -1;
+	m_Page = 0;
+	m_SelectedPage = 0;
 	m_SelectorMouse = vec2(0.0f, 0.0f);
-	if((int)m_vBinds.size() != MAX_BINDS)
-		m_vBinds.resize(MAX_BINDS);
+	if((int)m_vBinds.size() != TOTAL_BINDS)
+		m_vBinds.resize(TOTAL_BINDS);
 }
 
 void CBindWheel::OnRelease()
@@ -66,7 +77,23 @@ bool CBindWheel::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 
 bool CBindWheel::OnInput(const IInput::CEvent &Event)
 {
-	if(IsActive() && Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE)
+	if(!IsActive())
+		return false;
+
+	if(Event.m_Key == KEY_MOUSE_WHEEL_UP || Event.m_Key == KEY_MOUSE_WHEEL_DOWN)
+	{
+		if(Event.m_Flags & IInput::FLAG_PRESS)
+		{
+			const int PageCount = NumPages();
+			int Direction = Event.m_Key == KEY_MOUSE_WHEEL_UP ? 1 : -1;
+			if(g_Config.m_ClMClientBindWheelScrollInvert)
+				Direction = -Direction;
+			m_Page = (std::clamp(m_Page, 0, PageCount - 1) + Direction + PageCount) % PageCount;
+		}
+		return true;
+	}
+
+	if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE)
 	{
 		OnRelease();
 		m_SelectedBind = -1;
@@ -83,11 +110,15 @@ void CBindWheel::OnRender()
 
 	if(!m_Active)
 	{
-		if(m_WasActive && m_SelectedBind >= 0 && m_SelectedBind < (int)m_vBinds.size())
+		if(m_WasActive && m_SelectedBind >= 0)
 		{
-			const char *pCommand = m_vBinds[m_SelectedBind].m_aCommand;
-			if(pCommand[0] != '\0')
-				Console()->ExecuteLine(pCommand, -1);
+			const int Index = BindIndex(std::clamp(m_SelectedPage, 0, MAX_PAGES - 1), m_SelectedBind);
+			if(Index < (int)m_vBinds.size())
+			{
+				const char *pCommand = m_vBinds[Index].m_aCommand;
+				if(pCommand[0] != '\0')
+					Console()->ExecuteLine(pCommand, -1);
+			}
 		}
 		m_WasActive = false;
 		m_SelectedBind = -1;
@@ -100,6 +131,9 @@ void CBindWheel::OnRender()
 	const vec2 Center = Screen.Center();
 
 	const int SliceCount = NumSlots();
+	const int PageCount = NumPages();
+	m_Page = std::clamp(m_Page, 0, PageCount - 1);
+	m_SelectedPage = m_Page;
 
 	const float SizeScale = g_Config.m_ClMClientBindWheelSize / 100.0f;
 	const float RingRadius = 215.0f * SizeScale;
@@ -129,13 +163,27 @@ void CBindWheel::OnRender()
 	Ui()->MapScreen();
 
 	const float BackgroundAlpha = g_Config.m_ClMClientBindWheelAlpha / 100.0f;
-	const ColorRGBA Accent = CMenus::AccentColor();
+	const ColorRGBA Highlight = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMClientBindWheelBoxColor, false));
 
 	Graphics()->TextureClear();
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(0.0f, 0.0f, 0.0f, BackgroundAlpha);
 	Graphics()->DrawCircle(Center.x, Center.y, BackgroundRadius, 64);
 	Graphics()->QuadsEnd();
+
+	const float PageNumberSize = (float)g_Config.m_ClMClientBindWheelPageNumberSize;
+	if(PageNumberSize > 0.0f)
+	{
+		char aPage[8];
+		str_format(aPage, sizeof(aPage), "%d", m_Page + 1);
+		CUIRect PageLabel = {Center.x - PageNumberSize * 1.5f, Center.y - PageNumberSize * 0.65f, PageNumberSize * 3.0f, PageNumberSize * 1.3f};
+		const float PageNumberAlpha = g_Config.m_ClMClientBindWheelPageNumberAlpha / 100.0f;
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, PageNumberAlpha);
+		TextRender()->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.35f * PageNumberAlpha);
+		Ui()->DoLabel(&PageLabel, aPage, PageNumberSize, TEXTALIGN_MC);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+		TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+	}
 
 	const float Rounding = 8.0f;
 	const float BoxAlpha = g_Config.m_ClMClientBindWheelBoxAlpha / 100.0f;
@@ -150,11 +198,11 @@ void CBindWheel::OnRender()
 
 		CUIRect Button = {Pos.x - ButtonWidth / 2.0f, Pos.y - ButtonHeight / 2.0f, ButtonWidth, ButtonHeight};
 		if(Selected)
-			Button.Draw(ColorRGBA(Accent.r, Accent.g, Accent.b, BoxAlpha), IGraphics::CORNER_ALL, Rounding);
+			Button.Draw(ColorRGBA(Highlight.r, Highlight.g, Highlight.b, BoxAlpha), IGraphics::CORNER_ALL, Rounding);
 		else
 			Button.Draw(ColorRGBA(0.04f, 0.045f, 0.055f, BoxAlpha), IGraphics::CORNER_ALL, Rounding);
 
-		const CBind &Bind = m_vBinds[i];
+		const CBind &Bind = m_vBinds[BindIndex(m_Page, i)];
 		const bool HasEmoji = Bind.m_aEmoji[0] != '\0';
 		const char *pName;
 		if(Bind.m_aName[0] != '\0')
@@ -165,10 +213,10 @@ void CBindWheel::OnRender()
 			pName = Bind.m_aCommand;
 		else
 			pName = "-";
-		const bool HasText = pName[0] != '\0';
+		CUIRect Label = {Button.x + 6.0f, Pos.y - 10.0f, ButtonWidth - 12.0f, 20.0f};
+		const bool HasText = pName[0] != '\0' && (!HasEmoji || Label.w >= 44.0f);
 		const ColorRGBA TextColor = Selected ? ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f) : ColorRGBA(0.9f, 0.9f, 0.9f, 1.0f);
 
-		CUIRect Label = {Button.x + 6.0f, Pos.y - 10.0f, ButtonWidth - 12.0f, 20.0f};
 		if(HasEmoji)
 		{
 			CUIRect IconRect = Label;
@@ -219,7 +267,7 @@ void CBindWheel::OnRender()
 
 void CBindWheel::LoadBinds()
 {
-	m_vBinds.assign(MAX_BINDS, CBind());
+	m_vBinds.assign(TOTAL_BINDS, CBind());
 
 	void *pFileData;
 	unsigned FileSize;
@@ -233,23 +281,39 @@ void CBindWheel::LoadBinds()
 	if(pData == nullptr)
 		return;
 
-	const json_value &BindWheel = (*pData)["bindwheel"];
-	if(BindWheel.type == json_array)
+	const auto &&LoadBind = [&](const json_value &Entry, int Index) {
+		if(Entry.type != json_object || Index < 0 || Index >= TOTAL_BINDS)
+			return;
+		const json_value &Name = Entry["name"];
+		const json_value &Command = Entry["command"];
+		const json_value &Emoji = Entry["emoji"];
+		if(Name.type == json_string)
+			str_copy(m_vBinds[Index].m_aName, Name);
+		if(Command.type == json_string)
+			str_copy(m_vBinds[Index].m_aCommand, Command);
+		if(Emoji.type == json_string)
+			str_copy(m_vBinds[Index].m_aEmoji, Emoji);
+	};
+
+	const json_value &Pages = (*pData)["bindwheel_pages"];
+	if(Pages.type == json_array)
 	{
-		for(unsigned i = 0; i < BindWheel.u.array.length && i < (unsigned)MAX_BINDS; ++i)
+		for(unsigned Page = 0; Page < Pages.u.array.length && Page < (unsigned)MAX_PAGES; ++Page)
 		{
-			const json_value &Entry = BindWheel[i];
-			if(Entry.type != json_object)
+			const json_value &Slices = Pages[Page];
+			if(Slices.type != json_array)
 				continue;
-			const json_value &Name = Entry["name"];
-			const json_value &Command = Entry["command"];
-			const json_value &Emoji = Entry["emoji"];
-			if(Name.type == json_string)
-				str_copy(m_vBinds[i].m_aName, Name);
-			if(Command.type == json_string)
-				str_copy(m_vBinds[i].m_aCommand, Command);
-			if(Emoji.type == json_string)
-				str_copy(m_vBinds[i].m_aEmoji, Emoji);
+			for(unsigned i = 0; i < Slices.u.array.length && i < (unsigned)MAX_BINDS; ++i)
+				LoadBind(Slices[i], BindIndex(Page, i));
+		}
+	}
+	else
+	{
+		const json_value &BindWheel = (*pData)["bindwheel"];
+		if(BindWheel.type == json_array)
+		{
+			for(unsigned i = 0; i < BindWheel.u.array.length && i < (unsigned)(LEGACY_PAGE_BINDS * MAX_PAGES); ++i)
+				LoadBind(BindWheel[i], BindIndex(i / LEGACY_PAGE_BINDS, i % LEGACY_PAGE_BINDS));
 		}
 	}
 	json_value_free(pData);
