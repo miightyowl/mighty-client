@@ -23,6 +23,20 @@ class IHttpRequest;
 
 class CSkins : public CComponent
 {
+public:
+	enum
+	{
+		SKIN_VIEW_ALL = 0,
+		SKIN_VIEW_HIDDEN,
+		SKIN_VIEW_BLOCKED,
+	};
+	enum
+	{
+		SKIN_SORT_NAME_ASC = 0,
+		SKIN_SORT_NAME_DESC,
+		SKIN_SORT_RECENT,
+	};
+
 private:
 	/**
 	 * The data of a skin that can be loaded in a separate thread.
@@ -118,6 +132,8 @@ public:
 		bool IsAlwaysLoaded() const { return m_AlwaysLoaded; }
 		EState State() const { return m_State; }
 		const std::unique_ptr<CSkin> &Skin() const { return m_pSkin; }
+		int64_t FileTime() const { return m_FileTime; }
+		void SetFileTime(int64_t FileTime) { m_FileTime = FileTime; }
 
 		/**
 		 * Request that this skin should be loaded and should stay loaded.
@@ -132,6 +148,7 @@ public:
 		bool m_Vanilla;
 		bool m_Special;
 		bool m_AlwaysLoaded;
+		int64_t m_FileTime = 0;
 
 		EState m_State = EState::UNLOADED;
 		std::unique_ptr<CSkin> m_pSkin = nullptr;
@@ -163,9 +180,11 @@ public:
 		CSkinListEntry() :
 			m_pSkinContainer(nullptr),
 			m_Favorite(false) {}
-		CSkinListEntry(CSkinContainer *pSkinContainer, bool Favorite, bool SelectedMain, bool SelectedDummy, std::optional<std::pair<int, int>> NameMatch) :
+		CSkinListEntry(CSkinContainer *pSkinContainer, bool Favorite, bool Hidden, bool Blocked, bool SelectedMain, bool SelectedDummy, std::optional<std::pair<int, int>> NameMatch) :
 			m_pSkinContainer(pSkinContainer),
 			m_Favorite(Favorite),
+			m_Hidden(Hidden),
+			m_Blocked(Blocked),
 			m_SelectedMain(SelectedMain),
 			m_SelectedDummy(SelectedDummy),
 			m_NameMatch(NameMatch) {}
@@ -174,12 +193,16 @@ public:
 
 		const CSkinContainer *SkinContainer() const { return m_pSkinContainer; }
 		bool IsFavorite() const { return m_Favorite; }
+		bool IsHidden() const { return m_Hidden; }
+		bool IsBlocked() const { return m_Blocked; }
 		bool IsSelectedMain() const { return m_SelectedMain; }
 		bool IsSelectedDummy() const { return m_SelectedDummy; }
 		const std::optional<std::pair<int, int>> &NameMatch() const { return m_NameMatch; }
 
 		const void *ListItemId() const { return &m_ListItemId; }
 		const void *FavoriteButtonId() const { return &m_FavoriteButtonId; }
+		const void *HideButtonId() const { return &m_HideButtonId; }
+		const void *BlockButtonId() const { return &m_BlockButtonId; }
 		const void *ErrorTooltipId() const { return &m_ErrorTooltipId; }
 
 		/**
@@ -190,11 +213,15 @@ public:
 	private:
 		CSkinContainer *m_pSkinContainer;
 		bool m_Favorite;
+		bool m_Hidden = false;
+		bool m_Blocked = false;
 		bool m_SelectedMain;
 		bool m_SelectedDummy;
 		std::optional<std::pair<int, int>> m_NameMatch;
 		char m_ListItemId;
 		char m_FavoriteButtonId;
+		char m_HideButtonId;
+		char m_BlockButtonId;
 		char m_ErrorTooltipId;
 	};
 
@@ -246,6 +273,11 @@ public:
 	void AddFavorite(const char *pName);
 	void RemoveFavorite(const char *pName);
 	bool IsFavorite(const char *pName) const;
+
+	void SetHidden(const char *pName, bool Hidden);
+	bool IsHidden(const char *pName) const;
+	void SetBlocked(const char *pName, bool Blocked);
+	bool IsBlocked(const char *pName) const;
 
 	void RandomizeSkin(int Dummy);
 
@@ -312,6 +344,8 @@ private:
 
 	CSkinList m_SkinList;
 	std::set<std::string> m_Favorites;
+	std::set<std::string> m_HiddenSkins;
+	std::set<std::string> m_BlockedSkins;
 
 	CSkin m_PlaceholderSkin;
 	char m_aEventSkinPrefix[MAX_SKIN_LENGTH];
@@ -320,7 +354,7 @@ private:
 	void LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData &Data);
 	void LoadSkinDirect(const char *pName);
 	const CSkinContainer *FindContainerImpl(const char *pName);
-	static int SkinScan(const char *pName, int IsDir, int StorageType, void *pUser);
+	static int SkinScan(const CFsFileInfo *pInfo, int IsDir, int StorageType, void *pUser);
 
 	void UpdateUnloadSkins(CSkinLoadingStats &Stats);
 	void UpdateStartLoading(CSkinLoadingStats &Stats);
@@ -328,6 +362,8 @@ private:
 
 	static void ConAddFavoriteSkin(IConsole::IResult *pResult, void *pUserData);
 	static void ConRemFavoriteSkin(IConsole::IResult *pResult, void *pUserData);
+	static void ConAddHiddenSkin(IConsole::IResult *pResult, void *pUserData);
+	static void ConAddBlockedSkin(IConsole::IResult *pResult, void *pUserData);
 	static void ConfigSaveCallback(IConfigManager *pConfigManager, void *pUserData);
 	void OnConfigSave(IConfigManager *pConfigManager);
 	static void ConchainRefreshSkinList(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);

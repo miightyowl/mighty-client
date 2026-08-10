@@ -148,6 +148,8 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslate, Localize("Translate incoming chat"), &g_Config.m_ClChatTranslate, &RightView, LineSize);
 		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslateShowLang, Localize("Show detected language after translated messages"), &g_Config.m_ClChatTranslateShowLang, &RightView, LineSize))
 			GameClient()->m_Chat.RebuildChat();
+		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslateShortWords, Localize("Also translate short words"), &g_Config.m_ClChatTranslateShortWords, &RightView, LineSize))
+			GameClient()->m_Chat.ClearTranslationCache();
 
 		static const char *s_apTranslateLangCodes[] = {
 			"en", "de", "es", "fr", "pt", "it", "nl", "pl", "ru", "uk", "tr", "ar",
@@ -228,8 +230,10 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 			DoLine_ColorPicker(&s_FrozenHammerColorResetId, 25.0f, 13.0f, 2.0f, &LeftView, Localize("Weapon color while trying to interact"), &g_Config.m_ClMClientFrozenHammerColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientFrozenHammerColor, false)), false, nullptr, false);
 			LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
 			Ui()->DoScrollbarOption(&g_Config.m_ClMClientFrozenHammerColorAlpha, &g_Config.m_ClMClientFrozenHammerColorAlpha, &Button, Localize("Weapon color opacity"), 10, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenWeaponHammerOnly, Localize("Only recolor when holding the hammer"), &g_Config.m_ClMClientFrozenWeaponHammerOnly, &LeftView, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenWeaponInteractOnly, Localize("Only show the weapon while trying to interact"), &g_Config.m_ClMClientFrozenWeaponInteractOnly, &LeftView, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenWeaponHammerOnly, Localize("Only count the hammer as interacting"), &g_Config.m_ClMClientFrozenWeaponHammerOnly, &LeftView, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenWeaponNotSelf, Localize("Do not recolor your own tee and dummy"), &g_Config.m_ClMClientFrozenWeaponNotSelf, &LeftView, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenWeaponHideSelf, Localize("Hide the weapon on your own tee and dummy"), &g_Config.m_ClMClientFrozenWeaponHideSelf, &LeftView, LineSize);
 		}
 
 		Ui()->DoLabel_AutoLineSize(Localize("Frozen teammates HUD"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
@@ -333,13 +337,41 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 	MainView.HSplitTop(5.0f, nullptr, &MainView);
 
 	// Bottom controls
-	CUIRect QuickSearch, DirectoryButton, RefreshButton;
-	MainView.HSplitBottom(20.0f, &MainView, &QuickSearch);
+	CUIRect BottomBar, QuickSearch, SortDropDown, DatabaseButton, DdstatsButton, DirectoryButton, RefreshButton;
+	MainView.HSplitBottom(20.0f, &MainView, &BottomBar);
 	MainView.HSplitBottom(5.0f, &MainView, nullptr);
-	QuickSearch.VSplitLeft(220.0f, &QuickSearch, &DirectoryButton);
-	DirectoryButton.VSplitRight(25.0f, &DirectoryButton, &RefreshButton);
-	DirectoryButton.VSplitRight(10.0f, &DirectoryButton, nullptr);
-	DirectoryButton.VSplitRight(150.0f, nullptr, &DirectoryButton);
+	BottomBar.VSplitLeft(220.0f, &QuickSearch, &SortDropDown);
+	SortDropDown.VSplitLeft(10.0f, nullptr, &SortDropDown);
+	SortDropDown.VSplitLeft(150.0f, &SortDropDown, nullptr);
+	BottomBar.VSplitRight(25.0f, &BottomBar, &RefreshButton);
+	BottomBar.VSplitRight(10.0f, &BottomBar, nullptr);
+	BottomBar.VSplitRight(150.0f, &BottomBar, &DdstatsButton);
+	BottomBar.VSplitRight(10.0f, &BottomBar, nullptr);
+	BottomBar.VSplitRight(150.0f, &BottomBar, &DatabaseButton);
+	BottomBar.VSplitRight(10.0f, &BottomBar, nullptr);
+	BottomBar.VSplitRight(150.0f, nullptr, &DirectoryButton);
+
+	CUIRect ViewTabs;
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+	MainView.HSplitTop(20.0f, &ViewTabs, &MainView);
+	MainView.HSplitTop(5.0f, nullptr, &MainView);
+	{
+		const char *apViewNames[] = {Localize("All skins"), Localize("Hidden skins"), Localize("Blocked skins")};
+		static CButtonContainer s_aViewButtons[std::size(apViewNames)];
+		const float TabWidth = ViewTabs.w / std::size(apViewNames);
+		for(size_t i = 0; i < std::size(apViewNames); ++i)
+		{
+			CUIRect Tab;
+			ViewTabs.VSplitLeft(TabWidth, &Tab, &ViewTabs);
+			const int Corners = i == 0 ? IGraphics::CORNER_L : (i == std::size(apViewNames) - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
+			if(DoButton_MenuTab(&s_aViewButtons[i], apViewNames[i], g_Config.m_ClSkinListView == (int)i, &Tab, Corners, nullptr, nullptr, nullptr, nullptr, 5.0f) &&
+				g_Config.m_ClSkinListView != (int)i)
+			{
+				g_Config.m_ClSkinListView = i;
+				SkinList.ForceRefresh();
+			}
+		}
+	}
 
 	// Skin selector, highlighting the current companion skin
 	static CListBox s_ListBox;
@@ -380,6 +412,23 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 			RenderTools()->RenderTee(CAnimState::GetIdle(), &Info, EMOTE_NORMAL, vec2(1.0f, 0.0f), TeeRenderPos);
 		}
 		Ui()->DoLabel(&Label, pSkinContainer->Name(), 12.0f, TEXTALIGN_ML);
+
+		{
+			CUIRect IconBar, HideIcon, BlockIcon;
+			Item.m_Rect.HSplitTop(20.0f, &IconBar, nullptr);
+			IconBar.VSplitRight(20.0f, &IconBar, &HideIcon);
+			IconBar.VSplitRight(20.0f, nullptr, &BlockIcon);
+			if(DoButton_SkinListIcon(SkinListEntry.HideButtonId(), SkinListEntry.ListItemId(), SkinListEntry.IsHidden(), &HideIcon, FontIcon::EYE_SLASH, ColorRGBA(0.6f, 0.8f, 1.0f, 1.0f)))
+			{
+				GameClient()->m_Skins.SetHidden(pSkinContainer->Name(), !SkinListEntry.IsHidden());
+			}
+			GameClient()->m_Tooltips.DoToolTip(SkinListEntry.HideButtonId(), &HideIcon, SkinListEntry.IsHidden() ? Localize("Show this skin again") : Localize("Hide this skin from the list"));
+			if(DoButton_SkinListIcon(SkinListEntry.BlockButtonId(), SkinListEntry.ListItemId(), SkinListEntry.IsBlocked(), &BlockIcon, FontIcon::BAN, ColorRGBA(1.0f, 0.4f, 0.4f, 1.0f)))
+			{
+				GameClient()->m_Skins.SetBlocked(pSkinContainer->Name(), !SkinListEntry.IsBlocked());
+			}
+			GameClient()->m_Tooltips.DoToolTip(SkinListEntry.BlockButtonId(), &BlockIcon, SkinListEntry.IsBlocked() ? Localize("Unblock this skin") : Localize("Block this skin, players using it show the default skin"));
+		}
 	}
 	const int NewSelected = s_ListBox.DoEnd();
 	if(OldSelected != NewSelected)
@@ -392,6 +441,32 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 	if(Ui()->DoEditBox_Search(&s_SkinFilterInput, &QuickSearch, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive()))
 	{
 		SkinList.ForceRefresh();
+	}
+
+	{
+		const char *apSortNames[] = {Localize("Name (A-Z)"), Localize("Name (Z-A)"), Localize("Recently added")};
+		static CUi::SDropDownState s_SortDropDownState;
+		static CScrollRegion s_SortScrollRegion;
+		s_SortDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_SortScrollRegion;
+		const int OldSort = std::clamp(g_Config.m_ClSkinListSort, 0, (int)std::size(apSortNames) - 1);
+		const int NewSort = Ui()->DoDropDown(&SortDropDown, OldSort, apSortNames, std::size(apSortNames), s_SortDropDownState);
+		if(NewSort != OldSort)
+		{
+			g_Config.m_ClSkinListSort = NewSort;
+			SkinList.ForceRefresh();
+		}
+	}
+
+	static CButtonContainer s_SkinDatabaseButton;
+	if(DoButton_Menu(&s_SkinDatabaseButton, Localize("DDNet Database"), 0, &DatabaseButton))
+	{
+		Client()->ViewLink("https://ddnet.org/skins/");
+	}
+
+	static CButtonContainer s_DdstatsDatabaseButton;
+	if(DoButton_Menu(&s_DdstatsDatabaseButton, Localize("DDStats Database"), 0, &DdstatsButton))
+	{
+		Client()->ViewLink("https://skins.ddstats.tw/");
 	}
 
 	static CButtonContainer s_DirectoryButton;

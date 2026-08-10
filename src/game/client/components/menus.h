@@ -71,6 +71,7 @@ private:
 
 	int DoButton_GridHeader(const void *pId, const char *pText, int Checked, const CUIRect *pRect, int Align = TEXTALIGN_ML);
 	int DoButton_Favorite(const void *pButtonId, const void *pParentId, bool Checked, const CUIRect *pRect);
+	int DoButton_SkinListIcon(const void *pButtonId, const void *pParentId, bool Checked, const CUIRect *pRect, const char *pIcon, ColorRGBA CheckedColor);
 
 	std::optional<std::chrono::nanoseconds> m_SkinList7LastRefreshTime;
 	std::optional<std::chrono::nanoseconds> m_SkinPartsList7LastRefreshTime;
