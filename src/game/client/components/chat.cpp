@@ -581,9 +581,10 @@ void CChat::OnMessage(int MsgType, void *pRawMsg)
 			AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage);
 		*/
 
-		const bool OwnMessage = pMsg->m_ClientId == GameClient()->m_aLocalIds[0] || pMsg->m_ClientId == GameClient()->m_aLocalIds[1];
+		const bool OwnMessage = pMsg->m_ClientId >= 0 &&
+					(pMsg->m_ClientId == GameClient()->m_aLocalIds[0] || pMsg->m_ClientId == GameClient()->m_aLocalIds[1]);
 		char aMasked[1024];
-		if((pMsg->m_ClientId < 0 || OwnMessage || !g_Config.m_ClFoeAnonymizeRealNamesInChat) &&
+		if(!OwnMessage && (pMsg->m_ClientId < 0 || !g_Config.m_ClFoeAnonymizeRealNamesInChat) &&
 			GameClient()->MaskFoeNames(pMsg->m_pMessage, aMasked, sizeof(aMasked)))
 			AddLine(pMsg->m_ClientId, pMsg->m_Team, aMasked);
 		else
