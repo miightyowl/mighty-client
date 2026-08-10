@@ -2,6 +2,10 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "menus_start.h"
 
+#include <base/fs.h>
+#include <base/io.h>
+#include <base/log.h>
+
 #include <engine/client/updater.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
@@ -27,6 +31,37 @@
 #if defined(CONF_PLATFORM_ANDROID)
 #include <android/android_main.h>
 #endif
+
+// M-Client: platforms where a release ships a bare executable that can replace the running one
+#if (defined(CONF_PLATFORM_LINUX) && defined(CONF_ARCH_AMD64)) || defined(CONF_PLATFORM_WIN64)
+#define MCLIENT_AUTOUPDATE 1
+#endif
+
+#if defined(MCLIENT_AUTOUPDATE) && !defined(CONF_FAMILY_WINDOWS)
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+static bool SetExecutableBit(const char *pPath)
+{
+	const int FileDescriptor = open(pPath, O_RDWR);
+	if(FileDescriptor < 0)
+		return false;
+	struct stat FileStats;
+	if(fstat(FileDescriptor, &FileStats) != 0)
+	{
+		close(FileDescriptor);
+		return false;
+	}
+	const bool Success = fchmod(FileDescriptor, FileStats.st_mode | S_IXUSR | S_IXGRP | S_IXOTH) == 0;
+	close(FileDescriptor);
+	return Success;
+}
+#endif
+
+// the downloaded executable is kept next to the running one until it is swapped in
+static const char *const MCLIENT_UPDATE_TMP = "update/" CLIENT_EXEC ".update";
+static const int64_t MCLIENT_UPDATE_MIN_SIZE = 1024 * 1024;
 
 void CMenusStart::RenderStartMenu(CUIRect MainView)
 {
@@ -327,6 +362,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	NewsInner.HSplitTop(8.0f, nullptr, &NewsInner);
 	NewsInner.HSplitTop(22.0f, &NewsRow, &NewsInner);
 	UpdateLatestRelease();
+	UpdateDownloadState();
 	const char *pNewsTitle;
 	if(m_aReleaseTitle[0] != '\0')
 		pNewsTitle = m_aReleaseTitle;
@@ -511,12 +547,46 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		const char *pTag = m_aReleaseTag;
 		if(pTag[0] == 'v' || pTag[0] == 'V')
 			++pTag;
+		const bool CanInstall = m_aUpdateAssetUrl[0] != '\0';
 		char aSub[64];
-		str_format(aSub, sizeof(aSub), Localize("v%s - click to download"), pTag);
+		switch(m_UpdateState)
+		{
+		case EUpdateState::DOWNLOADING:
+			str_format(aSub, sizeof(aSub), Localize("Downloading update... %d%%"), m_pUpdateTask == nullptr ? 0 : m_pUpdateTask->Progress());
+			break;
+		case EUpdateState::INSTALLED:
+			str_copy(aSub, Localize("Update installed - click to restart"));
+			break;
+		case EUpdateState::FAILED:
+			str_copy(aSub, Localize("Update failed - click to download"));
+			break;
+		default:
+			str_format(aSub, sizeof(aSub), CanInstall ? Localize("v%s - click to update") : Localize("v%s - click to download"), pTag);
+			break;
+		}
 		Label(DescRow, aSub, 10.0f, TEXTALIGN_ML, Mix(ColorRGBA(0.60f, 0.60f, 0.60f, 1.0f), ColorRGBA(0.86f, 0.86f, 0.86f, 1.0f), Hover), Text.w);
 
 		if(Ui()->DoButtonLogic(&s_UpdatePopup, 0, &Popup, BUTTONFLAG_LEFT))
-			Client()->ViewLink(m_aReleaseUrl[0] != '\0' ? m_aReleaseUrl : "https://github.com/miightyowl/mighty-client/releases");
+		{
+			const char *pReleaseLink = m_aReleaseUrl[0] != '\0' ? m_aReleaseUrl : "https://github.com/miightyowl/mighty-client/releases";
+			switch(m_UpdateState)
+			{
+			case EUpdateState::DOWNLOADING:
+				break;
+			case EUpdateState::INSTALLED:
+				Client()->Restart();
+				break;
+			case EUpdateState::FAILED:
+				Client()->ViewLink(pReleaseLink);
+				break;
+			default:
+				if(CanInstall)
+					StartUpdateDownload();
+				else
+					Client()->ViewLink(pReleaseLink);
+				break;
+			}
+		}
 	}
 
 	if(NewPage != -1)
@@ -563,6 +633,95 @@ bool CMenusStart::VersionNewer(const char *pLatest, const char *pCurrent)
 	return false;
 }
 
+void CMenusStart::StartUpdateDownload()
+{
+	if(m_aUpdateAssetUrl[0] == '\0' || m_UpdateState == EUpdateState::DOWNLOADING)
+		return;
+
+	char aUpdateDir[IO_MAX_PATH_LENGTH];
+	Storage()->GetBinaryPathAbsolute("update", aUpdateDir, sizeof(aUpdateDir));
+	if(fs_makedir(aUpdateDir) != 0 && !fs_is_dir(aUpdateDir))
+	{
+		log_error("mclient", "Could not create the update directory '%s'", aUpdateDir);
+		m_UpdateState = EUpdateState::FAILED;
+		return;
+	}
+
+	char aDestination[IO_MAX_PATH_LENGTH];
+	Storage()->GetBinaryPathAbsolute(MCLIENT_UPDATE_TMP, aDestination, sizeof(aDestination));
+	m_pUpdateTask = HttpGetFile(m_aUpdateAssetUrl, Storage(), aDestination, IStorage::TYPE_ABSOLUTE);
+	m_pUpdateTask->Timeout(CTimeout{10000, 0, 500, 30});
+	Http()->Run(m_pUpdateTask);
+	m_UpdateState = EUpdateState::DOWNLOADING;
+}
+
+void CMenusStart::UpdateDownloadState()
+{
+	if(m_UpdateState != EUpdateState::DOWNLOADING || m_pUpdateTask == nullptr)
+		return;
+
+	const EHttpState State = m_pUpdateTask->State();
+	if(State == EHttpState::QUEUED || State == EHttpState::RUNNING)
+		return;
+
+	const bool Downloaded = State == EHttpState::DONE;
+	m_pUpdateTask = nullptr;
+	if(!Downloaded)
+	{
+		log_error("mclient", "Downloading the update failed");
+		m_UpdateState = EUpdateState::FAILED;
+		return;
+	}
+
+	char aDownloaded[IO_MAX_PATH_LENGTH];
+	Storage()->GetBinaryPathAbsolute(MCLIENT_UPDATE_TMP, aDownloaded, sizeof(aDownloaded));
+	int64_t DownloadedSize = 0;
+	IOHANDLE DownloadedFile = io_open(aDownloaded, IOFLAG_READ);
+	if(DownloadedFile != nullptr)
+	{
+		DownloadedSize = io_length(DownloadedFile);
+		io_close(DownloadedFile);
+	}
+	if(DownloadedSize < MCLIENT_UPDATE_MIN_SIZE)
+	{
+		log_error("mclient", "The downloaded update is too small to be a client, discarding it");
+		fs_remove(aDownloaded);
+		m_UpdateState = EUpdateState::FAILED;
+		return;
+	}
+
+	m_UpdateState = InstallUpdate() ? EUpdateState::INSTALLED : EUpdateState::FAILED;
+}
+
+bool CMenusStart::InstallUpdate()
+{
+	Storage()->RemoveBinaryFile(CLIENT_EXEC ".old");
+	if(!Storage()->RenameBinaryFile(PLAT_CLIENT_EXEC, CLIENT_EXEC ".old"))
+	{
+		log_error("mclient", "Could not move '%s' out of the way, the client directory may not be writable", PLAT_CLIENT_EXEC);
+		return false;
+	}
+	if(!Storage()->RenameBinaryFile(MCLIENT_UPDATE_TMP, PLAT_CLIENT_EXEC))
+	{
+		log_error("mclient", "Could not install the downloaded update, restoring the previous client");
+		Storage()->RenameBinaryFile(CLIENT_EXEC ".old", PLAT_CLIENT_EXEC);
+		return false;
+	}
+
+#if defined(MCLIENT_AUTOUPDATE) && !defined(CONF_FAMILY_WINDOWS)
+	char aPath[IO_MAX_PATH_LENGTH];
+	Storage()->GetBinaryPath(PLAT_CLIENT_EXEC, aPath, sizeof(aPath));
+	if(!SetExecutableBit(aPath))
+	{
+		log_error("mclient", "Could not make '%s' executable", aPath);
+		return false;
+	}
+#endif
+
+	log_info("mclient", "Installed %s, restart to use it", m_aReleaseTag);
+	return true;
+}
+
 void CMenusStart::UpdateLatestRelease()
 {
 	if(!m_ReleaseRequested)
@@ -602,6 +761,27 @@ void CMenusStart::UpdateLatestRelease()
 			if(HtmlUrl.type == json_string && ((const char *)HtmlUrl)[0] != '\0')
 				str_copy(m_aReleaseUrl, HtmlUrl);
 			m_UpdateAvailable = m_aReleaseTag[0] != '\0' && VersionNewer(m_aReleaseTag, MCLIENT_VERSION);
+
+#if defined(MCLIENT_AUTOUPDATE)
+			const json_value &Assets = Release["assets"];
+			if(Assets.type == json_array)
+			{
+				for(unsigned i = 0; i < Assets.u.array.length; ++i)
+				{
+					const json_value &Asset = Assets[i];
+					if(Asset.type != json_object)
+						continue;
+					const json_value &AssetName = Asset["name"];
+					const json_value &AssetUrl = Asset["browser_download_url"];
+					if(AssetName.type != json_string || AssetUrl.type != json_string)
+						continue;
+					if(str_comp(AssetName, PLAT_CLIENT_DOWN) != 0)
+						continue;
+					str_copy(m_aUpdateAssetUrl, AssetUrl);
+					break;
+				}
+			}
+#endif
 
 			const json_value &Body = Release["body"];
 			if(Body.type == json_string)

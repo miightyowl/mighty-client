@@ -19,6 +19,8 @@ jobs:
             os: ubuntu-22.04
             cmake-args: -G Ninja -DVIDEORECORDER=OFF
             package-file: "*-linux_x86_64.tar.xz"
+            updater-asset: DDNet-linux-x86_64
+            updater-source: DDNet
           - name: macos
             os: macos-latest
             cmake-args: -G Ninja
@@ -27,6 +29,8 @@ jobs:
             os: windows-latest
             cmake-args: -A x64 -DEXCEPTION_HANDLING=ON -DVULKAN=ON
             package-file: "*-win64.zip"
+            updater-asset: DDNet-win64.exe
+            updater-source: DDNet.exe
 
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +75,11 @@ jobs:
           cmake --build . --config Release --target package_default
           mkdir artifacts
           mv ${{ matrix.package-file }} artifacts
+
+      - name: Add updater executable
+        if: matrix.updater-asset != ''
+        shell: bash
+        run: cp "release/${{ matrix.updater-source }}" "release/artifacts/${{ matrix.updater-asset }}"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4

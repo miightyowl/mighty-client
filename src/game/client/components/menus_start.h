@@ -21,6 +21,21 @@ private:
 
 	void UpdateLatestRelease();
 	static bool VersionNewer(const char *pLatest, const char *pCurrent);
+
+	enum class EUpdateState
+	{
+		NONE,
+		DOWNLOADING,
+		INSTALLED,
+		FAILED,
+	};
+	void StartUpdateDownload();
+	void UpdateDownloadState();
+	bool InstallUpdate();
+	std::shared_ptr<IHttpRequest> m_pUpdateTask = nullptr;
+	EUpdateState m_UpdateState = EUpdateState::NONE;
+	char m_aUpdateAssetUrl[512] = "";
+
 	std::shared_ptr<IHttpRequest> m_pReleaseTask = nullptr;
 	bool m_ReleaseRequested = false;
 	bool m_ReleaseLoaded = false;
