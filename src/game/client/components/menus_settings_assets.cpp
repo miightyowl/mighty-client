@@ -534,6 +534,8 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 	else if(s_CurCustomTab == ASSETS_TAB_CURSOR)
 	{
 		SearchListSize = gs_vpSearchCursorList.size();
+		TextureWidth = 75;
+		TextureHeight = 75;
 	}
 
 	static CListBox s_ListBox;
