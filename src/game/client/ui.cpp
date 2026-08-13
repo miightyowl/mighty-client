@@ -460,7 +460,9 @@ const CUIRect *CUi::Screen()
 void CUi::MapScreen()
 {
 	const CUIRect *pScreen = Screen();
-	Graphics()->MapScreen(pScreen->x, pScreen->y, pScreen->w, pScreen->h);
+
+	// x and y are supposed to be 0
+	Graphics()->MapScreenToSize(pScreen->w, pScreen->h);
 }
 
 float CUi::PixelSize()
@@ -1584,7 +1586,10 @@ void CCachedText::Update(ITextRender *pTextRender, const char *pText, float Font
 	if(m_FontSize == FontSize && m_LineWidth == LineWidth && m_CursorFlags == CursorFlags && m_Text == pText)
 		return;
 
-	pTextRender->DeleteTextContainer(m_TextContainerIndex);
+	// The render flags of a text container are fixed when it is created and depend on the
+	// line width, so only text and font size changes can reuse the existing container and
+	// upload the new quads into its buffer instead of allocating a new one.
+	const bool ReuseContainer = m_TextContainerIndex.Valid() && m_LineWidth == LineWidth && m_CursorFlags == CursorFlags;
 
 	m_Text = pText;
 	m_FontSize = FontSize;
@@ -1599,7 +1604,10 @@ void CCachedText::Update(ITextRender *pTextRender, const char *pText, float Font
 	// The color is applied when rendering, so it must not be baked into the quads.
 	const ColorRGBA OldColor = pTextRender->GetTextColor();
 	pTextRender->TextColor(pTextRender->DefaultTextColor());
-	pTextRender->CreateTextContainer(m_TextContainerIndex, &Cursor, m_Text.c_str());
+	if(ReuseContainer)
+		pTextRender->RecreateTextContainerSoft(m_TextContainerIndex, &Cursor, m_Text.c_str());
+	else
+		pTextRender->RecreateTextContainer(m_TextContainerIndex, &Cursor, m_Text.c_str());
 	pTextRender->TextColor(OldColor);
 
 	m_BoundingBox = Cursor.BoundingBox();
