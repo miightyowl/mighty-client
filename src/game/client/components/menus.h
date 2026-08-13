@@ -57,6 +57,12 @@ public:
 	int DoButton_Menu(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, unsigned Flags = BUTTONFLAG_LEFT, const char *pImageName = nullptr, int Corners = IGraphics::CORNER_ALL, float Rounding = 5.0f, float FontFactor = 0.0f, ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 0.1f));
 	int DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, int Corners, SUIAnimator *pAnimator = nullptr, const ColorRGBA *pDefaultColor = nullptr, const ColorRGBA *pActiveColor = nullptr, const ColorRGBA *pHoverColor = nullptr, float EdgeRounding = 10.0f, const CCommunityIcon *pCommunityIcon = nullptr);
 
+	// M-Client: flat icon tabs shared by the main menu menubar and the ingame browser
+	static constexpr float BROWSER_TAB_WIDTH = 34.0f;
+	bool DoButton_IconTab(CButtonContainer *pButtonContainer, const char *pIcon, bool Active, const CUIRect &Rect);
+	bool DoButton_CommunityTab(CButtonContainer *pButtonContainer, const CCommunity *pCommunity, bool Active, const CUIRect &Rect);
+	void RenderBrowserTabs(CUIRect &Box, int ActivePage, int &NewPage);
+
 	int DoButton_CheckBox_Common(const void *pId, const char *pText, const char *pBoxText, const CUIRect *pRect, unsigned Flags);
 	int DoButton_CheckBox(const void *pId, const char *pText, int Checked, const CUIRect *pRect);
 	int DoButton_CheckBoxAutoVMarginAndSet(const void *pId, const char *pText, int *pValue, CUIRect *pRect, float VMargin);
