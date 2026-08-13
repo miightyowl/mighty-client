@@ -34,7 +34,8 @@ enum
 	ASSETS_TAB_PARTICLES = 3,
 	ASSETS_TAB_HUD = 4,
 	ASSETS_TAB_EXTRAS = 5,
-	NUMBER_OF_ASSETS_TABS = 6,
+	ASSETS_TAB_CURSOR = 6,
+	NUMBER_OF_ASSETS_TABS = 7,
 };
 
 void CMenus::LoadEntities(SCustomEntities *pEntitiesItem, void *pUser)
@@ -111,12 +112,12 @@ int CMenus::EntitiesScan(const char *pName, int IsDir, int DirType, void *pUser)
 }
 
 template<typename TName>
-static void LoadAsset(TName *pAssetItem, const char *pAssetName, IGraphics *pGraphics)
+static void LoadAsset(TName *pAssetItem, const char *pAssetName, IGraphics *pGraphics, const char *pDefaultFileName = nullptr)
 {
 	char aPath[IO_MAX_PATH_LENGTH];
 	if(str_comp(pAssetItem->m_aName, "default") == 0)
 	{
-		str_format(aPath, sizeof(aPath), "%s.png", pAssetName);
+		str_format(aPath, sizeof(aPath), "%s.png", pDefaultFileName == nullptr ? pAssetName : pDefaultFileName);
 		pAssetItem->m_RenderTexture = pGraphics->LoadTexture(aPath, IStorage::TYPE_ALL);
 	}
 	else
@@ -211,12 +212,21 @@ int CMenus::ExtrasScan(const char *pName, int IsDir, int DirType, void *pUser)
 	return AssetScan(pName, IsDir, DirType, pThis->m_vExtrasList, "extras", pGraphics, pUser);
 }
 
+int CMenus::CursorScan(const char *pName, int IsDir, int DirType, void *pUser)
+{
+	auto *pRealUser = (SMenuAssetScanUser *)pUser;
+	auto *pThis = (CMenus *)pRealUser->m_pUser;
+	IGraphics *pGraphics = pThis->Graphics();
+	return AssetScan(pName, IsDir, DirType, pThis->m_vCursorList, "cursor", pGraphics, pUser);
+}
+
 static std::vector<const CMenus::SCustomEntities *> gs_vpSearchEntitiesList;
 static std::vector<const CMenus::SCustomGame *> gs_vpSearchGamesList;
 static std::vector<const CMenus::SCustomEmoticon *> gs_vpSearchEmoticonsList;
 static std::vector<const CMenus::SCustomParticle *> gs_vpSearchParticlesList;
 static std::vector<const CMenus::SCustomHud *> gs_vpSearchHudList;
 static std::vector<const CMenus::SCustomExtras *> gs_vpSearchExtrasList;
+static std::vector<const CMenus::SCustomCursor *> gs_vpSearchCursorList;
 
 static bool gs_aInitCustomList[NUMBER_OF_ASSETS_TABS] = {
 	true,
@@ -244,6 +254,8 @@ static const CMenus::SCustomItem *GetCustomItem(int CurTab, size_t Index)
 		return gs_vpSearchHudList[Index];
 	else if(CurTab == ASSETS_TAB_EXTRAS)
 		return gs_vpSearchExtrasList[Index];
+	else if(CurTab == ASSETS_TAB_CURSOR)
+		return gs_vpSearchCursorList[Index];
 	dbg_assert_failed("Invalid CurTab: %d", CurTab);
 }
 
@@ -308,6 +320,12 @@ void CMenus::ClearCustomItems(int CurTab)
 		// reload current DDNet particles skin
 		GameClient()->LoadExtrasSkin(g_Config.m_ClAssetExtras);
 	}
+	else if(CurTab == ASSETS_TAB_CURSOR)
+	{
+		ClearAssetList(m_vCursorList, Graphics());
+
+		GameClient()->LoadCursorSkin(g_Config.m_ClAssetCursor);
+	}
 	else
 	{
 		dbg_assert_failed("Invalid CurTab: %d", CurTab);
@@ -316,13 +334,13 @@ void CMenus::ClearCustomItems(int CurTab)
 }
 
 template<typename TName, typename TCaller>
-static void InitAssetList(std::vector<TName> &vAssetList, const char *pAssetPath, const char *pAssetName, FS_LISTDIR_CALLBACK pfnCallback, IGraphics *pGraphics, IStorage *pStorage, TCaller Caller)
+static void InitAssetList(std::vector<TName> &vAssetList, const char *pAssetPath, const char *pAssetName, FS_LISTDIR_CALLBACK pfnCallback, IGraphics *pGraphics, IStorage *pStorage, TCaller Caller, const char *pDefaultFileName = nullptr)
 {
 	if(vAssetList.empty())
 	{
 		TName AssetItem;
 		str_copy(AssetItem.m_aName, "default");
-		LoadAsset(&AssetItem, pAssetName, pGraphics);
+		LoadAsset(&AssetItem, pAssetName, pGraphics, pDefaultFileName);
 		vAssetList.push_back(AssetItem);
 
 		// load assets
@@ -364,7 +382,8 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 		Localize("Emoticons"),
 		Localize("Particles"),
 		Localize("HUD"),
-		Localize("Extras")};
+		Localize("Extras"),
+		Localize("Cursor")};
 
 	for(int Tab = ASSETS_TAB_ENTITIES; Tab < NUMBER_OF_ASSETS_TABS; ++Tab)
 	{
@@ -420,6 +439,11 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 	{
 		InitAssetList(m_vExtrasList, "assets/extras", "extras", ExtrasScan, Graphics(), Storage(), &User);
 	}
+	else if(s_CurCustomTab == ASSETS_TAB_CURSOR)
+	{
+		// the stock cursor image is named gui_cursor.png, not cursor.png
+		InitAssetList(m_vCursorList, "assets/cursor", "cursor", CursorScan, Graphics(), Storage(), &User, "gui_cursor");
+	}
 	else
 	{
 		dbg_assert_failed("Invalid s_CurCustomTab: %d", s_CurCustomTab);
@@ -467,6 +491,10 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 		{
 			ListSize = InitSearchList(gs_vpSearchExtrasList, m_vExtrasList);
 		}
+		else if(s_CurCustomTab == ASSETS_TAB_CURSOR)
+		{
+			ListSize = InitSearchList(gs_vpSearchCursorList, m_vCursorList);
+		}
 		gs_aInitCustomList[s_CurCustomTab] = false;
 		gs_aCustomListSize[s_CurCustomTab] = ListSize;
 	}
@@ -502,6 +530,10 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 	else if(s_CurCustomTab == ASSETS_TAB_EXTRAS)
 	{
 		SearchListSize = gs_vpSearchExtrasList.size();
+	}
+	else if(s_CurCustomTab == ASSETS_TAB_CURSOR)
+	{
+		SearchListSize = gs_vpSearchCursorList.size();
 	}
 
 	static CListBox s_ListBox;
@@ -540,6 +572,11 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 		else if(s_CurCustomTab == ASSETS_TAB_EXTRAS)
 		{
 			if(str_comp(pItem->m_aName, g_Config.m_ClAssetExtras) == 0)
+				OldSelected = i;
+		}
+		else if(s_CurCustomTab == ASSETS_TAB_CURSOR)
+		{
+			if(str_comp(pItem->m_aName, g_Config.m_ClAssetCursor) == 0)
 				OldSelected = i;
 		}
 
@@ -601,6 +638,11 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 				str_copy(g_Config.m_ClAssetExtras, GetCustomItem(s_CurCustomTab, NewSelected)->m_aName);
 				GameClient()->LoadExtrasSkin(g_Config.m_ClAssetExtras);
 			}
+			else if(s_CurCustomTab == ASSETS_TAB_CURSOR)
+			{
+				str_copy(g_Config.m_ClAssetCursor, GetCustomItem(s_CurCustomTab, NewSelected)->m_aName);
+				GameClient()->LoadCursorSkin(g_Config.m_ClAssetCursor);
+			}
 		}
 	}
 
@@ -634,6 +676,8 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 			str_copy(aBufFull, "assets/hud");
 		else if(s_CurCustomTab == ASSETS_TAB_EXTRAS)
 			str_copy(aBufFull, "assets/extras");
+		else if(s_CurCustomTab == ASSETS_TAB_CURSOR)
+			str_copy(aBufFull, "assets/cursor");
 		Storage()->GetCompletePath(IStorage::TYPE_SAVE, aBufFull, aBuf, sizeof(aBuf));
 		Storage()->CreateFolder("assets", IStorage::TYPE_SAVE);
 		Storage()->CreateFolder(aBufFull, IStorage::TYPE_SAVE);
@@ -736,6 +780,21 @@ void CMenus::ConchainAssetExtras(IConsole::IResult *pResult, void *pUserData, IC
 		if(str_comp(pArg, g_Config.m_ClAssetExtras) != 0)
 		{
 			pThis->GameClient()->LoadExtrasSkin(pArg);
+		}
+	}
+
+	pfnCallback(pResult, pCallbackUserData);
+}
+
+void CMenus::ConchainAssetCursor(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
+{
+	CMenus *pThis = (CMenus *)pUserData;
+	if(pResult->NumArguments() == 1)
+	{
+		const char *pArg = pResult->GetString(0);
+		if(str_comp(pArg, g_Config.m_ClAssetCursor) != 0)
+		{
+			pThis->GameClient()->LoadCursorSkin(pArg);
 		}
 	}
 

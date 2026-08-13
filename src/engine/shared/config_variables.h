@@ -424,6 +424,7 @@ MACRO_CONFIG_STR(ClAssetEmoticons, cl_asset_emoticons, 50, "default", CFGFLAG_SA
 MACRO_CONFIG_STR(ClAssetParticles, cl_asset_particles, 50, "default", CFGFLAG_SAVE | CFGFLAG_CLIENT, "The asset for particles")
 MACRO_CONFIG_STR(ClAssetHud, cl_asset_hud, 50, "default", CFGFLAG_SAVE | CFGFLAG_CLIENT, "The asset for HUD")
 MACRO_CONFIG_STR(ClAssetExtras, cl_asset_extras, 50, "default", CFGFLAG_SAVE | CFGFLAG_CLIENT, "The asset for the game graphics that do not come from Teeworlds")
+MACRO_CONFIG_STR(ClAssetCursor, cl_asset_cursor, 50, "default", CFGFLAG_SAVE | CFGFLAG_CLIENT, "The asset for the menu cursor")
 
 MACRO_CONFIG_STR(BrFilterString, br_filter_string, 128, "Novice", CFGFLAG_SAVE | CFGFLAG_CLIENT, "Server browser filtering string")
 MACRO_CONFIG_STR(BrExcludeString, br_exclude_string, 128, "", CFGFLAG_SAVE | CFGFLAG_CLIENT, "Server browser exclusion string")

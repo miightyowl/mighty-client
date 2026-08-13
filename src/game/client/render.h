@@ -214,6 +214,8 @@ class CRenderTools
 
 	int m_TeeQuadContainerIndex;
 
+	IGraphics::CTextureHandle m_CursorTexture;
+
 	static void GetRenderTeeBodyScale(float BaseSize, float &BodyScale);
 	static void GetRenderTeeFeetScale(float BaseSize, float &FeetScaleWidth, float &FeetScaleHeight);
 
@@ -226,6 +228,7 @@ public:
 
 	void Init(class IGraphics *pGraphics, class ITextRender *pTextRender);
 
+	void SetCursorTexture(IGraphics::CTextureHandle Texture) { m_CursorTexture = Texture; }
 	void RenderCursor(vec2 Center, float Size) const;
 	void RenderIcon(int ImageId, int SpriteId, const CUIRect *pRect, const ColorRGBA *pColor = nullptr) const;
 
