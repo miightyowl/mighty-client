@@ -1541,10 +1541,9 @@ void CMenus::RenderServerControl(CUIRect MainView)
 
 void CMenus::RenderInGameNetwork(CUIRect MainView)
 {
-	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.8f), IGraphics::CORNER_B, 10.0f);
-
 	CUIRect TabBar;
 	MainView.HSplitTop(24.0f, &TabBar, &MainView);
+	TabBar.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, MenuPanelBackgroundAlpha()), IGraphics::CORNER_NONE, 0.0f);
 
 	int NewPage = g_Config.m_UiPage;
 
