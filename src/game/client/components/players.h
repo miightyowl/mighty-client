@@ -21,18 +21,21 @@ class CPlayers : public CComponent
 	 */
 	bool IsFrozenInteracting(int ClientId, int Weapon) const;
 	void RenderPlayer(
+		const CScreenRect &ScreenRect,
 		const CNetObj_Character *pPrevChar,
 		const CNetObj_Character *pPlayerChar,
 		const CTeeRenderInfo *pRenderInfo,
 		int ClientId,
 		float Intra = 0.f);
 	void RenderHook(
+		const CScreenRect &ScreenRect,
 		const CNetObj_Character *pPrevChar,
 		const CNetObj_Character *pPlayerChar,
 		const CTeeRenderInfo *pRenderInfo,
 		int ClientId,
 		float Intra = 0.f);
 	void RenderHookCollLine(
+		const CScreenRect &ScreenRect,
 		const CNetObj_Character *pPrevChar,
 		const CNetObj_Character *pPlayerChar,
 		int ClientId);

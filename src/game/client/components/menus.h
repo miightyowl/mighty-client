@@ -620,6 +620,9 @@ protected:
 	//       member function, to move this function to CMenusSettingsControls
 	void ResetSettingsControls();
 
+	// found in menus_settings_credits.cpp
+	void RenderSettingsCredits(CUIRect MainView);
+
 	// found in menus_settings_ddnet.cpp
 	void RenderSettingsDDNet(CUIRect MainView);
 
@@ -666,6 +669,7 @@ protected:
 
 	std::vector<CButtonContainer> m_vButtonContainersNamePlateShow = {{}, {}, {}, {}};
 	std::vector<CButtonContainer> m_vButtonContainersNamePlateKeyPresses = {{}, {}, {}, {}};
+	std::vector<CButtonContainer> m_vButtonContainersAntiPingPlayers = {{}, {}, {}};
 
 	class CMapListItem
 	{
@@ -774,6 +778,7 @@ public:
 		SETTINGS_BINDWHEEL,
 		SETTINGS_WIDGETBAR,
 		SETTINGS_PROFILES,
+		SETTINGS_CREDITS,
 
 		SETTINGS_LENGTH,
 	};
