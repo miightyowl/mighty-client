@@ -35,9 +35,12 @@ void CBindWheel::ConKeyBindWheel(IConsole::IResult *pResult, void *pUserData)
 	// don't open while the emote wheel is open
 	if(Activate && pSelf->GameClient()->m_Emoticon.IsActive())
 		return;
-	// the wheel always opens on the first page
+	// the wheel always opens on the first page with the cursor centered
 	if(Activate && !pSelf->m_Active)
+	{
 		pSelf->m_Page = 0;
+		pSelf->m_SelectorMouse = vec2(0.0f, 0.0f);
+	}
 	pSelf->m_Active = Activate;
 }
 
