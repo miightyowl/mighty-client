@@ -62,8 +62,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("M-Client"),
 		Localize("Bind Wheel"),
 		Localize("Widget Bar"),
-		Localize("Profiles"),
-		Localize("Credits")};
+		Localize("Profiles")};
 	static CButtonContainer s_aTabButtons[SETTINGS_LENGTH];
 
 	TabBar.HSplitTop(52.0f, nullptr, &TabBar);
@@ -173,11 +172,6 @@ void CMenus::RenderSettings(CUIRect MainView)
 	{
 		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_ASSETS);
 		RenderSettingsWidgetBar(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_CREDITS)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_CREDITS);
-		RenderSettingsCredits(MainView);
 	}
 	else
 	{
