@@ -524,6 +524,114 @@ int CMenus::DoButton_CheckBox_Number(const void *pId, const char *pText, int Che
 	return DoButton_CheckBox_Common(pId, pText, aBuf, pRect, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);
 }
 
+bool CMenus::DoButton_IconTab(CButtonContainer *pButtonContainer, const char *pIcon, bool Active, const CUIRect &Rect)
+{
+	const bool Hovered = Ui()->HotItem() == pButtonContainer;
+	if(Active)
+		Rect.Draw(AccentColor().WithAlpha(1.0f), IGraphics::CORNER_ALL, 6.0f);
+	else if(Hovered)
+		Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f), IGraphics::CORNER_ALL, 6.0f);
+	SLabelProperties Props;
+	Props.SetColor(Active ? ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f) : (Hovered ? ColorRGBA(0.92f, 0.92f, 0.92f, 1.0f) : ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f)));
+	CUIRect Label = Rect;
+	Ui()->DoLabel(&Label, pIcon, 13.0f, TEXTALIGN_MC, Props);
+	return Ui()->DoButtonLogic(pButtonContainer, 0, &Rect, BUTTONFLAG_LEFT);
+}
+
+bool CMenus::DoButton_CommunityTab(CButtonContainer *pButtonContainer, const CCommunity *pCommunity, bool Active, const CUIRect &Rect)
+{
+	if(Active)
+		Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.10f), IGraphics::CORNER_ALL, 6.0f);
+	else if(Ui()->HotItem() == pButtonContainer)
+		Rect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f), IGraphics::CORNER_ALL, 6.0f);
+	const CCommunityIcon *pCommunityIcon = m_CommunityIcons.Find(pCommunity->Id());
+	if(pCommunityIcon != nullptr)
+	{
+		CUIRect CommunityIconRect;
+		Rect.Margin(5.0f, &CommunityIconRect);
+		m_CommunityIcons.Render(pCommunityIcon, CommunityIconRect, true);
+	}
+	return Ui()->DoButtonLogic(pButtonContainer, 0, &Rect, BUTTONFLAG_LEFT);
+}
+
+void CMenus::RenderBrowserTabs(CUIRect &Box, int ActivePage, int &NewPage)
+{
+	CUIRect Button;
+
+	CUIRect Pill;
+	Box.VSplitLeft(BROWSER_TAB_WIDTH * 3.0f, &Pill, nullptr);
+	Pill.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.04f), IGraphics::CORNER_ALL, 6.0f);
+
+	Box.VSplitLeft(BROWSER_TAB_WIDTH, &Button, &Box);
+	static CButtonContainer s_InternetButton;
+	if(DoButton_IconTab(&s_InternetButton, FontIcon::EARTH_AMERICAS, ActivePage == PAGE_INTERNET, Button))
+	{
+		NewPage = PAGE_INTERNET;
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_InternetButton, &Button, Localize("Internet"));
+
+	Box.VSplitLeft(BROWSER_TAB_WIDTH, &Button, &Box);
+	static CButtonContainer s_LanButton;
+	if(DoButton_IconTab(&s_LanButton, FontIcon::NETWORK_WIRED, ActivePage == PAGE_LAN, Button))
+	{
+		NewPage = PAGE_LAN;
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_LanButton, &Button, Localize("LAN"));
+
+	Box.VSplitLeft(BROWSER_TAB_WIDTH, &Button, &Box);
+	static CButtonContainer s_FavoritesButton;
+	if(DoButton_IconTab(&s_FavoritesButton, FontIcon::STAR, ActivePage == PAGE_FAVORITES, Button))
+	{
+		NewPage = PAGE_FAVORITES;
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_FavoritesButton, &Button, Localize("Favorites"));
+
+	const int MaxPage = PAGE_FAVORITES + ServerBrowser()->FavoriteCommunities().size();
+	if(
+		!Ui()->IsPopupOpen() &&
+		CLineInput::GetActiveInput() == nullptr &&
+		(g_Config.m_UiPage >= PAGE_INTERNET && g_Config.m_UiPage <= MaxPage) &&
+		(m_MenuPage >= PAGE_INTERNET && m_MenuPage <= PAGE_FAVORITE_COMMUNITY_5))
+	{
+		if(Input()->KeyPress(KEY_RIGHT))
+		{
+			NewPage = g_Config.m_UiPage + 1;
+			if(NewPage > MaxPage)
+				NewPage = PAGE_INTERNET;
+		}
+		if(Input()->KeyPress(KEY_LEFT))
+		{
+			NewPage = g_Config.m_UiPage - 1;
+			if(NewPage < PAGE_INTERNET)
+				NewPage = MaxPage;
+		}
+	}
+
+	size_t FavoriteCommunityIndex = 0;
+	static CButtonContainer s_aFavoriteCommunityButtons[5];
+	static_assert(std::size(s_aFavoriteCommunityButtons) == (size_t)PAGE_FAVORITE_COMMUNITY_5 - PAGE_FAVORITE_COMMUNITY_1 + 1);
+	static_assert(std::size(s_aFavoriteCommunityButtons) == (size_t)BIT_TAB_FAVORITE_COMMUNITY_5 - BIT_TAB_FAVORITE_COMMUNITY_1 + 1);
+	static_assert(std::size(s_aFavoriteCommunityButtons) == (size_t)IServerBrowser::TYPE_FAVORITE_COMMUNITY_5 - IServerBrowser::TYPE_FAVORITE_COMMUNITY_1 + 1);
+	for(const CCommunity *pCommunity : ServerBrowser()->FavoriteCommunities())
+	{
+		if(Box.w < BROWSER_TAB_WIDTH)
+			break;
+		Box.VSplitLeft(8.0f, nullptr, &Box);
+		Box.VSplitLeft(BROWSER_TAB_WIDTH, &Button, &Box);
+		const int Page = PAGE_FAVORITE_COMMUNITY_1 + FavoriteCommunityIndex;
+		CButtonContainer *pCommunityButton = &s_aFavoriteCommunityButtons[FavoriteCommunityIndex];
+		if(DoButton_CommunityTab(pCommunityButton, pCommunity, ActivePage == Page, Button))
+		{
+			NewPage = Page;
+		}
+		GameClient()->m_Tooltips.DoToolTip(pCommunityButton, &Button, pCommunity->Name());
+
+		++FavoriteCommunityIndex;
+		if(FavoriteCommunityIndex >= std::size(s_aFavoriteCommunityButtons))
+			break;
+	}
+}
+
 void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 {
 	CUIRect Button;
@@ -636,91 +744,8 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 		}
 		GameClient()->m_Tooltips.DoToolTip(&s_StartButton, &Button, Localize("Main menu"));
 
-		const float BrowserButtonWidth = 34.0f;
 		Box.VSplitLeft(10.0f, nullptr, &Box);
-		CUIRect Pill;
-		Box.VSplitLeft(BrowserButtonWidth * 3.0f, &Pill, nullptr);
-		Pill.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.04f), IGraphics::CORNER_ALL, 6.0f);
-
-		Box.VSplitLeft(BrowserButtonWidth, &Button, &Box);
-		static CButtonContainer s_InternetButton;
-		if(IconTab(&s_InternetButton, FontIcon::EARTH_AMERICAS, ActivePage == PAGE_INTERNET, Button))
-		{
-			NewPage = PAGE_INTERNET;
-		}
-		GameClient()->m_Tooltips.DoToolTip(&s_InternetButton, &Button, Localize("Internet"));
-
-		Box.VSplitLeft(BrowserButtonWidth, &Button, &Box);
-		static CButtonContainer s_LanButton;
-		if(IconTab(&s_LanButton, FontIcon::NETWORK_WIRED, ActivePage == PAGE_LAN, Button))
-		{
-			NewPage = PAGE_LAN;
-		}
-		GameClient()->m_Tooltips.DoToolTip(&s_LanButton, &Button, Localize("LAN"));
-
-		Box.VSplitLeft(BrowserButtonWidth, &Button, &Box);
-		static CButtonContainer s_FavoritesButton;
-		if(IconTab(&s_FavoritesButton, FontIcon::STAR, ActivePage == PAGE_FAVORITES, Button))
-		{
-			NewPage = PAGE_FAVORITES;
-		}
-		GameClient()->m_Tooltips.DoToolTip(&s_FavoritesButton, &Button, Localize("Favorites"));
-
-		const int MaxPage = PAGE_FAVORITES + ServerBrowser()->FavoriteCommunities().size();
-		if(
-			!Ui()->IsPopupOpen() &&
-			CLineInput::GetActiveInput() == nullptr &&
-			(g_Config.m_UiPage >= PAGE_INTERNET && g_Config.m_UiPage <= MaxPage) &&
-			(m_MenuPage >= PAGE_INTERNET && m_MenuPage <= PAGE_FAVORITE_COMMUNITY_5))
-		{
-			if(Input()->KeyPress(KEY_RIGHT))
-			{
-				NewPage = g_Config.m_UiPage + 1;
-				if(NewPage > MaxPage)
-					NewPage = PAGE_INTERNET;
-			}
-			if(Input()->KeyPress(KEY_LEFT))
-			{
-				NewPage = g_Config.m_UiPage - 1;
-				if(NewPage < PAGE_INTERNET)
-					NewPage = MaxPage;
-			}
-		}
-
-		size_t FavoriteCommunityIndex = 0;
-		static CButtonContainer s_aFavoriteCommunityButtons[5];
-		static_assert(std::size(s_aFavoriteCommunityButtons) == (size_t)PAGE_FAVORITE_COMMUNITY_5 - PAGE_FAVORITE_COMMUNITY_1 + 1);
-		static_assert(std::size(s_aFavoriteCommunityButtons) == (size_t)BIT_TAB_FAVORITE_COMMUNITY_5 - BIT_TAB_FAVORITE_COMMUNITY_1 + 1);
-		static_assert(std::size(s_aFavoriteCommunityButtons) == (size_t)IServerBrowser::TYPE_FAVORITE_COMMUNITY_5 - IServerBrowser::TYPE_FAVORITE_COMMUNITY_1 + 1);
-		for(const CCommunity *pCommunity : ServerBrowser()->FavoriteCommunities())
-		{
-			if(Box.w < BrowserButtonWidth)
-				break;
-			Box.VSplitLeft(8.0f, nullptr, &Box);
-			Box.VSplitLeft(BrowserButtonWidth, &Button, &Box);
-			const int Page = PAGE_FAVORITE_COMMUNITY_1 + FavoriteCommunityIndex;
-			CButtonContainer *pCommunityButton = &s_aFavoriteCommunityButtons[FavoriteCommunityIndex];
-			if(ActivePage == Page)
-				Button.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.10f), IGraphics::CORNER_ALL, 6.0f);
-			else if(Ui()->HotItem() == pCommunityButton)
-				Button.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f), IGraphics::CORNER_ALL, 6.0f);
-			const CCommunityIcon *pCommunityIcon = m_CommunityIcons.Find(pCommunity->Id());
-			if(pCommunityIcon != nullptr)
-			{
-				CUIRect CommunityIconRect;
-				Button.Margin(5.0f, &CommunityIconRect);
-				m_CommunityIcons.Render(pCommunityIcon, CommunityIconRect, true);
-			}
-			if(Ui()->DoButtonLogic(pCommunityButton, 0, &Button, BUTTONFLAG_LEFT))
-			{
-				NewPage = Page;
-			}
-			GameClient()->m_Tooltips.DoToolTip(pCommunityButton, &Button, pCommunity->Name());
-
-			++FavoriteCommunityIndex;
-			if(FavoriteCommunityIndex >= std::size(s_aFavoriteCommunityButtons))
-				break;
-		}
+		RenderBrowserTabs(Box, ActivePage, NewPage);
 
 		TextRender()->SetRenderFlags(0);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
