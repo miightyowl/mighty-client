@@ -132,7 +132,7 @@ void CRenderTools::Init(IGraphics *pGraphics, ITextRender *pTextRender)
 void CRenderTools::RenderCursor(vec2 Center, float Size) const
 {
 	Graphics()->WrapClamp();
-	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_CURSOR].m_Id);
+	Graphics()->TextureSet(m_CursorTexture.IsValid() ? m_CursorTexture : g_pData->m_aImages[IMAGE_CURSOR].m_Id);
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 	IGraphics::CQuadItem QuadItem(Center.x, Center.y, Size, Size);

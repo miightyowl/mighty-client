@@ -432,6 +432,11 @@ void CGameClient::OnInit()
 			LoadHudSkin(g_Config.m_ClAssetHud);
 		else if(i == IMAGE_EXTRAS)
 			LoadExtrasSkin(g_Config.m_ClAssetExtras);
+		else if(i == IMAGE_CURSOR)
+		{
+			g_pData->m_aImages[i].m_Id = Graphics()->LoadTexture(g_pData->m_aImages[i].m_pFilename, IStorage::TYPE_ALL);
+			LoadCursorSkin(g_Config.m_ClAssetCursor);
+		}
 		else if(g_pData->m_aImages[i].m_pFilename[0] == '\0') // handle special null image without filename
 			g_pData->m_aImages[i].m_Id = IGraphics::CTextureHandle();
 		else
@@ -4878,6 +4883,39 @@ void CGameClient::LoadHudSkin(const char *pPath, bool AsDir)
 	ImgInfo.Free();
 	if(FallbackImgInfo.has_value())
 		FallbackImgInfo.value().Free();
+}
+
+void CGameClient::LoadCursorSkin(const char *pPath, bool AsDir)
+{
+	if(m_CursorSkinLoaded)
+	{
+		Graphics()->UnloadTexture(&m_CursorSkinTexture);
+		m_CursorSkinLoaded = false;
+	}
+	// Clearing the override makes CRenderTools fall back to the stock cursor image
+	RenderTools()->SetCursorTexture(IGraphics::CTextureHandle());
+
+	if(str_comp(pPath, "default") == 0)
+		return;
+
+	CImageAsset LoadedAsset = LoadAssetFromPath(pPath, AsDir, IMAGE_CURSOR, "cursor");
+	CImageInfo &ImgInfo = LoadedAsset.m_ImageInfo;
+	if(!LoadedAsset.IsLoaded())
+	{
+		if(AsDir)
+			LoadCursorSkin("default");
+		else
+			LoadCursorSkin(pPath, true);
+	}
+	else if(Graphics()->IsImageFormatRgba(LoadedAsset.m_aPath, ImgInfo))
+	{
+		m_CursorSkinTexture = Graphics()->LoadTextureRaw(ImgInfo, 0, LoadedAsset.m_aPath);
+		m_CursorSkinLoaded = true;
+		RenderTools()->SetCursorTexture(m_CursorSkinTexture);
+	}
+	ImgInfo.Free();
+	if(LoadedAsset.m_FallbackImageInfo.has_value())
+		LoadedAsset.m_FallbackImageInfo.value().Free();
 }
 
 void CGameClient::LoadExtrasSkin(const char *pPath, bool AsDir)
