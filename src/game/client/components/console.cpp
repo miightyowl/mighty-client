@@ -32,6 +32,7 @@
 
 static constexpr float FONT_SIZE = 10.0f;
 static constexpr float LINE_SPACING = 1.0f;
+static constexpr int FAST_SCROLL_LINES = 10;
 
 class CConsoleLogger : public ILogger
 {
@@ -654,12 +655,12 @@ bool CGameConsole::CInstance::OnInput(const IInput::CEvent &Event)
 		}
 		else if(Event.m_Key == KEY_MOUSE_WHEEL_UP)
 		{
-			m_BacklogCurLine += GetLinesToScroll(-1, 1);
+			m_BacklogCurLine += GetLinesToScroll(-1, m_pGameConsole->Input()->ModifierIsPressed() ? FAST_SCROLL_LINES : 1);
 			Handled = true;
 		}
 		else if(Event.m_Key == KEY_MOUSE_WHEEL_DOWN)
 		{
-			--m_BacklogCurLine;
+			m_BacklogCurLine -= m_pGameConsole->Input()->ModifierIsPressed() ? FAST_SCROLL_LINES : 1;
 			if(m_BacklogCurLine < 0)
 			{
 				m_BacklogCurLine = 0;
