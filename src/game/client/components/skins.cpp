@@ -884,7 +884,7 @@ const CSkins::CSkinContainer *CSkins::FindContainerOrNullptr(const char *pName)
 
 const CSkins::CSkinContainer *CSkins::FindContainerImpl(const char *pName)
 {
-	if(!CSkin::IsValidName(pName) || IsBlockedSkin(pName))
+	if(!CSkin::IsValidName(pName))
 	{
 		return nullptr;
 	}
