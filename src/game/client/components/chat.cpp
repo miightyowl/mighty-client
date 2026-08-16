@@ -584,6 +584,10 @@ void CChat::OnMessage(int MsgType, void *pRawMsg)
 			AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage);
 		*/
 
+		if(GameClient()->m_TicTacToe.OnWhisper(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage))
+			return;
+		GameClient()->m_TicTacToe.OnChatMessage(pMsg->m_ClientId, pMsg->m_pMessage);
+
 		const bool OwnMessage = pMsg->m_ClientId >= 0 &&
 					(pMsg->m_ClientId == GameClient()->m_aLocalIds[0] || pMsg->m_ClientId == GameClient()->m_aLocalIds[1]);
 		char aMasked[1024];
@@ -1969,6 +1973,13 @@ void CChat::EnsureCoherentWidth() const
 }
 
 // ----- send functions -----
+
+bool CChat::ServerHasCommand(const char *pName) const
+{
+	return std::any_of(m_vServerCommands.begin(), m_vServerCommands.end(), [pName](const CCommand &Command) {
+		return str_comp(Command.m_aName, pName) == 0;
+	});
+}
 
 void CChat::SendChat(int Team, const char *pLine)
 {

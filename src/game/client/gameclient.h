@@ -74,6 +74,7 @@
 #include "components/sounds.h"
 #include "components/spectator.h"
 #include "components/statboard.h"
+#include "components/tictactoe.h"
 #include "components/tooltips.h"
 #include "components/touch_controls.h"
 #include "components/unfinished_map_vote.h"
@@ -189,6 +190,7 @@ public:
 
 	CPlayers m_Players;
 	CPracticeSetup m_PracticeSetup;
+	CTicTacToe m_TicTacToe;
 	CPetting m_Petting;
 	CPetTee m_PetTee;
 	CAds m_Ads;

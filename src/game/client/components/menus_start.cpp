@@ -62,6 +62,7 @@ static bool SetExecutableBit(const char *pPath)
 // the downloaded executable is kept next to the running one until it is swapped in
 static const char *const MCLIENT_UPDATE_TMP = "update/" CLIENT_EXEC ".update";
 static const int64_t MCLIENT_UPDATE_MIN_SIZE = 1024 * 1024;
+static const int MCLIENT_UPDATE_STORAGE_TYPE = -2;
 
 void CMenusStart::RenderStartMenu(CUIRect MainView)
 {
@@ -647,9 +648,7 @@ void CMenusStart::StartUpdateDownload()
 		return;
 	}
 
-	char aDestination[IO_MAX_PATH_LENGTH];
-	Storage()->GetBinaryPathAbsolute(MCLIENT_UPDATE_TMP, aDestination, sizeof(aDestination));
-	m_pUpdateTask = HttpGetFile(m_aUpdateAssetUrl, Storage(), aDestination, IStorage::TYPE_ABSOLUTE);
+	m_pUpdateTask = HttpGetFile(m_aUpdateAssetUrl, Storage(), MCLIENT_UPDATE_TMP, MCLIENT_UPDATE_STORAGE_TYPE);
 	m_pUpdateTask->Timeout(CTimeout{10000, 0, 500, 30});
 	Http()->Run(m_pUpdateTask);
 	m_UpdateState = EUpdateState::DOWNLOADING;
