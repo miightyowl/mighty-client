@@ -209,6 +209,7 @@ MACRO_CONFIG_INT(ClMClientPetTee, cl_mclient_pet_tee, 0, 0, 1, CFGFLAG_CLIENT | 
 MACRO_CONFIG_STR(ClMClientPetTeeSkin, cl_mclient_pet_tee_skin, 24, "twinbop", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_INSENSITIVE, "M-Client: skin used for the companion tee")
 MACRO_CONFIG_INT(ClMClientPetTeeSize, cl_mclient_pet_tee_size, 60, 10, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: size of the companion tee as a percentage of a normal player")
 MACRO_CONFIG_INT(ClMClientPetTeeAlpha, cl_mclient_pet_tee_alpha, 90, 10, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: opacity of the companion tee")
+MACRO_CONFIG_INT(ClMClientTicTacToe, cl_mclient_tictactoe, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: allow other M-Client players to challenge you to tic tac toe")
 MACRO_CONFIG_INT(ClSkinListView, cl_skin_list_view, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: skin list view (0 = all skins, 1 = hidden skins, 2 = blocked skins)")
 MACRO_CONFIG_INT(ClSkinListSort, cl_skin_list_sort, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: skin list order (0 = name A-Z, 1 = name Z-A, 2 = recently added)")
 MACRO_CONFIG_INT(ClMClientBindWheelSlots, cl_mclient_bindwheel_slots, 8, 4, 20, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: number of slices on the bind wheel (4-20)")

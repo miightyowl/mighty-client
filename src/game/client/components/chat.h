@@ -249,6 +249,9 @@ public:
 	// @param pLine the chat message
 	void SendChat(int Team, const char *pLine);
 
+	// checks whether the server offers a chat command
+	bool ServerHasCommand(const char *pName) const;
+
 	// Sends a chat message to the server.
 	//
 	// It uses a queue with a maximum of 3 entries
