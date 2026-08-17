@@ -21,12 +21,14 @@
 #include <game/client/components/menus_ingame_touch_controls.h>
 #include <game/client/components/menus_settings_controls.h>
 #include <game/client/components/menus_start.h>
+#include <game/client/components/save_notice.h>
 #include <game/client/components/skins7.h>
 #include <game/client/lineinput.h>
 #include <game/client/ui.h>
 #include <game/voting.h>
 
 #include <chrono>
+#include <string>
 #include <initializer_list>
 #include <optional>
 #include <utility>
@@ -542,6 +544,15 @@ protected:
 	bool RenderServerControlKick(CUIRect MainView, bool FilterSpectators, bool UpdateScroll);
 	bool RenderServerControlServer(CUIRect MainView, bool UpdateScroll);
 	void RenderServerControlSaveMaps(CUIRect MainView);
+	void RenderServerControlSavedTeams(CUIRect MainView);
+
+	struct CSavedTeam
+	{
+		CSaveNotice::SSave m_Save;
+		std::vector<std::string> m_vPlayers;
+	};
+	std::vector<CSavedTeam> m_vSavedTeams;
+	bool m_SavedTeamsLoaded = false;
 
 	// user's personal list of saved maps + notes, persisted to disk
 	struct CSavedMap

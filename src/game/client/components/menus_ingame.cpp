@@ -40,6 +40,7 @@
 #include <game/client/ui_scrollregion.h>
 #include <game/localization.h>
 
+#include <algorithm>
 #include <chrono>
 
 using namespace std::chrono_literals;
@@ -1307,6 +1308,351 @@ void CMenus::RenderServerControlSaveMaps(CUIRect MainView)
 		}
 	}
 
+	static CButtonContainer s_CallVoteButton;
+	if(DoButton_Menu(&s_CallVoteButton, Localize("Call vote"), 0, &CallVoteButton) && s_Selected >= 0 && s_Selected < (int)vFiltered.size())
+		DoMapVote(vFiltered[s_Selected]);
+}
+
+static void SplitFilterTerms(const char *pString, std::vector<std::string> &vTerms)
+{
+	const char *pStart = pString;
+	while(true)
+	{
+		const char *pEnd = str_find(pStart, ",");
+		std::string Term(pStart, pEnd != nullptr ? pEnd - pStart : str_length(pStart));
+		while(!Term.empty() && Term.front() == ' ')
+			Term.erase(Term.begin());
+		while(!Term.empty() && Term.back() == ' ')
+			Term.pop_back();
+		if(!Term.empty())
+			vTerms.push_back(Term);
+		if(pEnd == nullptr)
+			break;
+		pStart = pEnd + 1;
+	}
+}
+
+void CMenus::RenderServerControlSavedTeams(CUIRect MainView)
+{
+	if(!m_SavedTeamsLoaded)
+	{
+		std::vector<CSaveNotice::SSave> vSaves;
+		GameClient()->m_SaveNotice.AllSaves(vSaves);
+		m_vSavedTeams.clear();
+		for(auto It = vSaves.rbegin(); It != vSaves.rend(); ++It)
+		{
+			CSavedTeam SavedTeam;
+			SavedTeam.m_Save = *It;
+			SplitFilterTerms(It->m_Players.c_str(), SavedTeam.m_vPlayers);
+			m_vSavedTeams.push_back(std::move(SavedTeam));
+		}
+		m_SavedTeamsLoaded = true;
+	}
+
+	const char *pCurrentMap = GameClient()->Map() != nullptr ? GameClient()->Map()->BaseName() : "";
+	const bool HideCode = g_Config.m_ClMClientSaveNoticeHideCode;
+
+	const CCommunity *pCommunity = ServerBrowser()->Community(Client()->ServerInfo().m_aCommunityId);
+	if(pCommunity == nullptr || !pCommunity->HasRanks())
+		pCommunity = ServerBrowser()->Community(IServerBrowser::COMMUNITY_DDNET);
+	const bool FinishesKnown = pCommunity != nullptr && pCommunity->HasRanks();
+
+	const auto &&SplitColumns = [](CUIRect Row, CUIRect *pPlayers, CUIRect *pMap, CUIRect *pFinished, CUIRect *pCode, CUIRect *pDate) {
+		Row.VSplitLeft(6.0f, nullptr, &Row);
+		Row.VSplitRight(6.0f, &Row, nullptr);
+		Row.VSplitLeft(Row.w * 0.32f, pPlayers, &Row);
+		Row.VSplitLeft(Row.w * 0.38f, pMap, &Row);
+		Row.VSplitLeft(66.0f, pFinished, &Row);
+		Row.VSplitLeft(Row.w * 0.5f, pCode, pDate);
+		pPlayers->VSplitRight(8.0f, pPlayers, nullptr);
+		pMap->VSplitRight(8.0f, pMap, nullptr);
+		pCode->VSplitRight(8.0f, pCode, nullptr);
+	};
+
+	CUIRect Header, HeaderPlayers, HeaderMap, HeaderFinished, HeaderCode, HeaderDate;
+	MainView.HSplitTop(18.0f, &Header, &MainView);
+	SplitColumns(Header, &HeaderPlayers, &HeaderMap, &HeaderFinished, &HeaderCode, &HeaderDate);
+	SLabelProperties HeaderProps;
+	HeaderProps.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+	Ui()->DoLabel(&HeaderMap, Localize("Map"), 11.0f, TEXTALIGN_ML, HeaderProps);
+	Ui()->DoLabel(&HeaderCode, Localize("Save code"), 11.0f, TEXTALIGN_ML, HeaderProps);
+
+	enum class ESortColumn
+	{
+		DATE,
+		PLAYERS,
+	};
+	enum class EFinishedFilter
+	{
+		ALL,
+		UNFINISHED,
+		FINISHED,
+	};
+	static ESortColumn s_SortColumn = ESortColumn::DATE;
+	static bool s_NewestFirst = true;
+	static bool s_FewestPlayersFirst = true;
+	static EFinishedFilter s_FinishedFilter = EFinishedFilter::ALL;
+
+	const auto &&DoColumnHeader = [&](const CUIRect &HeaderRect, const char *pLabel, const void *pId, bool Active, const char *pIcon) {
+		const bool Hovered = Ui()->HotItem() == pId;
+		SLabelProperties Props;
+		Props.SetColor(Active || Hovered ? ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f) : ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+
+		CUIRect Label, Icon;
+		HeaderRect.VSplitLeft(TextRender()->TextWidth(11.0f, pLabel, -1, -1.0f) + 4.0f, &Label, &Icon);
+		Ui()->DoLabel(&Label, pLabel, 11.0f, TEXTALIGN_ML, Props);
+		if(Active)
+		{
+			Icon.VSplitLeft(10.0f, &Icon, nullptr);
+			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+			Ui()->DoLabel(&Icon, pIcon, 10.0f, TEXTALIGN_MC, Props);
+			TextRender()->SetRenderFlags(0);
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		}
+		return Ui()->DoButtonLogic(pId, 0, &HeaderRect, BUTTONFLAG_LEFT) != 0;
+	};
+
+	bool SortChanged = false;
+	if(DoColumnHeader(HeaderPlayers, Localize("Players"), &s_FewestPlayersFirst, s_SortColumn == ESortColumn::PLAYERS, s_FewestPlayersFirst ? FontIcon::SORT_UP : FontIcon::SORT_DOWN))
+	{
+		if(s_SortColumn == ESortColumn::PLAYERS)
+			s_FewestPlayersFirst = !s_FewestPlayersFirst;
+		s_SortColumn = ESortColumn::PLAYERS;
+		SortChanged = true;
+	}
+
+	if(DoColumnHeader(HeaderFinished, Localize("Finished"), &s_FinishedFilter, s_FinishedFilter != EFinishedFilter::ALL, s_FinishedFilter == EFinishedFilter::FINISHED ? FontIcon::FLAG_CHECKERED : FontIcon::XMARK))
+	{
+		if(s_FinishedFilter == EFinishedFilter::ALL)
+			s_FinishedFilter = EFinishedFilter::UNFINISHED;
+		else if(s_FinishedFilter == EFinishedFilter::UNFINISHED)
+			s_FinishedFilter = EFinishedFilter::FINISHED;
+		else
+			s_FinishedFilter = EFinishedFilter::ALL;
+		SortChanged = true;
+	}
+	if(DoColumnHeader(HeaderDate, Localize("Date"), &s_NewestFirst, s_SortColumn == ESortColumn::DATE, s_NewestFirst ? FontIcon::SORT_DOWN : FontIcon::SORT_UP))
+	{
+		if(s_SortColumn == ESortColumn::DATE)
+			s_NewestFirst = !s_NewestFirst;
+		s_SortColumn = ESortColumn::DATE;
+		SortChanged = true;
+	}
+
+	CUIRect Divider;
+	MainView.HSplitTop(1.0f, &Divider, &MainView);
+	Divider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_NONE, 0.0f);
+	MainView.HSplitTop(6.0f, nullptr, &MainView);
+
+	CUIRect BottomBar, SearchBox, CallVoteButton;
+	MainView.HSplitBottom(ms_ButtonHeight + 5 * 2, &MainView, &BottomBar);
+	BottomBar.HMargin(5.0f, &BottomBar);
+	BottomBar.HSplitTop(5.0f, nullptr, &BottomBar);
+	BottomBar.VSplitLeft(5.0f, nullptr, &BottomBar);
+	BottomBar.VSplitLeft(250.0f, &SearchBox, &BottomBar);
+	BottomBar.VSplitRight(10.0f, &BottomBar, nullptr);
+	BottomBar.VSplitRight(120.0f, nullptr, &CallVoteButton);
+
+	static CLineInputBuffered<256> s_SearchInput;
+	Ui()->DoEditBox_Search(&s_SearchInput, &SearchBox, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive());
+
+	std::vector<std::string> vTerms;
+	SplitFilterTerms(s_SearchInput.GetString(), vTerms);
+
+	const auto &&IsFiltered = [&](const char *pName) {
+		return std::any_of(vTerms.begin(), vTerms.end(), [&](const std::string &Term) {
+			return str_comp_nocase(Term.c_str(), pName) == 0;
+		});
+	};
+
+	const auto &&ToggleFilter = [&](const char *pName) {
+		std::vector<std::string> vNewTerms = vTerms;
+		const auto Existing = std::find_if(vNewTerms.begin(), vNewTerms.end(), [&](const std::string &Term) {
+			return str_comp_nocase(Term.c_str(), pName) == 0;
+		});
+		if(Existing != vNewTerms.end())
+			vNewTerms.erase(Existing);
+		else
+			vNewTerms.emplace_back(pName);
+
+		std::string Filter;
+		for(const std::string &Term : vNewTerms)
+		{
+			if(!Filter.empty())
+				Filter += ", ";
+			Filter += Term;
+		}
+		s_SearchInput.Set(Filter.c_str());
+	};
+
+	const auto &&IsMapFinished = [&](const char *pMap) {
+		return FinishesKnown && pCommunity->HasRank(pMap) == CServerInfo::RANK_RANKED;
+	};
+
+	std::vector<size_t> vFiltered;
+	for(size_t i = 0; i < m_vSavedTeams.size(); ++i)
+	{
+		const CSaveNotice::SSave &Save = m_vSavedTeams[i].m_Save;
+		if(s_FinishedFilter != EFinishedFilter::ALL && IsMapFinished(Save.m_Map.c_str()) != (s_FinishedFilter == EFinishedFilter::FINISHED))
+			continue;
+		const bool Matches = std::all_of(vTerms.begin(), vTerms.end(), [&](const std::string &Term) {
+			return str_find_nocase(Save.m_Players.c_str(), Term.c_str()) != nullptr ||
+			       str_find_nocase(Save.m_Map.c_str(), Term.c_str()) != nullptr ||
+			       (!HideCode && str_find_nocase(Save.m_Code.c_str(), Term.c_str()) != nullptr);
+		});
+		if(Matches)
+			vFiltered.push_back(i);
+	}
+
+	if(!s_NewestFirst)
+		std::reverse(vFiltered.begin(), vFiltered.end());
+	if(s_SortColumn == ESortColumn::PLAYERS)
+	{
+		std::stable_sort(vFiltered.begin(), vFiltered.end(), [&](size_t Left, size_t Right) {
+			const size_t LeftPlayers = m_vSavedTeams[Left].m_vPlayers.size();
+			const size_t RightPlayers = m_vSavedTeams[Right].m_vPlayers.size();
+			return s_FewestPlayersFirst ? LeftPlayers < RightPlayers : LeftPlayers > RightPlayers;
+		});
+	}
+
+	const auto &&DoMapVote = [this, pCurrentMap](size_t RealIndex) {
+		if(str_comp_nocase(m_vSavedTeams[RealIndex].m_Save.m_Map.c_str(), pCurrentMap) == 0)
+			return;
+		char aCmd[192];
+		str_format(aCmd, sizeof(aCmd), "/map %s", m_vSavedTeams[RealIndex].m_Save.m_Map.c_str());
+		GameClient()->m_Chat.SendChat(0, aCmd);
+		SetActive(false);
+	};
+
+	static int s_Selected = -1;
+	if(s_Selected >= (int)vFiltered.size() || SortChanged)
+		s_Selected = -1;
+
+	if(vFiltered.empty())
+	{
+		SLabelProperties Props;
+		Props.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+		CUIRect Hint;
+		MainView.HSplitTop(24.0f, &Hint, nullptr);
+		Ui()->DoLabel(&Hint, m_vSavedTeams.empty() ? Localize("You have no saved teams yet.") : Localize("No saved teams match your search."), 12.0f, TEXTALIGN_ML, Props);
+	}
+	else
+	{
+		static CListBox s_ListBox;
+		s_ListBox.SetRowColors(
+			AccentColor().WithAlpha(0.14f),
+			AccentColor().WithAlpha(0.10f),
+			ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f));
+		s_ListBox.DoStart(24.0f, vFiltered.size(), 1, 3, s_Selected, &MainView, false);
+
+		const char *pToggleName = nullptr;
+		for(size_t k = 0; k < vFiltered.size(); ++k)
+		{
+			CSavedTeam &SavedTeam = m_vSavedTeams[vFiltered[k]];
+			const CSaveNotice::SSave &Save = SavedTeam.m_Save;
+			const CListboxItem Item = s_ListBox.DoNextItem(&SavedTeam, (int)k == s_Selected);
+			if(!Item.m_Visible)
+				continue;
+
+			CUIRect PlayersCol, MapCol, FinishedCol, CodeCol, DateCol;
+			SplitColumns(Item.m_Rect, &PlayersCol, &MapCol, &FinishedCol, &CodeCol, &DateCol);
+
+			for(size_t p = 0; p < SavedTeam.m_vPlayers.size(); ++p)
+			{
+				const char *pName = SavedTeam.m_vPlayers[p].c_str();
+				const float ChipWidth = TextRender()->TextWidth(12.0f, pName, -1, -1.0f) + 10.0f;
+				if(ChipWidth > PlayersCol.w)
+				{
+					SLabelProperties EllipsisProps;
+					EllipsisProps.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+					Ui()->DoLabel(&PlayersCol, "…", 12.0f, TEXTALIGN_ML, EllipsisProps);
+					break;
+				}
+
+				CUIRect Chip;
+				PlayersCol.VSplitLeft(ChipWidth, &Chip, &PlayersCol);
+				PlayersCol.VSplitLeft(3.0f, nullptr, &PlayersCol);
+				Chip.HMargin(3.0f, &Chip);
+
+				void *pNameId = &SavedTeam.m_vPlayers[p];
+				const bool Filtered = IsFiltered(pName);
+				const bool Hovered = Ui()->HotItem() == pNameId;
+				SLabelProperties NameProps;
+				if(Filtered)
+				{
+					Chip.Draw(AccentColor().WithAlpha(0.55f), IGraphics::CORNER_ALL, 3.0f);
+					NameProps.SetColor(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+				}
+				else
+				{
+					Chip.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Hovered ? 0.22f : 0.08f), IGraphics::CORNER_ALL, 3.0f);
+					NameProps.SetColor(Hovered ? ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f) : ColorRGBA(0.80f, 0.80f, 0.80f, 1.0f));
+				}
+				Ui()->DoLabel(&Chip, pName, 12.0f, TEXTALIGN_MC, NameProps);
+				if(Ui()->DoButtonLogic(pNameId, 0, &Chip, BUTTONFLAG_LEFT))
+					pToggleName = pName;
+			}
+
+			SLabelProperties MapProps;
+			MapProps.m_MaxWidth = MapCol.w;
+			MapProps.m_EllipsisAtEnd = true;
+			if(str_comp_nocase(Save.m_Map.c_str(), pCurrentMap) == 0)
+				MapProps.SetColor(AccentColorLight().WithAlpha(1.0f));
+			Ui()->DoLabel(&MapCol, Save.m_Map.c_str(), 12.0f, TEXTALIGN_ML, MapProps);
+
+			const CServerInfo::ERankState Rank = FinishesKnown ? pCommunity->HasRank(Save.m_Map.c_str()) : CServerInfo::RANK_UNAVAILABLE;
+
+			SLabelProperties FinishedProps;
+			const char *pFinishedIcon;
+			if(Rank == CServerInfo::RANK_RANKED)
+			{
+				pFinishedIcon = FontIcon::FLAG_CHECKERED;
+				FinishedProps.SetColor(ColorRGBA(0.45f, 0.85f, 0.45f, 1.0f));
+			}
+			else if(Rank == CServerInfo::RANK_UNRANKED)
+			{
+				pFinishedIcon = FontIcon::XMARK;
+				FinishedProps.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+			}
+			else
+			{
+				pFinishedIcon = FontIcon::QUESTION;
+				FinishedProps.SetColor(ColorRGBA(0.45f, 0.45f, 0.45f, 1.0f));
+			}
+			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+			Ui()->DoLabel(&FinishedCol, pFinishedIcon, 11.0f, TEXTALIGN_ML, FinishedProps);
+			TextRender()->SetRenderFlags(0);
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+
+			SLabelProperties CodeProps;
+			CodeProps.m_MaxWidth = CodeCol.w;
+			CodeProps.m_EllipsisAtEnd = true;
+			Ui()->DoLabel(&CodeCol, HideCode ? "****" : Save.m_Code.c_str(), 12.0f, TEXTALIGN_ML, CodeProps);
+
+			SLabelProperties DateProps;
+			DateProps.m_MaxWidth = DateCol.w;
+			DateProps.m_EllipsisAtEnd = true;
+			DateProps.SetColor(ColorRGBA(0.60f, 0.60f, 0.60f, 1.0f));
+			Ui()->DoLabel(&DateCol, Save.m_Timestamp.c_str(), 12.0f, TEXTALIGN_ML, DateProps);
+		}
+		const int NewSelected = s_ListBox.DoEnd();
+
+		if(s_ListBox.WasItemActivated() && NewSelected >= 0 && NewSelected < (int)vFiltered.size())
+			DoMapVote(vFiltered[NewSelected]);
+
+		if(pToggleName != nullptr)
+		{
+			ToggleFilter(pToggleName);
+			s_Selected = -1;
+		}
+		else
+		{
+			s_Selected = NewSelected;
+		}
+	}
+
 	// call vote button
 	static CButtonContainer s_CallVoteButton;
 	if(DoButton_Menu(&s_CallVoteButton, Localize("Call vote"), 0, &CallVoteButton) && s_Selected >= 0 && s_Selected < (int)vFiltered.size())
@@ -1321,6 +1667,7 @@ void CMenus::RenderServerControl(CUIRect MainView)
 		KICKVOTE,
 		SPECVOTE,
 		SAVEMAPS,
+		SAVEDTEAMS,
 	};
 	static EServerControlTab s_ControlPage = EServerControlTab::SETTINGS;
 
@@ -1332,11 +1679,11 @@ void CMenus::RenderServerControl(CUIRect MainView)
 	MainView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.8f), IGraphics::CORNER_B, 10.0f);
 	MainView.Margin(10.0f, &MainView);
 
-	if(Client()->RconAuthed() && s_ControlPage != EServerControlTab::SAVEMAPS)
+	if(Client()->RconAuthed() && s_ControlPage != EServerControlTab::SAVEMAPS && s_ControlPage != EServerControlTab::SAVEDTEAMS)
 		MainView.HSplitBottom(90.0f, &MainView, &RconExtension);
 
 	// tab bar
-	const float TabWidth = TabBar.w / 4.0f;
+	const float TabWidth = TabBar.w / 5.0f;
 	TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
 	static CButtonContainer s_Button0;
 	if(DoButton_MenuTab(&s_Button0, Localize("Change settings"), s_ControlPage == EServerControlTab::SETTINGS, &Button, IGraphics::CORNER_NONE))
@@ -1352,13 +1699,27 @@ void CMenus::RenderServerControl(CUIRect MainView)
 	if(DoButton_MenuTab(&s_Button2, Localize("Move player to spectators"), s_ControlPage == EServerControlTab::SPECVOTE, &Button, IGraphics::CORNER_NONE))
 		s_ControlPage = EServerControlTab::SPECVOTE;
 
+	TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
 	static CButtonContainer s_Button3;
-	if(DoButton_MenuTab(&s_Button3, Localize("Save maps"), s_ControlPage == EServerControlTab::SAVEMAPS, &TabBar, IGraphics::CORNER_NONE))
+	if(DoButton_MenuTab(&s_Button3, Localize("Save maps"), s_ControlPage == EServerControlTab::SAVEMAPS, &Button, IGraphics::CORNER_NONE))
 		s_ControlPage = EServerControlTab::SAVEMAPS;
+
+	static CButtonContainer s_Button4;
+	if(DoButton_MenuTab(&s_Button4, Localize("Saved teams"), s_ControlPage == EServerControlTab::SAVEDTEAMS, &TabBar, IGraphics::CORNER_NONE))
+	{
+		m_SavedTeamsLoaded = false;
+		s_ControlPage = EServerControlTab::SAVEDTEAMS;
+	}
 
 	if(s_ControlPage == EServerControlTab::SAVEMAPS)
 	{
 		RenderServerControlSaveMaps(MainView);
+		return;
+	}
+
+	if(s_ControlPage == EServerControlTab::SAVEDTEAMS)
+	{
+		RenderServerControlSavedTeams(MainView);
 		return;
 	}
 

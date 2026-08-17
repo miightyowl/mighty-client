@@ -127,7 +127,7 @@ void CSaveNotice::CollectSaves(const char *pMap, std::vector<SSave> &vSaves) con
 			continue;
 		CsvReadField(pNext, aCode, sizeof(aCode));
 
-		if(aCode[0] == '\0' || str_comp_nocase(aMap, pMap) != 0)
+		if(aCode[0] == '\0' || (pMap != nullptr && str_comp_nocase(aMap, pMap) != 0))
 		{
 			continue;
 		}
@@ -137,14 +137,19 @@ void CSaveNotice::CollectSaves(const char *pMap, std::vector<SSave> &vSaves) con
 		}
 
 		const auto Duplicate = std::find_if(vSaves.begin(), vSaves.end(), [&](const SSave &Save) {
-			return str_comp(Save.m_Code.c_str(), aCode) == 0 && str_comp(Save.m_Players.c_str(), aPlayers) == 0;
+			return str_comp(Save.m_Code.c_str(), aCode) == 0 && str_comp(Save.m_Players.c_str(), aPlayers) == 0 && str_comp(Save.m_Map.c_str(), aMap) == 0;
 		});
 		if(Duplicate != vSaves.end())
 		{
 			vSaves.erase(Duplicate);
 		}
-		vSaves.push_back({aTimestamp, aPlayers, aCode});
+		vSaves.push_back({aTimestamp, aPlayers, aMap, aCode});
 	}
+}
+
+void CSaveNotice::AllSaves(std::vector<SSave> &vSaves) const
+{
+	CollectSaves(nullptr, vSaves);
 }
 
 void CSaveNotice::ShowSaves(bool Verbose)
