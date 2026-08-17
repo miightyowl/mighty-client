@@ -18,14 +18,17 @@ public:
 	void OnRender() override;
 	void OnStateChange(int NewState, int OldState) override;
 
-private:
 	struct SSave
 	{
 		std::string m_Timestamp;
 		std::string m_Players;
+		std::string m_Map;
 		std::string m_Code;
 	};
 
+	void AllSaves(std::vector<SSave> &vSaves) const;
+
+private:
 	bool m_Pending = false;
 
 	void ShowSaves(bool Verbose);
