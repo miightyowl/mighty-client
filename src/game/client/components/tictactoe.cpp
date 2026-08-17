@@ -24,20 +24,42 @@
 
 namespace
 {
-	const char *PROTOCOL_PREFIX = "MTTT1 ";
+	const char *PROTOCOL_PREFIX = "MTTT2 ";
 	const char *VIEW_BIND = "+tictactoe";
 
+	// handshake goes over whispers
 	const float SEND_INTERVAL = 1.2f;
 	const float CHAT_SCORE_PENALTY = 250.0f;
 	const float CHAT_SCORE_DECAY = 50.0f;
 	const float CHAT_SCORE_BUDGET = 750.0f;
-	const float ACK_DELAY = 2.5f;
 	const float RETRY_INTERVAL = 8.0f;
 	const int MAX_RETRIES = 3;
 	const int MAX_CHALLENGE_RETRIES = 1;
 	const float ACCEPT_TIMEOUT = 60.0f;
 	const float RESULT_HOLD = 5.0f;
 	const float RESULT_FADE = 2.0f;
+
+	const int EMOTE_RADIX = 12;
+	const int EMOTE_OP_MOVE = 12;
+	const int EMOTE_OP_ACK = 13;
+
+	const float EMOTE_ECHO_TIMEOUT = 2.0f;
+	const int MAX_EMOTE_RETRIES = 4;
+	const float MOVE_RETRY_INTERVAL = 6.0f;
+	const int MAX_MOVE_RETRIES = 3;
+
+	int FramePayload(int Op)
+	{
+		switch(Op)
+		{
+		case EMOTE_OP_MOVE:
+			return 2;
+		case EMOTE_OP_ACK:
+			return 1;
+		default:
+			return -1;
+		}
+	}
 
 	const ColorRGBA COLOR_MARK_OTHER = ColorRGBA(0.95f, 0.95f, 0.95f, 1.0f);
 	const ColorRGBA COLOR_OUTLINE = ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f);
@@ -99,12 +121,12 @@ void CTicTacToe::OnReset()
 	m_KeyBlocked = false;
 	m_ShowKeyHint = false;
 	m_AcceptDeadline = 0.0f;
-	m_PendingAck = -1;
 	m_ChatScore = 0.0f;
 	m_ChatScoreTime = LocalTime();
 	m_vSendQueue.clear();
 	m_NextSendTime = 0.0f;
 	ClearRetry();
+	ResetEmoteChannel();
 }
 
 bool CTicTacToe::WhisperSupported() const
@@ -223,10 +245,10 @@ void CTicTacToe::Close()
 	m_HasBoard = false;
 	m_CursorActive = false;
 	m_IgnoreClick = false;
-	m_PendingAck = -1;
 	m_Result = 0;
 	m_aStatus[0] = '\0';
 	ClearRetry();
+	ResetEmoteChannel();
 }
 
 void CTicTacToe::Finish(char Result, const char *pStatus)
@@ -269,6 +291,7 @@ void CTicTacToe::StartGame(int OpponentId, bool Challenger)
 	m_HasBoard = true;
 	m_State = STATE_PLAYING;
 	ClearRetry();
+	ResetEmoteChannel();
 }
 
 void CTicTacToe::SendTo(int ClientId, const char *pMessage)
@@ -336,15 +359,6 @@ void CTicTacToe::FlushSendQueue()
 	m_NextSendTime = Now + SEND_INTERVAL;
 }
 
-void CTicTacToe::UpdatePendingAck()
-{
-	if(m_PendingAck < 0 || LocalTime() < m_PendingAckTime)
-		return;
-
-	SendAck(m_OpponentId, m_PendingAck);
-	m_PendingAck = -1;
-}
-
 void CTicTacToe::UpdateRetry()
 {
 	if(m_RetryMessage.empty() || LocalTime() < m_RetryTime)
@@ -366,83 +380,197 @@ void CTicTacToe::UpdateRetry()
 	m_RetryTime = LocalTime() + RETRY_INTERVAL;
 }
 
-void CTicTacToe::SendState()
+// folds the board into a single protocol digit, both sides derive it from the
+// same nine cells so it doubles as a duplicate filter and a desync check
+int CTicTacToe::BoardHash() const
 {
-	char aMessage[32];
-	str_format(aMessage, sizeof(aMessage), "S %d %s", m_MoveCount, m_aBoard);
-	m_PendingAck = -1;
-	SendProtocol(aMessage, MAX_RETRIES);
-}
-
-void CTicTacToe::SendAck(int ClientId, int Moves)
-{
-	char aMessage[32];
-	str_format(aMessage, sizeof(aMessage), "K %d", Moves);
-	SendTo(ClientId, aMessage);
-}
-
-bool CTicTacToe::ApplyState(const char *pArgs)
-{
-	char aMoves[8];
-	const char *pRest = str_next_token(pArgs, " ", aMoves, sizeof(aMoves));
-	if(!pRest)
-		return false;
-
-	char aBoard[16];
-	str_next_token(pRest, " ", aBoard, sizeof(aBoard));
-	if(str_length(aBoard) != 9)
-		return false;
+	unsigned Hash = 2166136261u;
 	for(int i = 0; i < 9; i++)
 	{
-		if(aBoard[i] != '.' && aBoard[i] != 'X' && aBoard[i] != 'O')
-			return false;
+		Hash ^= (unsigned char)m_aBoard[i];
+		Hash *= 16777619u;
+	}
+	return (int)(Hash % (unsigned)EMOTE_RADIX);
+}
+
+void CTicTacToe::ResetEmoteChannel()
+{
+	m_vEmoteQueue.clear();
+	m_EmoteWaiting = false;
+	m_EmoteTime = 0.0f;
+	m_EmoteRetries = 0;
+	m_FrameOp = -1;
+	m_FrameExpect = 0;
+	m_FrameLen = 0;
+	ClearMoveRetry();
+}
+
+// queues one frame, the opcode is followed by its data digits and a check digit
+void CTicTacToe::SendFrame(int Op, const int *pDigits, int NumDigits)
+{
+	int Check = Op;
+	m_vEmoteQueue.push_back(Op);
+	for(int i = 0; i < NumDigits; i++)
+	{
+		m_vEmoteQueue.push_back(pDigits[i]);
+		Check += pDigits[i];
+	}
+	m_vEmoteQueue.push_back(Check % EMOTE_RADIX);
+}
+
+// answers a move with the board we ended up with, the sender compares it against
+// its own board and stops repeating the move once both match
+void CTicTacToe::SendMoveAck()
+{
+	const int Hash = BoardHash();
+	SendFrame(EMOTE_OP_ACK, &Hash, 1);
+}
+
+void CTicTacToe::ClearMoveRetry()
+{
+	m_MovePending = false;
+	m_MoveRetryTime = 0.0f;
+	m_MoveRetryCount = 0;
+}
+
+void CTicTacToe::UpdateMoveRetry()
+{
+	if(!m_MovePending || LocalTime() < m_MoveRetryTime)
+		return;
+
+	m_MoveRetryCount++;
+	if(m_MoveRetryCount > MAX_MOVE_RETRIES)
+	{
+		const bool Running = m_State == STATE_PLAYING;
+		ClearMoveRetry();
+		if(Running)
+			Finish(0, "Your opponent is not responding.");
+		return;
 	}
 
-	int Moves;
-	if(!str_toint(aMoves, &Moves))
+	SendFrame(EMOTE_OP_MOVE, m_aMoveFrame, 2);
+	m_MoveRetryTime = LocalTime() + MOVE_RETRY_INTERVAL;
+}
+
+void CTicTacToe::FlushEmoteQueue()
+{
+	if(m_vEmoteQueue.empty())
+		return;
+
+	if(Client()->State() != IClient::STATE_ONLINE)
+	{
+		ResetEmoteChannel();
+		return;
+	}
+
+	// the server drops emoticons from a tee that is not alive, wait for the respawn
+	if(!GameClient()->m_Snap.m_pLocalCharacter)
+		return;
+
+	if(m_EmoteWaiting)
+	{
+		if(LocalTime() < m_EmoteTime + EMOTE_ECHO_TIMEOUT)
+			return;
+
+		// a server that never echoes emoticons back cannot carry the game at all,
+		// give up instead of emoting into the void forever
+		m_EmoteRetries++;
+		if(m_EmoteRetries > MAX_EMOTE_RETRIES)
+		{
+			const bool Running = m_State == STATE_PLAYING;
+			ResetEmoteChannel();
+			if(Running)
+				Finish(0, "Stopped, this server does not pass emoticons through.");
+			return;
+		}
+	}
+
+	CNetMsg_Cl_Emoticon Msg;
+	Msg.m_Emoticon = m_vEmoteQueue.front();
+	Client()->SendPackMsgActive(&Msg, MSGFLAG_VITAL);
+	m_EmoteWaiting = true;
+	m_EmoteTime = LocalTime();
+}
+
+bool CTicTacToe::QueueManualEmote(int Emoticon)
+{
+	if(m_vEmoteQueue.empty())
 		return false;
 
-	if(Moves == m_MoveCount)
-	{
-		if(str_comp(aBoard, m_aBoard) != 0)
-			return false;
-		SendAck(m_OpponentId, Moves);
-		return true;
-	}
-	if(Moves < m_MoveCount)
-	{
-		SendState();
-		return true;
-	}
-	if(Moves != m_MoveCount + 1)
-		return false;
-
-	const char OpponentMark = m_MyMark == 'X' ? 'O' : 'X';
-	int Cell = -1;
-	for(int i = 0; i < 9; i++)
-	{
-		if(aBoard[i] == m_aBoard[i])
-			continue;
-		if(Cell >= 0 || m_aBoard[i] != '.' || aBoard[i] != OpponentMark)
-			return false;
-		Cell = i;
-	}
-	if(Cell < 0)
-		return false;
-
-	m_aBoard[Cell] = OpponentMark;
-	m_MoveCount = Moves;
-	ClearRetry();
-	if(CheckGameEnd())
-	{
-		SendAck(m_OpponentId, Moves);
-	}
-	else
-	{
-		m_PendingAck = Moves;
-		m_PendingAckTime = LocalTime() + ACK_DELAY;
-	}
+	m_vEmoteQueue.push_back(Emoticon);
 	return true;
+}
+
+// the copy of our own emoticon confirms the server accepted it
+void CTicTacToe::HandleEmoteEcho(int Emoticon)
+{
+	if(!m_EmoteWaiting || m_vEmoteQueue.empty() || m_vEmoteQueue.front() != Emoticon)
+		return;
+
+	m_vEmoteQueue.erase(m_vEmoteQueue.begin());
+	m_EmoteWaiting = false;
+	m_EmoteTime = 0.0f;
+	m_EmoteRetries = 0;
+}
+
+void CTicTacToe::HandleEmoteFrame(int Emoticon)
+{
+	if(Emoticon >= EMOTE_RADIX)
+	{
+		m_FrameExpect = FramePayload(Emoticon);
+		m_FrameOp = m_FrameExpect < 0 ? -1 : Emoticon;
+		m_FrameLen = 0;
+		return;
+	}
+
+	if(m_FrameOp < 0)
+		return;
+
+	m_aFrame[m_FrameLen++] = Emoticon;
+	if(m_FrameLen <= m_FrameExpect)
+		return;
+
+	int Check = m_FrameOp;
+	for(int i = 0; i < m_FrameExpect; i++)
+		Check += m_aFrame[i];
+	if(Check % EMOTE_RADIX == m_aFrame[m_FrameExpect])
+		ProcessFrame();
+	m_FrameOp = -1;
+}
+
+void CTicTacToe::ProcessFrame()
+{
+	if(m_FrameOp == EMOTE_OP_ACK)
+	{
+		if(m_MovePending && m_aFrame[0] == BoardHash())
+			ClearMoveRetry();
+		return;
+	}
+
+	const int Hash = m_aFrame[0];
+	const int Cell = m_aFrame[1];
+	const bool Applicable = m_State == STATE_PLAYING && !MyTurn() && Cell < 9 && m_aBoard[Cell] == '.' && Hash == BoardHash();
+	if(Applicable)
+	{
+		m_aBoard[Cell] = m_MyMark == 'X' ? 'O' : 'X';
+		m_MoveCount++;
+		CheckGameEnd();
+	}
+
+	// a repeat of a move we already played gets the same answer again, only a
+	// board that really drifted apart keeps the two hashes different
+	SendMoveAck();
+}
+
+void CTicTacToe::OnEmoticon(int ClientId, int Emoticon)
+{
+	if(Emoticon < 0 || Emoticon >= NUM_EMOTICONS)
+		return;
+
+	if(ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1])
+		HandleEmoteEcho(Emoticon);
+	else if(ClientId == m_OpponentId && (m_State == STATE_PLAYING || m_State == STATE_OVER))
+		HandleEmoteFrame(Emoticon);
 }
 
 void CTicTacToe::PlayCell(int Cell)
@@ -452,10 +580,18 @@ void CTicTacToe::PlayCell(int Cell)
 	if(!MyTurn())
 		return;
 
+	// the hash describes the board the opponent still has in front of them
+	m_aMoveFrame[0] = BoardHash();
+	m_aMoveFrame[1] = Cell;
+
 	m_aBoard[Cell] = m_MyMark;
 	m_MoveCount++;
 	CheckGameEnd();
-	SendState();
+
+	m_MovePending = true;
+	m_MoveRetryCount = 0;
+	m_MoveRetryTime = LocalTime() + MOVE_RETRY_INTERVAL;
+	SendFrame(EMOTE_OP_MOVE, m_aMoveFrame, 2);
 }
 
 bool CTicTacToe::CheckGameEnd()
@@ -495,7 +631,9 @@ void CTicTacToe::OnChatMessage(int ClientId, const char *pMessage)
 		return;
 	}
 
-	if(ClientId >= 0 || m_State == STATE_IDLE || m_State == STATE_SELECT || LocalId < 0)
+	if(ClientId >= 0 || LocalId < 0)
+		return;
+	if(m_State != STATE_CALLING && m_State != STATE_RINGING && m_State != STATE_INVITED)
 		return;
 
 	const bool Muted = str_find(pMessage, "You are not permitted to talk") != nullptr ||
@@ -504,7 +642,6 @@ void CTicTacToe::OnChatMessage(int ClientId, const char *pMessage)
 		return;
 
 	m_vSendQueue.clear();
-	m_PendingAck = -1;
 	Finish(0, "Stopped, the server muted you.");
 }
 
@@ -521,10 +658,6 @@ bool CTicTacToe::OnWhisper(int ClientId, int Team, const char *pMessage)
 		return true;
 
 	const char Verb = pArgs[0];
-	const char *pRest = pArgs + 1;
-	while(*pRest == ' ')
-		pRest++;
-
 	const bool FromOpponent = ClientId == m_OpponentId;
 
 	switch(Verb)
@@ -570,11 +703,11 @@ bool CTicTacToe::OnWhisper(int ClientId, int Team, const char *pMessage)
 		if(FromOpponent && (m_State == STATE_CALLING || m_State == STATE_RINGING))
 		{
 			StartGame(ClientId, true);
-			SendAck(ClientId, 0);
+			SendTo(ClientId, "K");
 		}
 		else if(FromOpponent && m_State == STATE_PLAYING && m_MoveCount == 0)
 		{
-			SendAck(ClientId, 0);
+			SendTo(ClientId, "K");
 		}
 		break;
 
@@ -587,21 +720,10 @@ bool CTicTacToe::OnWhisper(int ClientId, int Team, const char *pMessage)
 		}
 		break;
 
-	case 'S':
-		if(FromOpponent && m_State == STATE_PLAYING && !ApplyState(pRest))
-		{
-			SendTo(m_OpponentId, "Q");
-			Finish(0, "The game got out of sync.");
-		}
-		break;
-
 	case 'K':
-	{
-		int Moves;
-		if(FromOpponent && str_toint(pRest, &Moves) && Moves == m_MoveCount)
+		if(FromOpponent)
 			ClearRetry();
 		break;
-	}
 
 	case 'Q':
 		if(FromOpponent && (m_State == STATE_CALLING || m_State == STATE_RINGING || m_State == STATE_INVITED || m_State == STATE_PLAYING))
@@ -609,6 +731,7 @@ bool CTicTacToe::OnWhisper(int ClientId, int Team, const char *pMessage)
 			char aStatus[128];
 			str_format(aStatus, sizeof(aStatus), "%s left the game.", OpponentName());
 			Finish(0, aStatus);
+			ResetEmoteChannel();
 		}
 		break;
 
@@ -967,6 +1090,7 @@ void CTicTacToe::RenderBoard(CUIRect Area, bool Interactive, float Alpha)
 void CTicTacToe::OnRender()
 {
 	FlushSendQueue();
+	FlushEmoteQueue();
 
 	if(m_ViewActive && ViewKeyState() == 0)
 	{
@@ -990,10 +1114,12 @@ void CTicTacToe::OnRender()
 	if(m_State != STATE_SELECT && m_State != STATE_OVER && m_LocalId != GameClient()->m_Snap.m_LocalClientId)
 	{
 		Finish(0, "Aborted, you switched to another tee.");
+		ResetEmoteChannel();
 	}
 	else if(m_State != STATE_SELECT && m_State != STATE_OVER && (m_OpponentId < 0 || !GameClient()->m_aClients[m_OpponentId].m_Active))
 	{
 		Finish(0, "Your opponent left the server.");
+		ResetEmoteChannel();
 	}
 	else if((m_State == STATE_INVITED || m_State == STATE_RINGING) && LocalTime() > m_AcceptDeadline)
 	{
@@ -1008,7 +1134,7 @@ void CTicTacToe::OnRender()
 	}
 
 	UpdateRetry();
-	UpdatePendingAck();
+	UpdateMoveRetry();
 
 	if(m_State == STATE_OVER && !m_HasBoard && m_ViewActive && !m_KeyBlocked)
 		OpenSelect();
