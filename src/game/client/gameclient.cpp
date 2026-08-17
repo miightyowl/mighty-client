@@ -4236,9 +4236,9 @@ void CGameClient::UpdateFoeAlias(int ClientId)
 void CGameClient::FoeAliasName(int Index, char *pBuffer, int BufferSize)
 {
 	if(Index <= 1)
-		str_copy(pBuffer, "nameless tee", BufferSize);
+		str_copy(pBuffer, "nameless foe", BufferSize);
 	else if(Index <= 10)
-		str_format(pBuffer, BufferSize, "(%d)nameless tee", Index - 1);
+		str_format(pBuffer, BufferSize, "(%d)nameless foe", Index - 1);
 	else
 		str_format(pBuffer, BufferSize, "(%d)nameless", Index - 1);
 }

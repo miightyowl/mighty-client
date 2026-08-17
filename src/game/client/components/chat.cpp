@@ -1987,7 +1987,7 @@ void CChat::SendChat(int Team, const char *pLine)
 	if(*str_utf8_skip_whitespaces(pLine) == '\0')
 		return;
 
-	// the user types "nameless tee" foe aliases, everyone else should read the real names
+	// the user types "nameless foe" foe aliases, everyone else should read the real names
 	char aRewritten[1024];
 	if(GameClient()->ReplaceFoeNames(pLine, aRewritten, sizeof(aRewritten)))
 		pLine = aRewritten;

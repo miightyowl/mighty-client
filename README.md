@@ -21,7 +21,7 @@ The **mighty client** is a fork of the [DDraceNetwork](https://github.com/ddnet/
 ![Ingame](data/bindwheel.png)
 
 
-- **Foe anonymization**: fully hide tees on your foe list by changing their name to "nameless tee" and their skin to default.
+- **Foe anonymization**: fully hide tees on your foe list by changing their name to "nameless foe" and their skin to default.
 - **Custom unfinished map votes**: adds votes where you can select all or specific players on the server and instantly vote unfinished maps for everyone, instead of the usual vote that only applies to you.
 - **Saved maps**: get an additional tab in the voting menu to save, note and keep a list of saved maps.
 
