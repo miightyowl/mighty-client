@@ -92,6 +92,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFoeAnonymizeRealNamesInChat, Localize("Keep real foe names in chat messages of others"), &g_Config.m_ClFoeAnonymizeRealNamesInChat, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFriendsCommunityFilter, Localize("Only show friends in enabled communities"), &g_Config.m_ClMClientFriendsCommunityFilter, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFinishFireworks, Localize("Play fireworks when you finish"), &g_Config.m_ClMClientFinishFireworks, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientSaveNoticeHideCode, Localize("Map Saves: Hide names and password when entering a new map"), &g_Config.m_ClMClientSaveNoticeHideCode, &LeftView, LineSize);
 
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFastInput, Localize("Fast input (lower input delay)"), &g_Config.m_ClMClientFastInput, &LeftView, LineSize);
 		if(g_Config.m_ClMClientFastInput)

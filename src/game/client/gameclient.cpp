@@ -173,6 +173,7 @@ void CGameClient::OnConsoleInit()
 					      &m_MaodieWalk,
 					      &m_PracticeSetup,
 					      &m_TicTacToe,
+					      &m_SaveNotice,
 					      &m_Menus,
 					      &m_Tooltips,
 					      &m_KeyBinder,

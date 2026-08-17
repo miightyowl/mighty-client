@@ -2645,6 +2645,8 @@ if(CLIENT)
     components/practice_setup.h
     components/race_demo.cpp
     components/race_demo.h
+    components/save_notice.cpp
+    components/save_notice.h
     components/scoreboard.cpp
     components/scoreboard.h
     components/skins.cpp
