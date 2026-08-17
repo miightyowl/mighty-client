@@ -68,6 +68,7 @@
 #include "components/players.h"
 #include "components/practice_setup.h"
 #include "components/race_demo.h"
+#include "components/save_notice.h"
 #include "components/scoreboard.h"
 #include "components/skins.h"
 #include "components/skins7.h"
@@ -191,6 +192,7 @@ public:
 	CPlayers m_Players;
 	CPracticeSetup m_PracticeSetup;
 	CTicTacToe m_TicTacToe;
+	CSaveNotice m_SaveNotice;
 	CPetting m_Petting;
 	CPetTee m_PetTee;
 	CAds m_Ads;
