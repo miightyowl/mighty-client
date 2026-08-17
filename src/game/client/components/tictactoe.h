@@ -28,6 +28,10 @@ public:
 
 	void OnChatMessage(int ClientId, const char *pMessage);
 
+	void OnEmoticon(int ClientId, int Emoticon);
+
+	bool QueueManualEmote(int Emoticon);
+
 private:
 	enum EState
 	{
@@ -65,13 +69,26 @@ private:
 	float m_NextSendTime = 0.0f;
 	float m_ChatScore = 0.0f;
 	float m_ChatScoreTime = 0.0f;
-	int m_PendingAck = -1;
-	float m_PendingAckTime = 0.0f;
 
 	std::string m_RetryMessage;
 	float m_RetryTime = 0.0f;
 	int m_RetryCount = 0;
 	int m_RetryMax = 0;
+
+	std::vector<int> m_vEmoteQueue;
+	bool m_EmoteWaiting = false;
+	float m_EmoteTime = 0.0f;
+	int m_EmoteRetries = 0;
+
+	int m_FrameOp = -1;
+	int m_FrameExpect = 0;
+	int m_FrameLen = 0;
+	int m_aFrame[4] = {0, 0, 0, 0};
+
+	int m_aMoveFrame[2] = {0, 0};
+	bool m_MovePending = false;
+	float m_MoveRetryTime = 0.0f;
+	int m_MoveRetryCount = 0;
 
 	bool WhisperSupported() const;
 	bool WindowVisible() const;
@@ -94,10 +111,16 @@ private:
 	void UpdateRetry();
 	void ClearRetry();
 
-	void SendState();
-	void SendAck(int ClientId, int Moves);
-	void UpdatePendingAck();
-	bool ApplyState(const char *pArgs);
+	int BoardHash() const;
+	void SendFrame(int Op, const int *pDigits, int NumDigits);
+	void SendMoveAck();
+	void FlushEmoteQueue();
+	void UpdateMoveRetry();
+	void ClearMoveRetry();
+	void ResetEmoteChannel();
+	void HandleEmoteEcho(int Emoticon);
+	void HandleEmoteFrame(int Emoticon);
+	void ProcessFrame();
 	void PlayCell(int Cell);
 	bool CheckGameEnd();
 

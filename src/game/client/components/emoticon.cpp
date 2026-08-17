@@ -210,6 +210,9 @@ void CEmoticon::OnRender()
 
 void CEmoticon::Emote(int Emoticon)
 {
+	if(GameClient()->m_TicTacToe.QueueManualEmote(Emoticon))
+		return;
+
 	CNetMsg_Cl_Emoticon Msg;
 	Msg.m_Emoticon = Emoticon;
 	Client()->SendPackMsgActive(&Msg, MSGFLAG_VITAL);

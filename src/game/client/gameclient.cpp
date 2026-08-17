@@ -1167,6 +1167,9 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dumm
 	{
 		CNetMsg_Sv_Emoticon *pMsg = (CNetMsg_Sv_Emoticon *)pRawMsg;
 
+		// tic tac toe sends its moves as emoticons
+		m_TicTacToe.OnEmoticon(pMsg->m_ClientId, pMsg->m_Emoticon);
+
 		// apply
 		m_aClients[pMsg->m_ClientId].m_Emoticon = pMsg->m_Emoticon;
 		m_aClients[pMsg->m_ClientId].m_EmoticonStartTick = Client()->GameTick(Conn);
