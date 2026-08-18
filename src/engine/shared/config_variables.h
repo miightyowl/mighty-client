@@ -212,6 +212,7 @@ MACRO_CONFIG_INT(ClMClientPetTeeAlpha, cl_mclient_pet_tee_alpha, 90, 10, 100, CF
 MACRO_CONFIG_INT(ClMClientMiniGames, cl_mclient_minigames, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: allow other M-Client players to challenge you to a game")
 MACRO_CONFIG_INT(ClMClientMiniGamesAlpha, cl_mclient_minigames_alpha, 60, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: background opacity of the game windows")
 MACRO_CONFIG_INT(ClMClientMiniGamesBarAlpha, cl_mclient_minigames_bar_alpha, 35, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: background opacity of the game status window")
+MACRO_CONFIG_INT(ClMClientMiniGamesHold, cl_mclient_minigames_hold, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: hold the mini game key to show a game, when off it is clicked on and off instead")
 MACRO_CONFIG_INT(ClMClientSaveNoticeHideCode, cl_mclient_save_notice_hide_code, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: only show how many saves you have on the map, hiding the codes and the player names")
 MACRO_CONFIG_INT(ClSkinListView, cl_skin_list_view, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: skin list view (0 = all skins, 1 = hidden skins, 2 = blocked skins)")
 MACRO_CONFIG_INT(ClSkinListSort, cl_skin_list_sort, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: skin list order (0 = name A-Z, 1 = name Z-A, 2 = recently added)")

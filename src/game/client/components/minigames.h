@@ -135,6 +135,7 @@ private:
 	void StatusText(char *pBuf, size_t Size) const;
 
 	void Toggle();
+	void HideView();
 	void OpenGames();
 	void OpenSelect();
 	void Close();
