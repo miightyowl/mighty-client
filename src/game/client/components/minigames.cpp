@@ -117,14 +117,18 @@ void CMiniGames::ConKeyMiniGames(IConsole::IResult *pResult, void *pUserData)
 {
 	CMiniGames *pSelf = static_cast<CMiniGames *>(pUserData);
 
+	const bool ToggleMode = g_Config.m_ClMClientMiniGamesHold == 0;
+
 	if(pResult->GetInteger(0) == 0)
 	{
-		if(pSelf->m_State == STATE_GAMES || pSelf->m_State == STATE_SELECT)
-			pSelf->Close();
-		pSelf->m_ViewActive = false;
-		pSelf->m_CursorActive = false;
-		pSelf->m_IgnoreClick = false;
-		pSelf->m_KeyBlocked = false;
+		if(!ToggleMode)
+			pSelf->HideView();
+		return;
+	}
+
+	if(ToggleMode && pSelf->m_ViewActive)
+	{
+		pSelf->HideView();
 		return;
 	}
 
@@ -287,6 +291,16 @@ const char *CMiniGames::GameName() const
 	return g_apGameNames[m_Game];
 }
 
+void CMiniGames::HideView()
+{
+	if(m_State == STATE_GAMES || m_State == STATE_SELECT)
+		Close();
+	m_ViewActive = false;
+	m_CursorActive = false;
+	m_IgnoreClick = false;
+	m_KeyBlocked = false;
+}
+
 void CMiniGames::Toggle()
 {
 	if(IsActive())
@@ -324,7 +338,9 @@ void CMiniGames::Close()
 	else if(m_State == STATE_INVITED)
 		SendTo(m_OpponentId, "D");
 
-	m_KeyBlocked = m_ViewActive;
+	m_KeyBlocked = m_ViewActive && g_Config.m_ClMClientMiniGamesHold;
+	if(!g_Config.m_ClMClientMiniGamesHold)
+		m_ViewActive = false;
 	m_State = STATE_IDLE;
 	m_OpponentId = -1;
 	m_LocalId = -1;
@@ -1446,6 +1462,8 @@ void CMiniGames::RenderStatusBar(float Alpha)
 		char aHint[128];
 		if(aKey[0] == '\0')
 			str_copy(aHint, Localize("Bind a key in the controls"));
+		else if(!g_Config.m_ClMClientMiniGamesHold)
+			str_format(aHint, sizeof(aHint), Localize("Press %s to view"), aKey);
 		else
 			str_format(aHint, sizeof(aHint), Localize("Hold %s to view"), aKey);
 
@@ -1748,15 +1766,8 @@ void CMiniGames::OnRender()
 	FlushSendQueue();
 	FlushEmoteQueue();
 
-	if(m_ViewActive && ViewKeyState() == 0)
-	{
-		m_ViewActive = false;
-		m_CursorActive = false;
-		m_IgnoreClick = false;
-		m_KeyBlocked = false;
-		if(m_State == STATE_GAMES || m_State == STATE_SELECT)
-			Close();
-	}
+	if(g_Config.m_ClMClientMiniGamesHold && m_ViewActive && ViewKeyState() == 0)
+		HideView();
 
 	if(!IsActive())
 		return;
