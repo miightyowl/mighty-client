@@ -110,7 +110,7 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 		{EBindOptionGroup::MCLIENT, Localizable("Translate chat"), "+show_chat; chat translate"},
 		{EBindOptionGroup::MCLIENT, Localizable("Bind wheel"), "+bindwheel"},
 		{EBindOptionGroup::MCLIENT, Localizable("Fast practice"), "practice_setup"},
-		{EBindOptionGroup::MCLIENT, Localizable("Tic tac toe"), "+tictactoe"},
+		{EBindOptionGroup::MCLIENT, Localizable("Games"), "+minigames"},
 	};
 	m_NumPredefinedBindOptions = m_vBindOptions.size();
 

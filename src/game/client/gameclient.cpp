@@ -172,7 +172,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Ads,
 					      &m_MaodieWalk,
 					      &m_PracticeSetup,
-					      &m_TicTacToe,
+					      &m_MiniGames,
 					      &m_SaveNotice,
 					      &m_Menus,
 					      &m_Tooltips,
@@ -192,7 +192,7 @@ void CGameClient::OnConsoleInit()
 						  &m_Emoticon,
 						  &m_BindWheel,
 						  &m_PracticeSetup,
-						  &m_TicTacToe,
+						  &m_MiniGames,
 						  &m_ImportantAlert,
 						  &m_Menus,
 						  &m_Controls,
@@ -1168,7 +1168,7 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dumm
 		CNetMsg_Sv_Emoticon *pMsg = (CNetMsg_Sv_Emoticon *)pRawMsg;
 
 		// tic tac toe sends its moves as emoticons
-		m_TicTacToe.OnEmoticon(pMsg->m_ClientId, pMsg->m_Emoticon);
+		m_MiniGames.OnEmoticon(pMsg->m_ClientId, pMsg->m_Emoticon);
 
 		// apply
 		m_aClients[pMsg->m_ClientId].m_Emoticon = pMsg->m_Emoticon;

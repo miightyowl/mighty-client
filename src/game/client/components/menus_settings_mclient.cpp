@@ -266,6 +266,10 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		Ui()->DoScrollbarOption(&g_Config.m_ClMClientMenuCursorSize, &g_Config.m_ClMClientMenuCursorSize, &Button, Localize("Menu cursor size"), 50, 300, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
 		LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
 		Ui()->DoScrollbarOption(&g_Config.m_ClMClientIngameCursorSize, &g_Config.m_ClMClientIngameCursorSize, &Button, Localize("Ingame cursor size"), 50, 300, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+		LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClMClientMiniGamesAlpha, &g_Config.m_ClMClientMiniGamesAlpha, &Button, Localize("Game background opacity"), 0, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+		LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_ClMClientMiniGamesBarAlpha, &g_Config.m_ClMClientMiniGamesBarAlpha, &Button, Localize("Game status window opacity"), 0, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
 
 		Ui()->DoLabel_AutoLineSize(Localize("Accessibility"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
 		RightView.HSplitTop(MarginSmall, nullptr, &RightView);

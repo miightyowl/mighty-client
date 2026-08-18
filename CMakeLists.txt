@@ -2556,6 +2556,8 @@ if(CLIENT)
     components/censor.h
     components/chat.cpp
     components/chat.h
+    components/chess_board.cpp
+    components/chess_board.h
     components/community_icons.cpp
     components/community_icons.h
     components/console.cpp
@@ -2629,6 +2631,8 @@ if(CLIENT)
     components/menus_settings_tee7.cpp
     components/menus_start.cpp
     components/menus_start.h
+    components/minigames.cpp
+    components/minigames.h
     components/motd.cpp
     components/motd.h
     components/nameplates.cpp
@@ -2659,8 +2663,6 @@ if(CLIENT)
     components/spectator.h
     components/statboard.cpp
     components/statboard.h
-    components/tictactoe.cpp
-    components/tictactoe.h
     components/tooltips.cpp
     components/tooltips.h
     components/touch_controls.cpp

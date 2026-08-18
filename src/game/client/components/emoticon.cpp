@@ -210,7 +210,7 @@ void CEmoticon::OnRender()
 
 void CEmoticon::Emote(int Emoticon)
 {
-	if(GameClient()->m_TicTacToe.QueueManualEmote(Emoticon))
+	if(GameClient()->m_MiniGames.QueueManualEmote(Emoticon))
 		return;
 
 	CNetMsg_Cl_Emoticon Msg;
