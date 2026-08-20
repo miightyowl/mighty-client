@@ -1170,8 +1170,10 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dumm
 		CNetMsg_Sv_Emoticon *pMsg = (CNetMsg_Sv_Emoticon *)pRawMsg;
 
 		// tic tac toe sends its moves as emoticons
-		m_MiniGames.OnEmoticon(pMsg->m_ClientId, pMsg->m_Emoticon);
-		m_MClientDetect.OnEmoticon(pMsg->m_ClientId, pMsg->m_Emoticon);
+		const bool MiniGameEmote = m_MiniGames.OnEmoticon(pMsg->m_ClientId, pMsg->m_Emoticon);
+		const bool DetectEmote = m_MClientDetect.OnEmoticon(pMsg->m_ClientId, pMsg->m_Emoticon);
+		if((MiniGameEmote || DetectEmote) && g_Config.m_ClMClientHideProtocolEmotes)
+			return;
 
 		// apply
 		m_aClients[pMsg->m_ClientId].m_Emoticon = pMsg->m_Emoticon;
