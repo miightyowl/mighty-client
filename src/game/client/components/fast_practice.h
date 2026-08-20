@@ -90,10 +90,8 @@ private:
 
 	bool CanRun() const;
 	void Toggle();
-	bool HasMoved() const;
 	void Start();
 	void Stop();
-	void Reset();
 	void SetCheckpoint();
 	bool Respawn();
 	void Advance(int Ticks);
