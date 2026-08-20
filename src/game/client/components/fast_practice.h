@@ -106,7 +106,7 @@ private:
 		int m_Saved;
 	};
 
-	void NeutraliseOtherTees();
+	void RemoveOtherTees();
 	void HandleTeleports(class CCharacter *pChar);
 	bool IsDead(class CCharacter *pChar) const;
 	void SetRespawn(int ClientId, const CCharacterCore &Core, int TeleCheckpoint, int Tick);

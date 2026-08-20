@@ -224,7 +224,7 @@ bool CFastPractice::Respawn()
 	pChar->ResetInput();
 
 	SetRespawn(m_ClientId, Core, m_CheckpointTele, m_World.GameTick());
-	NeutraliseOtherTees();
+	RemoveOtherTees();
 	SpawnMapEntities();
 
 	m_RenderWorld.CopyWorldClean(&m_World);
@@ -246,7 +246,7 @@ CFastPractice::CScopedPredictEvents::~CScopedPredictEvents()
 	g_Config.m_ClPredictEvents = m_Saved;
 }
 
-void CFastPractice::NeutraliseOtherTees()
+void CFastPractice::RemoveOtherTees()
 {
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
@@ -255,9 +255,8 @@ void CFastPractice::NeutraliseOtherTees()
 		CCharacter *pOther = m_World.GetCharacterById(i);
 		if(pOther == nullptr)
 			continue;
-		pOther->ResetInput();
-		pOther->ResetHook();
 		m_World.ReleaseHooked(i);
+		pOther->Destroy();
 	}
 }
 
