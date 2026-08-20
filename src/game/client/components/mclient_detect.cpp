@@ -24,8 +24,9 @@ namespace
 	const float ECHO_TIMEOUT = 2.0f;
 	const int MAX_ECHO_RETRIES = 4;
 
-	const float ANNOUNCE_DELAY = 0.5f;
-	const float ANNOUNCE_JITTER = 2.0f;
+	const float ANNOUNCE_TIMEOUT = 10.0f;
+	const float ANNOUNCE_COOLDOWN = 30.0f;
+	const float ANNOUNCE_LISTEN = 8.0f;
 	const float REPLY_DELAY = 0.3f;
 	const float REPLY_JITTER = 1.5f;
 
@@ -102,10 +103,10 @@ void CMClientDetect::OnReset()
 	m_EmoteGap = MIN_EMOTE_GAP;
 	m_EmoteRetries = 0;
 
-	m_AnnouncedId = -1;
-	m_aAnnouncedName[0] = '\0';
 	m_AnnouncePending = false;
-	m_AnnounceTime = 0.0f;
+	m_AnnounceDeadline = 0.0f;
+	m_AnnounceCooldown = 0.0f;
+	m_AnnounceListenTime = 0.0f;
 
 	m_ReplyPending = false;
 	m_ReplyTime = 0.0f;
@@ -129,36 +130,40 @@ void CMClientDetect::ForgetLeftPeers()
 	}
 }
 
+void CMClientDetect::Announce()
+{
+	if(!Enabled() || Client()->State() != IClient::STATE_ONLINE)
+		return;
+	if(m_AnnouncePending || LocalTime() < m_AnnounceCooldown)
+		return;
+
+	m_AnnouncePending = true;
+	m_AnnounceDeadline = LocalTime() + ANNOUNCE_TIMEOUT;
+}
+
 void CMClientDetect::UpdateAnnounce()
 {
-	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
-	if(LocalId < 0)
-	{
-		m_AnnouncePending = false;
-		return;
-	}
-
-	const char *pName = GameClient()->m_aClients[LocalId].m_aRealName;
-	if(LocalId == m_AnnouncedId && str_comp(pName, m_aAnnouncedName) == 0)
-	{
-		m_AnnouncePending = false;
-		return;
-	}
-
 	if(!m_AnnouncePending)
+		return;
+
+	if(LocalTime() > m_AnnounceDeadline)
 	{
-		m_AnnouncePending = true;
-		m_AnnounceTime = LocalTime() + ANNOUNCE_DELAY + Jitter(ANNOUNCE_JITTER);
+		m_AnnouncePending = false;
 		return;
 	}
 
-	if(!CanEmote() || LocalTime() < m_AnnounceTime || !m_vEmoteQueue.empty())
+	if(!CanEmote() || !m_vEmoteQueue.empty())
 		return;
 
 	SendBeacon(KIND_ANNOUNCE);
-	m_AnnouncedId = LocalId;
-	str_copy(m_aAnnouncedName, pName);
 	m_AnnouncePending = false;
+	m_AnnounceCooldown = LocalTime() + ANNOUNCE_COOLDOWN;
+	m_AnnounceListenTime = LocalTime() + ANNOUNCE_LISTEN;
+}
+
+bool CMClientDetect::Announcing() const
+{
+	return m_AnnouncePending || LocalTime() < m_AnnounceListenTime;
 }
 
 void CMClientDetect::UpdateReply()
@@ -194,8 +199,8 @@ void CMClientDetect::AbortBeacon(bool Retry)
 
 	if(Retry && m_QueuedKind == KIND_ANNOUNCE)
 	{
-		m_AnnouncedId = -1;
-		m_aAnnouncedName[0] = '\0';
+		m_AnnouncePending = true;
+		m_AnnounceDeadline = LocalTime() + ANNOUNCE_TIMEOUT;
 	}
 	else if(Retry && m_QueuedKind == KIND_REPLY)
 	{
@@ -327,7 +332,7 @@ void CMClientDetect::OnRender()
 {
 	if(!Enabled())
 	{
-		if(m_AnnouncedId >= 0 || m_AnnouncePending || m_ReplyPending || !m_vEmoteQueue.empty() || NumDetected() > 0)
+		if(m_AnnouncePending || m_ReplyPending || !m_vEmoteQueue.empty() || NumDetected() > 0)
 			OnReset();
 		return;
 	}
