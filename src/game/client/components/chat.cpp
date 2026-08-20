@@ -1987,6 +1987,10 @@ void CChat::SendChat(int Team, const char *pLine)
 	if(*str_utf8_skip_whitespaces(pLine) == '\0')
 		return;
 
+	// fast practice runs commands on the practice tee
+	if(GameClient()->m_FastPractice.OnChatCommand(pLine))
+		return;
+
 	// the user types "nameless foe" foe aliases, everyone else should read the real names
 	char aRewritten[1024];
 	if(GameClient()->ReplaceFoeNames(pLine, aRewritten, sizeof(aRewritten)))

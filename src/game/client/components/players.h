@@ -10,6 +10,7 @@
 class CPlayers : public CComponent
 {
 	friend class CGhost;
+	friend class CFastPractice;
 
 	void RenderHand6(const CTeeRenderInfo *pInfo, vec2 HandPos, float HandAngle, float Alpha);
 	void RenderHand7(const CTeeRenderInfo *pInfo, vec2 HandPos, float HandAngle, float Alpha);
