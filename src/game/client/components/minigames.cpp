@@ -837,8 +837,8 @@ void CMiniGames::PlaceShips()
 {
 	for(int Attempt = 0; Attempt < 200; Attempt++)
 	{
-		for(int i = 0; i < 100; i++)
-			m_aMyWaters[i] = '.';
+		for(char &Water : m_aMyWaters)
+			Water = '.';
 
 		bool Complete = true;
 		for(const int Length : g_aShipSizes)
@@ -847,14 +847,14 @@ void CMiniGames::PlaceShips()
 			for(int Try = 0; Try < 500 && !Placed; Try++)
 			{
 				const bool Horizontal = secure_rand_below(2) == 0;
-				const int x = secure_rand_below(Horizontal ? 11 - Length : 10);
-				const int y = secure_rand_below(Horizontal ? 10 : 11 - Length);
+				const int StartX = secure_rand_below(Horizontal ? 11 - Length : 10);
+				const int StartY = secure_rand_below(Horizontal ? 10 : 11 - Length);
 
 				bool Free = true;
 				for(int i = 0; i < Length && Free; i++)
 				{
-					const int Cx = x + (Horizontal ? i : 0);
-					const int Cy = y + (Horizontal ? 0 : i);
+					const int Cx = StartX + (Horizontal ? i : 0);
+					const int Cy = StartY + (Horizontal ? 0 : i);
 					for(int Dy = -1; Dy <= 1 && Free; Dy++)
 					{
 						for(int Dx = -1; Dx <= 1 && Free; Dx++)
@@ -871,7 +871,7 @@ void CMiniGames::PlaceShips()
 					continue;
 
 				for(int i = 0; i < Length; i++)
-					m_aMyWaters[(y + (Horizontal ? 0 : i)) * 10 + x + (Horizontal ? i : 0)] = 'S';
+					m_aMyWaters[(StartY + (Horizontal ? 0 : i)) * 10 + StartX + (Horizontal ? i : 0)] = 'S';
 				Placed = true;
 			}
 

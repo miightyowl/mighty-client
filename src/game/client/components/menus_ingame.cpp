@@ -1679,9 +1679,9 @@ void CMenus::RenderServerControlSavedTeams(CUIRect MainView)
 			CUIRect PlayersCol, MapCol, FinishedCol, CodeCol, DateCol;
 			SplitColumns(Item.m_Rect, &PlayersCol, &MapCol, &FinishedCol, &CodeCol, &DateCol);
 
-			for(size_t p = 0; p < SavedTeam.m_vPlayers.size(); ++p)
+			for(std::string &Player : SavedTeam.m_vPlayers)
 			{
-				const char *pName = SavedTeam.m_vPlayers[p].c_str();
+				const char *pName = Player.c_str();
 				const float ChipWidth = TextRender()->TextWidth(12.0f, pName, -1, -1.0f) + 10.0f;
 				if(ChipWidth > PlayersCol.w)
 				{
@@ -1696,7 +1696,7 @@ void CMenus::RenderServerControlSavedTeams(CUIRect MainView)
 				PlayersCol.VSplitLeft(3.0f, nullptr, &PlayersCol);
 				Chip.HMargin(3.0f, &Chip);
 
-				void *pNameId = &SavedTeam.m_vPlayers[p];
+				void *pNameId = &Player;
 				const bool Filtered = IsFiltered(pName);
 				const bool Hovered = Ui()->HotItem() == pNameId;
 				SLabelProperties NameProps;

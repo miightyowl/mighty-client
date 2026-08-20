@@ -423,9 +423,9 @@ bool CFastPractice::IsDead(CCharacter *pChar) const
 	const float Radius = pChar->GetProximityRadius() / 3.0f;
 	for(int Corner = 0; Corner < 4; Corner++)
 	{
-		const float x = Pos.x + ((Corner & 1) != 0 ? Radius : -Radius);
-		const float y = Pos.y + ((Corner & 2) != 0 ? Radius : -Radius);
-		if(pCollision->GetCollisionAt(x, y) == TILE_DEATH || pCollision->GetFrontCollisionAt(x, y) == TILE_DEATH)
+		const float CornerX = Pos.x + ((Corner & 1) != 0 ? Radius : -Radius);
+		const float CornerY = Pos.y + ((Corner & 2) != 0 ? Radius : -Radius);
+		if(pCollision->GetCollisionAt(CornerX, CornerY) == TILE_DEATH || pCollision->GetFrontCollisionAt(CornerX, CornerY) == TILE_DEATH)
 			return true;
 	}
 
