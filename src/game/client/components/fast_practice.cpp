@@ -81,23 +81,12 @@ bool CFastPractice::CanRun() const
 	return GameClient()->m_PredictedWorld.GetCharacterById(ClientId) != nullptr;
 }
 
-bool CFastPractice::HasMoved() const
-{
-	return distance(m_Core.m_Pos, m_CheckpointCore.m_Pos) > 16.0f;
-}
-
 void CFastPractice::Toggle()
 {
-	if(!m_Active)
-	{
-		Start();
-		return;
-	}
-
-	if(HasMoved())
-		Reset();
-	else
+	if(m_Active)
 		Stop();
+	else
+		Start();
 }
 
 void CFastPractice::Start()
@@ -168,14 +157,6 @@ void CFastPractice::Stop()
 		}
 	}
 	m_ClientId = -1;
-}
-
-void CFastPractice::Reset()
-{
-	if(!m_Active)
-		return;
-
-	Respawn();
 }
 
 void CFastPractice::SetCheckpoint()
