@@ -720,7 +720,7 @@ void CHud::RenderFrozenHud()
 				if(Frozen)
 					RenderTools()->RenderTee(pIdleState, &TeeInfo, EMOTE_PAIN, vec2(1.0f, 0.0f), TeeRenderPos, Alpha);
 				else
-					RenderTools()->RenderTee(pIdleState, &TeeInfo, CurChar.m_Emote, vec2(1.0f, 0.0f), TeeRenderPos);
+					RenderTools()->RenderTee(pIdleState, &TeeInfo, GameClient()->VisibleEmote(i, CurChar.m_Emote), vec2(1.0f, 0.0f), TeeRenderPos);
 				ProgressiveOffset += TeeSize;
 			}
 		}

@@ -1173,7 +1173,10 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dumm
 		const bool MiniGameEmote = m_MiniGames.OnEmoticon(pMsg->m_ClientId, pMsg->m_Emoticon);
 		const bool DetectEmote = m_MClientDetect.OnEmoticon(pMsg->m_ClientId, pMsg->m_Emoticon);
 		if((MiniGameEmote || DetectEmote) && g_Config.m_ClMClientHideProtocolEmotes)
+		{
+			HideEmote(pMsg->m_ClientId, pMsg->m_Emoticon, Conn);
 			return;
+		}
 
 		// apply
 		m_aClients[pMsg->m_ClientId].m_Emoticon = pMsg->m_Emoticon;
@@ -3168,6 +3171,9 @@ void CGameClient::CClientData::Reset()
 	m_Emoticon = 0;
 	m_EmoticonStartFraction = 0;
 	m_EmoticonStartTick = -1;
+	m_HiddenEmote = EMOTE_NORMAL;
+	m_ShownEmote = EMOTE_NORMAL;
+	m_HiddenEmoteStopTick = -1;
 
 	m_Solo = false;
 	m_Jetpack = false;
@@ -4402,6 +4408,63 @@ bool CGameClient::IsHoldingFire(int ClientId) const
 		}
 	}
 	return (Fire & 1) != 0;
+}
+
+static int EmoticonEmote(int Emoticon)
+{
+	switch(Emoticon)
+	{
+	case EMOTICON_EXCLAMATION:
+	case EMOTICON_GHOST:
+	case EMOTICON_QUESTION:
+	case EMOTICON_WTF:
+		return EMOTE_SURPRISE;
+	case EMOTICON_DOTDOT:
+	case EMOTICON_DROP:
+	case EMOTICON_ZZZ:
+		return EMOTE_BLINK;
+	case EMOTICON_EYES:
+	case EMOTICON_HEARTS:
+	case EMOTICON_MUSIC:
+		return EMOTE_HAPPY;
+	case EMOTICON_OOP:
+	case EMOTICON_SORRY:
+	case EMOTICON_SUSHI:
+		return EMOTE_PAIN;
+	case EMOTICON_DEVILTEE:
+	case EMOTICON_SPLATTEE:
+	case EMOTICON_ZOMG:
+		return EMOTE_ANGRY;
+	default:
+		return EMOTE_NORMAL;
+	}
+}
+
+void CGameClient::HideEmote(int ClientId, int Emoticon, int Conn)
+{
+	if(!in_range(ClientId, 0, MAX_CLIENTS - 1))
+		return;
+
+	CClientData &Data = m_aClients[ClientId];
+	const int GameTick = Client()->GameTick(Conn);
+	if(GameTick > Data.m_HiddenEmoteStopTick)
+	{
+		const CSnapState::CCharacterInfo &Character = m_Snap.m_aCharacters[ClientId];
+		Data.m_ShownEmote = Character.m_Active ? Character.m_Prev.m_Emote : EMOTE_NORMAL;
+	}
+	Data.m_HiddenEmote = EmoticonEmote(Emoticon);
+	Data.m_HiddenEmoteStopTick = GameTick + 5 * Client()->GameTickSpeed() / 2;
+}
+
+int CGameClient::VisibleEmote(int ClientId, int Emote) const
+{
+	if(!g_Config.m_ClMClientHideProtocolEmotes || !in_range(ClientId, 0, MAX_CLIENTS - 1))
+		return Emote;
+
+	const CClientData &Data = m_aClients[ClientId];
+	if(Client()->GameTick(g_Config.m_ClDummy) > Data.m_HiddenEmoteStopTick || Emote != Data.m_HiddenEmote)
+		return Emote;
+	return Data.m_ShownEmote;
 }
 
 bool CGameClient::IsOtherTeam(int ClientId) const

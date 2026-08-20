@@ -496,6 +496,9 @@ public:
 		int m_Emoticon;
 		float m_EmoticonStartFraction;
 		int m_EmoticonStartTick;
+		int m_HiddenEmote;
+		int m_ShownEmote;
+		int m_HiddenEmoteStopTick;
 
 		bool m_Solo;
 		bool m_Jetpack;
@@ -773,6 +776,8 @@ public:
 	bool MaskFoeNames(const char *pText, char *pBuffer, int BufferSize);
 	bool IsOtherTeam(int ClientId) const;
 	bool IsHoldingFire(int ClientId) const;
+	void HideEmote(int ClientId, int Emoticon, int Conn);
+	int VisibleEmote(int ClientId, int Emote) const;
 	int SwitchStateTeam() const;
 	bool IsLocalCharSuper() const;
 	bool CanDisplayWarning() const override;
