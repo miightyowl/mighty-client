@@ -28,9 +28,9 @@
 #include <game/voting.h>
 
 #include <chrono>
-#include <string>
 #include <initializer_list>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -282,8 +282,10 @@ protected:
 	{
 		CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL = -2,
 		CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_SELECTED = -3,
+		CALLVOTE_OPTION_NONE = -4,
 	};
 	int m_CallvoteSelectedOption;
+	bool m_CallvoteSelectedRemaining = false;
 	int m_CallvoteSelectedPlayer;
 	CLineInputBuffered<VOTE_REASON_LENGTH> m_CallvoteReasonInput;
 	CLineInputBuffered<64> m_FilterInput;

@@ -952,8 +952,12 @@ bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 {
 	const bool DDNetCommunity = str_comp(Client()->ServerInfo().m_aCommunityId, IServerBrowser::COMMUNITY_DDNET) == 0;
 
+	CUnfinishedMapVote &UnfinishedVote = GameClient()->m_UnfinishedMapVote;
 	if(DDNetCommunity)
+	{
 		RenderUnfinishedVoteTeeSelection(&MainView);
+		UnfinishedVote.UpdateRemainingMaps();
+	}
 
 	static const char *s_apClientOptionLabels[] = {
 		"Random Map Unfinished by All Players in Server (Reason=Stars)",
@@ -976,11 +980,42 @@ bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 			InsertClientOptionsAfter = i;
 	}
 
+	const std::vector<CUnfinishedMapVote::SRemainingMap> &vRemainingMaps = UnfinishedVote.RemainingMaps();
+	const bool RemainingLoading = DDNetCommunity && UnfinishedVote.RemainingMapsLoading();
+	std::vector<const CUnfinishedMapVote::SRemainingMap *> vpShownRemaining;
+	if(DDNetCommunity && !RemainingLoading)
+	{
+		for(const CUnfinishedMapVote::SRemainingMap &Map : vRemainingMaps)
+		{
+			if(m_FilterInput.IsEmpty() || str_utf8_find_nocase(Map.m_Description.c_str(), m_FilterInput.GetString()) != nullptr)
+				vpShownRemaining.push_back(&Map);
+		}
+	}
+	const bool RemainingEmpty = DDNetCommunity && !RemainingLoading && UnfinishedVote.RemainingMapsKnown() && vRemainingMaps.empty() && m_FilterInput.IsEmpty();
+	const bool ShowRemaining = DDNetCommunity && (RemainingLoading || RemainingEmpty || !vpShownRemaining.empty());
+	const bool RemainingNote = RemainingLoading || RemainingEmpty;
+	const int NumRemainingRows = ShowRemaining ? 1 + (RemainingNote ? 1 : (int)vpShownRemaining.size()) : 0;
+
+	int SkipBlankOption = -1;
+	if(ShowRemaining)
+	{
+		int Index = 0;
+		for(const CVoteOptionClient *pOption = GameClient()->m_Voting.FirstOption(); pOption; pOption = pOption->m_pNext, Index++)
+		{
+			if(Index <= InsertClientOptionsAfter)
+				continue;
+			if(str_skip_whitespaces_const(pOption->m_aDescription)[0] == '\0')
+				SkipBlankOption = Index;
+			break;
+		}
+	}
+
 	CUIRect List = MainView;
 	int NumVoteOptions = 0;
-	int aIndices[MAX_VOTE_OPTIONS + NumClientOptions];
+	int aIndices[2 * MAX_VOTE_OPTIONS + NumClientOptions + 2];
 	int Selected = -1;
 	int TotalShown = 0;
+	int RemainingFirstRow = -1;
 
 	auto CountClientOptions = [&]() {
 		for(int Option = 0; Option < NumClientOptions; Option++)
@@ -988,6 +1023,22 @@ bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 			if(!aShowClientOption[Option])
 				continue;
 			if(m_CallvoteSelectedOption == s_aClientOptionIds[Option])
+				Selected = TotalShown;
+			TotalShown++;
+		}
+
+		if(!ShowRemaining)
+			return;
+		RemainingFirstRow = TotalShown;
+		TotalShown++;
+		if(RemainingNote)
+		{
+			TotalShown++;
+			return;
+		}
+		for(const CUnfinishedMapVote::SRemainingMap *pMap : vpShownRemaining)
+		{
+			if(m_CallvoteSelectedRemaining && pMap->m_OptionIndex == m_CallvoteSelectedOption)
 				Selected = TotalShown;
 			TotalShown++;
 		}
@@ -1002,9 +1053,11 @@ bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 			CountClientOptions();
 			ClientOptionsCounted = true;
 		}
+		if(i == SkipBlankOption)
+			continue;
 		if(!m_FilterInput.IsEmpty() && !str_utf8_find_nocase(pOption->m_aDescription, m_FilterInput.GetString()))
 			continue;
-		if(i == m_CallvoteSelectedOption)
+		if(i == m_CallvoteSelectedOption && !m_CallvoteSelectedRemaining)
 			Selected = TotalShown;
 		TotalShown++;
 	}
@@ -1030,6 +1083,71 @@ bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 				Ui()->DoLabel(&Label, s_apClientOptionLabels[Option], 13.0f, TEXTALIGN_ML);
 			}
 		}
+
+		if(!ShowRemaining)
+			return;
+
+		s_ListBox.DoSpacing(19.0f);
+
+		char aHeader[64];
+		if(RemainingNote)
+			str_copy(aHeader, Localize("—— SELECTED MAPS ——"));
+		else
+			str_format(aHeader, sizeof(aHeader), Localize("—— SELECTED MAPS (%d) ——"), (int)vpShownRemaining.size());
+
+		static char s_RemainingHeaderId;
+		aIndices[NumVoteOptions] = CALLVOTE_OPTION_NONE;
+		NumVoteOptions++;
+		const CListboxItem Header = s_ListBox.DoNextItem(&s_RemainingHeaderId);
+		if(Header.m_Visible)
+		{
+			CUIRect Label;
+			Header.m_Rect.VMargin(2.0f, &Label);
+			Ui()->DoLabel(&Label, aHeader, 13.0f, TEXTALIGN_ML);
+		}
+
+		if(RemainingNote)
+		{
+			static char s_RemainingNoteId;
+			aIndices[NumVoteOptions] = CALLVOTE_OPTION_NONE;
+			NumVoteOptions++;
+			const CListboxItem Note = s_ListBox.DoNextItem(&s_RemainingNoteId);
+			if(Note.m_Visible)
+			{
+				CUIRect Label;
+				Note.m_Rect.VMargin(2.0f, &Label);
+				Ui()->DoLabel(&Label, RemainingLoading ? Localize("Loading the stats of the selected players...") : Localize("The selected players have finished every map of the vote list."), 13.0f, TEXTALIGN_ML);
+			}
+		}
+		else
+		{
+			for(const CUnfinishedMapVote::SRemainingMap *pMap : vpShownRemaining)
+			{
+				aIndices[NumVoteOptions] = pMap->m_OptionIndex;
+				NumVoteOptions++;
+
+				const CListboxItem Item = s_ListBox.DoNextItem(pMap);
+				if(!Item.m_Visible)
+					continue;
+
+				CUIRect Label;
+				Item.m_Rect.VMargin(2.0f, &Label);
+
+				SLabelProperties Props;
+				Props.m_MaxWidth = Label.w;
+				Props.m_EllipsisAtEnd = true;
+				Ui()->DoLabel(&Label, pMap->m_Description.c_str(), 13.0f, TEXTALIGN_ML, Props);
+
+				if(!pMap->m_Info.empty())
+				{
+					CUIRect Info;
+					Label.VSplitLeft(std::min(TextRender()->TextWidth(13.0f, pMap->m_Description.c_str()) + 12.0f, Label.w), nullptr, &Info);
+					TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.5f);
+					Ui()->DoLabel(&Info, pMap->m_Info.c_str(), 13.0f, TEXTALIGN_ML);
+					TextRender()->TextColor(TextRender()->DefaultTextColor());
+				}
+			}
+		}
 	};
 
 	i = 0;
@@ -1041,6 +1159,8 @@ bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 			RenderClientOptions();
 			ClientOptionsRendered = true;
 		}
+		if(i == SkipBlankOption)
+			continue;
 		if(!m_FilterInput.IsEmpty() && !str_utf8_find_nocase(pOption->m_aDescription, m_FilterInput.GetString()))
 			continue;
 		aIndices[NumVoteOptions] = i;
@@ -1061,6 +1181,7 @@ bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 	if(UpdateScroll)
 		s_ListBox.ScrollToSelected();
 	m_CallvoteSelectedOption = Selected != -1 ? aIndices[Selected] : -1;
+	m_CallvoteSelectedRemaining = Selected != -1 && RemainingFirstRow != -1 && Selected >= RemainingFirstRow && Selected < RemainingFirstRow + NumRemainingRows;
 	return s_ListBox.WasItemActivated();
 }
 
