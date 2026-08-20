@@ -56,6 +56,7 @@
 #include "components/key_binder.h"
 #include "components/local_server.h"
 #include "components/maodie_walk.h"
+#include "components/map_details.h"
 #include "components/mapimages.h"
 #include "components/maplayers.h"
 #include "components/mapsounds.h"
@@ -188,6 +189,7 @@ public:
 	CVoting m_Voting;
 	CUnfinishedMapVote m_UnfinishedMapVote;
 	CFinishRename m_FinishRename;
+	CMapDetails m_MapDetails;
 	CSpectator m_Spectator;
 
 	CPlayers m_Players;

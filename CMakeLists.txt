@@ -2602,6 +2602,8 @@ if(CLIENT)
     components/local_server.h
     components/maodie_walk.cpp
     components/maodie_walk.h
+    components/map_details.cpp
+    components/map_details.h
     components/mapimages.cpp
     components/mapimages.h
     components/maplayers.cpp

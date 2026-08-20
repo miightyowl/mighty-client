@@ -211,15 +211,43 @@ void CScoreboard::RenderTitle(CUIRect TitleLabel, int Team, const char *pTitle, 
 	Ui()->DoLabel(&TitleLabel, pTitle, TitleFontSize, Team == TEAM_RED ? TEXTALIGN_ML : TEXTALIGN_MR, Props);
 }
 
+void CScoreboard::RenderTitleStars(CUIRect StarsLabel)
+{
+	const int Stars = GameClient()->m_MapDetails.Stars();
+	if(Stars < 0 || StarsLabel.w <= 0.0f)
+		return;
+
+	char aStars[64] = "";
+	for(int i = 0; i < MAX_MAP_STARS; i++)
+		str_append(aStars, i < Stars ? "★" : "✰");
+
+	StarsLabel.VSplitLeft(6.0f, nullptr, &StarsLabel);
+	SLabelProperties Props;
+	Props.m_MaxWidth = StarsLabel.w;
+	Props.m_EllipsisAtEnd = true;
+	Ui()->DoLabel(&StarsLabel, aStars, 15.0f, TEXTALIGN_ML, Props);
+}
+
 void CScoreboard::RenderTitleScore(CUIRect ScoreLabel, int Team, float TitleFontSize)
 {
-	// map best
+	// map time
 	char aScore[128] = "";
 	const CNetObj_GameInfo *pGameInfoObj = GameClient()->m_Snap.m_pGameInfoObj;
 	const bool TimeScore = GameClient()->m_GameInfo.m_TimeScore;
 	const bool Race7 = Client()->IsSixup() && pGameInfoObj && pGameInfoObj->m_GameFlags & protocol7::GAMEFLAG_RACE;
 	if(GameClient()->m_ReceivedDDNetPlayerFinishTimes || TimeScore || Race7)
 	{
+		if(GameClient()->m_MapDetails.HasMedianTime())
+		{
+			Ui()->RenderTime(ScoreLabel,
+				TitleFontSize,
+				GameClient()->m_MapDetails.MedianTimeSeconds(),
+				false,
+				-1,
+				false,
+				m_TitleScore, m_TitleScoreMillis, TextRender()->DefaultTextColor());
+			return;
+		}
 		if(GameClient()->m_MapBestTimeSeconds != FinishTime::UNSET)
 		{
 			Ui()->RenderTime(ScoreLabel,
@@ -270,12 +298,12 @@ void CScoreboard::RenderTitleBar(CUIRect TitleBar, int Team, const char *pTitle)
 	const float TitleTextWidth = TextRender()->TextWidth(TitleFontSize, pTitle);
 
 	TitleBar.VMargin(MARGIN, &TitleBar);
-	CUIRect TitleLabel, ScoreLabel;
+	CUIRect TitleLabel, ScoreLabel, StarsLabel = {0.0f, 0.0f, 0.0f, 0.0f};
 	if(Team == TEAM_RED)
 	{
 		TitleBar.VSplitRight(ScoreTextWidth, &TitleLabel, &ScoreLabel);
 		TitleLabel.VSplitRight(5.0f, &TitleLabel, nullptr);
-		TitleLabel.VSplitLeft(std::min(TitleTextWidth + 2.0f, TitleLabel.w), &TitleLabel, nullptr);
+		TitleLabel.VSplitLeft(std::min(TitleTextWidth + 2.0f, TitleLabel.w), &TitleLabel, &StarsLabel);
 	}
 	else
 	{
@@ -285,6 +313,8 @@ void CScoreboard::RenderTitleBar(CUIRect TitleBar, int Team, const char *pTitle)
 	}
 
 	RenderTitle(TitleLabel, Team, pTitle, TitleFontSize);
+	if(!GameClient()->IsTeamPlay() && str_comp(pTitle, GameClient()->Map()->BaseName()) == 0)
+		RenderTitleStars(StarsLabel);
 	RenderTitleScore(ScoreLabel, Team, TitleFontSize);
 }
 
