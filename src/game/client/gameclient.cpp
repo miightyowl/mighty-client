@@ -173,6 +173,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Ads,
 					      &m_MaodieWalk,
 					      &m_MiniGames,
+					      &m_MClientDetect,
 					      &m_SaveNotice,
 					      &m_Menus,
 					      &m_Tooltips,
@@ -1170,6 +1171,7 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dumm
 
 		// tic tac toe sends its moves as emoticons
 		m_MiniGames.OnEmoticon(pMsg->m_ClientId, pMsg->m_Emoticon);
+		m_MClientDetect.OnEmoticon(pMsg->m_ClientId, pMsg->m_Emoticon);
 
 		// apply
 		m_aClients[pMsg->m_ClientId].m_Emoticon = pMsg->m_Emoticon;
@@ -2367,6 +2369,9 @@ void CGameClient::OnNewSnapshot(bool DummySwapped)
 
 	float ShowDistanceZoom = m_Camera.m_Zoom;
 	float Zoom = m_Camera.m_Zoom;
+
+	if(m_MClientDetect.Enabled() || m_MiniGames.WantsDistantEmotes())
+		ShowDistanceZoom = std::max(ShowDistanceZoom, 6.0f);
 	if(m_Camera.m_Zooming)
 	{
 		if(m_Camera.m_ZoomSmoothingTarget > m_Camera.m_Zoom) // Zooming out
