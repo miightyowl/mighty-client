@@ -882,6 +882,8 @@ void CPlayers::RenderPlayer(
 		}
 	}
 
+	const int Emote = GameClient()->VisibleEmote(ClientId, Player.m_Emote);
+
 	// render the "shadow" tee
 	if(g_Config.m_ClUnpredictedShadow == 3 || (Local && g_Config.m_ClUnpredictedShadow == 1) || (!Local && g_Config.m_ClUnpredictedShadow == 2))
 	{
@@ -892,10 +894,10 @@ void CPlayers::RenderPlayer(
 				vec2(GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_Y),
 				Client()->IntraGameTick(g_Config.m_ClDummy));
 
-		RenderTools()->RenderTee(&State, &RenderInfo, Player.m_Emote, Direction, ShadowPosition, g_Config.m_ClUnpredictedShadowAlpha / 100.f); // render ghost
+		RenderTools()->RenderTee(&State, &RenderInfo, Emote, Direction, ShadowPosition, g_Config.m_ClUnpredictedShadowAlpha / 100.f); // render ghost
 	}
 
-	RenderTools()->RenderTee(&State, &RenderInfo, Player.m_Emote, Direction, Position, Alpha);
+	RenderTools()->RenderTee(&State, &RenderInfo, Emote, Direction, Position, Alpha);
 
 	float TeeAnimScale, TeeBaseSize;
 	CRenderTools::GetRenderTeeAnimScaleAndBaseSize(&RenderInfo, TeeAnimScale, TeeBaseSize);
