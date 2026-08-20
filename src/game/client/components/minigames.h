@@ -44,8 +44,6 @@ public:
 
 	bool EmoteChannelBusy() const { return !m_vEmoteQueue.empty(); }
 
-	bool WantsDistantEmotes() const { return m_State != STATE_IDLE && m_State != STATE_GAMES; }
-
 private:
 	enum EState
 	{

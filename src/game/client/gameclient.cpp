@@ -2376,8 +2376,6 @@ void CGameClient::OnNewSnapshot(bool DummySwapped)
 	float ShowDistanceZoom = m_Camera.m_Zoom;
 	float Zoom = m_Camera.m_Zoom;
 
-	if(m_MClientDetect.Enabled() || m_MiniGames.WantsDistantEmotes())
-		ShowDistanceZoom = std::max(ShowDistanceZoom, 6.0f);
 	if(m_Camera.m_Zooming)
 	{
 		if(m_Camera.m_ZoomSmoothingTarget > m_Camera.m_Zoom) // Zooming out
