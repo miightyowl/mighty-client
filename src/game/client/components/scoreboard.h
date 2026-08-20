@@ -24,6 +24,7 @@ class CScoreboard : public CComponent
 
 	void RenderTitleScore(CUIRect ScoreLabel, int Team, float TitleFontSize);
 	void RenderTitle(CUIRect TitleLabel, int Team, const char *pTitle, float TitleFontSize);
+	void RenderTitleStars(CUIRect StarsLabel);
 	void RenderTitleBar(CUIRect TitleBar, int Team, const char *pTitle);
 	void RenderGoals(CUIRect Goals);
 	void RenderSpectators(CUIRect Spectators);
