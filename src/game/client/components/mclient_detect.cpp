@@ -245,10 +245,10 @@ void CMClientDetect::FlushEmoteQueue()
 	m_NextEmoteTime = LocalTime() + m_EmoteGap;
 }
 
-void CMClientDetect::HandleEcho(int Emoticon)
+bool CMClientDetect::HandleEcho(int Emoticon)
 {
 	if(!m_EmoteWaiting || m_vEmoteQueue.empty() || m_vEmoteQueue.front() != Emoticon)
-		return;
+		return false;
 
 	m_vEmoteQueue.erase(m_vEmoteQueue.begin());
 	if(m_vEmoteQueue.empty())
@@ -256,35 +256,43 @@ void CMClientDetect::HandleEcho(int Emoticon)
 	m_EmoteWaiting = false;
 	m_EmoteTime = 0.0f;
 	m_EmoteRetries = 0;
+	return true;
 }
 
-void CMClientDetect::Decode(int ClientId, int Emoticon)
+bool CMClientDetect::Decode(int ClientId, int Emoticon)
 {
 	CPeer &Peer = m_aPeers[ClientId];
 
 	if(Emoticon == BEACON_OP)
 	{
 		Peer.m_Step = 1;
-		return;
+		return false;
 	}
 
 	switch(Peer.m_Step)
 	{
 	case 1:
-		Peer.m_Step = Emoticon == BEACON_MAGIC ? 2 : 0;
-		break;
+		if(Emoticon != BEACON_MAGIC)
+		{
+			Peer.m_Step = 0;
+			return false;
+		}
+		Peer.m_Step = 2;
+		if(g_Config.m_ClMClientHideProtocolEmotes)
+			GameClient()->m_aClients[ClientId].m_EmoticonStartTick = -1;
+		return true;
 	case 2:
 		Peer.m_Kind = Emoticon;
 		Peer.m_Step = Emoticon >= 0 && Emoticon < NUM_KINDS ? 3 : 0;
-		break;
+		return true;
 	case 3:
 		if(Emoticon == BeaconCheck(Peer.m_Kind))
 			OnBeacon(ClientId, Peer.m_Kind);
 		Peer.m_Step = 0;
-		break;
+		return true;
 	default:
 		Peer.m_Step = 0;
-		break;
+		return false;
 	}
 }
 
@@ -303,17 +311,16 @@ void CMClientDetect::OnBeacon(int ClientId, int Kind)
 	m_ReplyTime = LocalTime() + REPLY_DELAY + Jitter(REPLY_JITTER);
 }
 
-void CMClientDetect::OnEmoticon(int ClientId, int Emoticon)
+bool CMClientDetect::OnEmoticon(int ClientId, int Emoticon)
 {
 	if(!Enabled() || ClientId < 0 || ClientId >= MAX_CLIENTS)
-		return;
+		return false;
 	if(Emoticon < 0 || Emoticon >= NUM_EMOTICONS)
-		return;
+		return false;
 
 	if(IsLocal(ClientId))
-		HandleEcho(Emoticon);
-	else
-		Decode(ClientId, Emoticon);
+		return HandleEcho(Emoticon);
+	return Decode(ClientId, Emoticon);
 }
 
 void CMClientDetect::OnRender()

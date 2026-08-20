@@ -548,13 +548,13 @@ void CMiniGames::ResetEmoteChannel()
 void CMiniGames::SendFrame(int Op, const int *pDigits, int NumDigits)
 {
 	int Check = Op;
-	m_vEmoteQueue.push_back(Op);
+	m_vEmoteQueue.push_back({Op, true});
 	for(int i = 0; i < NumDigits; i++)
 	{
-		m_vEmoteQueue.push_back(pDigits[i]);
+		m_vEmoteQueue.push_back({pDigits[i], true});
 		Check += pDigits[i];
 	}
-	m_vEmoteQueue.push_back(Check % EMOTE_RADIX);
+	m_vEmoteQueue.push_back({Check % EMOTE_RADIX, true});
 }
 
 void CMiniGames::SendMoveAck(int Cell)
@@ -632,7 +632,7 @@ void CMiniGames::FlushEmoteQueue()
 	}
 
 	CNetMsg_Cl_Emoticon Msg;
-	Msg.m_Emoticon = m_vEmoteQueue.front();
+	Msg.m_Emoticon = m_vEmoteQueue.front().m_Emoticon;
 	Client()->SendPackMsgActive(&Msg, MSGFLAG_VITAL);
 	m_EmoteWaiting = true;
 	m_EmoteTime = LocalTime();
@@ -643,37 +643,39 @@ bool CMiniGames::QueueManualEmote(int Emoticon)
 	if(m_vEmoteQueue.empty())
 		return false;
 
-	m_vEmoteQueue.push_back(Emoticon);
+	m_vEmoteQueue.push_back({Emoticon, false});
 	return true;
 }
 
-void CMiniGames::HandleEmoteEcho(int Emoticon)
+bool CMiniGames::HandleEmoteEcho(int Emoticon)
 {
-	if(!m_EmoteWaiting || m_vEmoteQueue.empty() || m_vEmoteQueue.front() != Emoticon)
-		return;
+	if(!m_EmoteWaiting || m_vEmoteQueue.empty() || m_vEmoteQueue.front().m_Emoticon != Emoticon)
+		return false;
 
+	const bool Protocol = m_vEmoteQueue.front().m_Protocol;
 	m_vEmoteQueue.erase(m_vEmoteQueue.begin());
 	m_EmoteWaiting = false;
 	m_EmoteTime = 0.0f;
 	m_EmoteRetries = 0;
+	return Protocol;
 }
 
-void CMiniGames::HandleEmoteFrame(int Emoticon)
+bool CMiniGames::HandleEmoteFrame(int Emoticon)
 {
 	if(Emoticon >= EMOTE_RADIX)
 	{
 		m_FrameExpect = FramePayload(Emoticon, m_Game);
 		m_FrameOp = m_FrameExpect < 0 ? -1 : Emoticon;
 		m_FrameLen = 0;
-		return;
+		return m_FrameOp >= 0;
 	}
 
 	if(m_FrameOp < 0)
-		return;
+		return false;
 
 	m_aFrame[m_FrameLen++] = Emoticon;
 	if(m_FrameLen <= m_FrameExpect)
-		return;
+		return true;
 
 	int Check = m_FrameOp;
 	for(int i = 0; i < m_FrameExpect; i++)
@@ -681,6 +683,7 @@ void CMiniGames::HandleEmoteFrame(int Emoticon)
 	if(Check % EMOTE_RADIX == m_aFrame[m_FrameExpect])
 		ProcessFrame();
 	m_FrameOp = -1;
+	return true;
 }
 
 void CMiniGames::ProcessFrame()
@@ -752,15 +755,16 @@ void CMiniGames::ProcessFrame()
 	SendMoveAck(-1);
 }
 
-void CMiniGames::OnEmoticon(int ClientId, int Emoticon)
+bool CMiniGames::OnEmoticon(int ClientId, int Emoticon)
 {
 	if(Emoticon < 0 || Emoticon >= NUM_EMOTICONS)
-		return;
+		return false;
 
 	if(ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1])
-		HandleEmoteEcho(Emoticon);
-	else if(ClientId == m_OpponentId && (m_State == STATE_PLAYING || m_State == STATE_OVER))
-		HandleEmoteFrame(Emoticon);
+		return HandleEmoteEcho(Emoticon);
+	if(ClientId == m_OpponentId && (m_State == STATE_PLAYING || m_State == STATE_OVER))
+		return HandleEmoteFrame(Emoticon);
+	return false;
 }
 
 void CMiniGames::PlayCell(int Cell)

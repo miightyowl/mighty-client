@@ -95,6 +95,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientSaveNoticeHideCode, Localize("Map Saves: Hide names and password when entering a new map"), &g_Config.m_ClMClientSaveNoticeHideCode, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMiniGames, Localize("Mini Game: Let other players invite you to games"), &g_Config.m_ClMClientMiniGames, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMiniGamesHold, Localize("Mini Game: Make the game key holdable"), &g_Config.m_ClMClientMiniGamesHold, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientHideProtocolEmotes, Localize("Hide emoticons that appear during communication"), &g_Config.m_ClMClientHideProtocolEmotes, &LeftView, LineSize);
 
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFastInput, Localize("Fast input (lower input delay)"), &g_Config.m_ClMClientFastInput, &LeftView, LineSize);
 		if(g_Config.m_ClMClientFastInput)

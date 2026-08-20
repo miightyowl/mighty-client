@@ -16,7 +16,7 @@ public:
 	void OnStateChange(int NewState, int OldState) override;
 	void OnRender() override;
 
-	void OnEmoticon(int ClientId, int Emoticon);
+	bool OnEmoticon(int ClientId, int Emoticon);
 
 	bool Enabled() const;
 	bool IsMClient(int ClientId) const;
@@ -68,8 +68,8 @@ private:
 	void SendBeacon(int Kind);
 	void AbortBeacon(bool Retry);
 	void FlushEmoteQueue();
-	void HandleEcho(int Emoticon);
-	void Decode(int ClientId, int Emoticon);
+	bool HandleEcho(int Emoticon);
+	bool Decode(int ClientId, int Emoticon);
 	void OnBeacon(int ClientId, int Kind);
 };
 

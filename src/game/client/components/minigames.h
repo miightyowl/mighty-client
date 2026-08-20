@@ -38,7 +38,7 @@ public:
 
 	void OnChatMessage(int ClientId, const char *pMessage);
 
-	void OnEmoticon(int ClientId, int Emoticon);
+	bool OnEmoticon(int ClientId, int Emoticon);
 
 	bool QueueManualEmote(int Emoticon);
 
@@ -111,7 +111,13 @@ private:
 	int m_RetryCount = 0;
 	int m_RetryMax = 0;
 
-	std::vector<int> m_vEmoteQueue;
+	struct CQueuedEmote
+	{
+		int m_Emoticon;
+		bool m_Protocol;
+	};
+
+	std::vector<CQueuedEmote> m_vEmoteQueue;
 	bool m_EmoteWaiting = false;
 	float m_EmoteTime = 0.0f;
 	int m_EmoteRetries = 0;
@@ -160,8 +166,8 @@ private:
 	void UpdateMoveRetry();
 	void ClearMoveRetry();
 	void ResetEmoteChannel();
-	void HandleEmoteEcho(int Emoticon);
-	void HandleEmoteFrame(int Emoticon);
+	bool HandleEmoteEcho(int Emoticon);
+	bool HandleEmoteFrame(int Emoticon);
 	void ProcessFrame();
 	void PlayCell(int Cell);
 	void ChessClick(int Square);
