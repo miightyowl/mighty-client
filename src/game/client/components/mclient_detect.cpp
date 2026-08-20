@@ -27,6 +27,7 @@ namespace
 	const float ANNOUNCE_TIMEOUT = 10.0f;
 	const float ANNOUNCE_COOLDOWN = 30.0f;
 	const float ANNOUNCE_LISTEN = 8.0f;
+	const float BEACON_ROUND = 10.0f;
 	const float REPLY_DELAY = 0.3f;
 	const float REPLY_JITTER = 1.5f;
 
@@ -78,10 +79,7 @@ bool CMClientDetect::CanEmote() const
 
 void CMClientDetect::ClearPeer(int ClientId)
 {
-	m_aPeers[ClientId].m_Detected = false;
-	m_aPeers[ClientId].m_aName[0] = '\0';
-	m_aPeers[ClientId].m_Step = 0;
-	m_aPeers[ClientId].m_Kind = 0;
+	m_aPeers[ClientId] = CPeer{};
 }
 
 void CMClientDetect::ClearPeers()
@@ -110,6 +108,9 @@ void CMClientDetect::OnReset()
 
 	m_ReplyPending = false;
 	m_ReplyTime = 0.0f;
+
+	m_aLocalName[0] = '\0';
+	m_BeaconHeardUntil = 0.0f;
 }
 
 void CMClientDetect::OnStateChange(int NewState, int OldState)
@@ -125,8 +126,64 @@ void CMClientDetect::ForgetLeftPeers()
 		const CGameClient::CClientData &Client = GameClient()->m_aClients[ClientId];
 		if(!Client.m_Active)
 			ClearPeer(ClientId);
-		else if(m_aPeers[ClientId].m_Detected && str_comp(Client.m_aRealName, m_aPeers[ClientId].m_aName) != 0)
+		else if(m_aPeers[ClientId].m_aName[0] != '\0' && str_comp(Client.m_aRealName, m_aPeers[ClientId].m_aName) != 0)
 			ClearPeer(ClientId);
+	}
+}
+
+void CMClientDetect::ForgetOnRename()
+{
+	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
+	const char *pName = LocalId < 0 ? "" : GameClient()->m_aClients[LocalId].m_aRealName;
+	if(str_comp(pName, m_aLocalName) == 0)
+		return;
+
+	str_copy(m_aLocalName, pName);
+	m_BeaconHeardUntil = 0.0f;
+	for(CPeer &Peer : m_aPeers)
+	{
+		Peer.m_Answering = false;
+		Peer.m_Answered = false;
+	}
+}
+
+bool CMClientDetect::AnswerOwed() const
+{
+	return std::any_of(std::begin(m_aPeers), std::end(m_aPeers), [](const CPeer &Peer) { return Peer.m_WantsAnswer; });
+}
+
+void CMClientDetect::MarkAnswering()
+{
+	for(CPeer &Peer : m_aPeers)
+	{
+		if(!Peer.m_WantsAnswer)
+			continue;
+		Peer.m_WantsAnswer = false;
+		Peer.m_Answering = true;
+	}
+}
+
+void CMClientDetect::OnBeaconSent()
+{
+	m_BeaconHeardUntil = LocalTime() + BEACON_ROUND;
+	for(CPeer &Peer : m_aPeers)
+	{
+		Peer.m_Answering = false;
+		if(!Peer.m_Detected)
+			continue;
+		Peer.m_WantsAnswer = false;
+		Peer.m_Answered = true;
+	}
+}
+
+void CMClientDetect::OnBeaconLost()
+{
+	for(CPeer &Peer : m_aPeers)
+	{
+		if(!Peer.m_Answering)
+			continue;
+		Peer.m_Answering = false;
+		Peer.m_WantsAnswer = true;
 	}
 }
 
@@ -171,6 +228,20 @@ void CMClientDetect::UpdateReply()
 	if(!m_ReplyPending)
 		return;
 
+	if(!g_Config.m_ClMClientMiniGames)
+	{
+		for(CPeer &Peer : m_aPeers)
+			Peer.m_WantsAnswer = false;
+		m_ReplyPending = false;
+		return;
+	}
+
+	if(!AnswerOwed())
+	{
+		m_ReplyPending = false;
+		return;
+	}
+
 	if(!CanEmote())
 		return;
 
@@ -178,6 +249,7 @@ void CMClientDetect::UpdateReply()
 		return;
 
 	SendBeacon(KIND_REPLY);
+	MarkAnswering();
 	m_ReplyPending = false;
 }
 
@@ -202,10 +274,14 @@ void CMClientDetect::AbortBeacon(bool Retry)
 		m_AnnouncePending = true;
 		m_AnnounceDeadline = LocalTime() + ANNOUNCE_TIMEOUT;
 	}
-	else if(Retry && m_QueuedKind == KIND_REPLY)
+	else if(m_QueuedKind == KIND_REPLY)
 	{
-		m_ReplyPending = true;
-		m_ReplyTime = LocalTime() + REPLY_DELAY + Jitter(REPLY_JITTER);
+		OnBeaconLost();
+		if(Retry)
+		{
+			m_ReplyPending = true;
+			m_ReplyTime = LocalTime() + REPLY_DELAY + Jitter(REPLY_JITTER);
+		}
 	}
 	m_QueuedKind = -1;
 }
@@ -257,7 +333,10 @@ bool CMClientDetect::HandleEcho(int Emoticon)
 
 	m_vEmoteQueue.erase(m_vEmoteQueue.begin());
 	if(m_vEmoteQueue.empty())
+	{
+		OnBeaconSent();
 		m_QueuedKind = -1;
+	}
 	m_EmoteWaiting = false;
 	m_EmoteTime = 0.0f;
 	m_EmoteRetries = 0;
@@ -303,11 +382,26 @@ bool CMClientDetect::Decode(int ClientId, int Emoticon)
 
 void CMClientDetect::OnBeacon(int ClientId, int Kind)
 {
-	m_aPeers[ClientId].m_Detected = true;
-	str_copy(m_aPeers[ClientId].m_aName, GameClient()->m_aClients[ClientId].m_aRealName);
+	CPeer &Peer = m_aPeers[ClientId];
+	Peer.m_Detected = true;
+	str_copy(Peer.m_aName, GameClient()->m_aClients[ClientId].m_aRealName);
+
+	if(LocalTime() < m_BeaconHeardUntil)
+	{
+		Peer.m_WantsAnswer = false;
+		Peer.m_Answered = true;
+	}
 
 	if(Kind != KIND_ANNOUNCE)
 		return;
+
+	if(!g_Config.m_ClMClientMiniGames)
+		return;
+
+	if(Peer.m_Answered || Peer.m_Answering)
+		return;
+
+	Peer.m_WantsAnswer = true;
 
 	if(m_ReplyPending)
 		return;
@@ -341,6 +435,7 @@ void CMClientDetect::OnRender()
 		return;
 
 	ForgetLeftPeers();
+	ForgetOnRename();
 	UpdateAnnounce();
 	UpdateReply();
 	FlushEmoteQueue();

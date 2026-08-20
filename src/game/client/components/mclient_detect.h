@@ -41,6 +41,9 @@ private:
 		char m_aName[MAX_NAME_LENGTH];
 		int m_Step;
 		int m_Kind;
+		bool m_WantsAnswer;
+		bool m_Answering;
+		bool m_Answered;
 	};
 
 	CPeer m_aPeers[MAX_CLIENTS] = {};
@@ -61,11 +64,19 @@ private:
 	bool m_ReplyPending = false;
 	float m_ReplyTime = 0.0f;
 
+	char m_aLocalName[MAX_NAME_LENGTH] = "";
+	float m_BeaconHeardUntil = 0.0f;
+
 	bool CanEmote() const;
 	bool IsLocal(int ClientId) const;
 	void ClearPeers();
 	void ClearPeer(int ClientId);
 	void ForgetLeftPeers();
+	void ForgetOnRename();
+	bool AnswerOwed() const;
+	void MarkAnswering();
+	void OnBeaconSent();
+	void OnBeaconLost();
 	void UpdateAnnounce();
 	void UpdateReply();
 	void SendBeacon(int Kind);
