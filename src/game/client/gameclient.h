@@ -59,6 +59,7 @@
 #include "components/mapimages.h"
 #include "components/maplayers.h"
 #include "components/mapsounds.h"
+#include "components/mclient_detect.h"
 #include "components/menu_background.h"
 #include "components/menus.h"
 #include "components/minigames.h"
@@ -191,6 +192,7 @@ public:
 
 	CPlayers m_Players;
 	CMiniGames m_MiniGames;
+	CMClientDetect m_MClientDetect;
 	CSaveNotice m_SaveNotice;
 	CPetting m_Petting;
 	CPetTee m_PetTee;

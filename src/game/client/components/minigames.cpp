@@ -612,6 +612,9 @@ void CMiniGames::FlushEmoteQueue()
 	if(!GameClient()->m_Snap.m_pLocalCharacter)
 		return;
 
+	if(!m_EmoteWaiting && GameClient()->m_MClientDetect.EmoteInFlight())
+		return;
+
 	if(m_EmoteWaiting)
 	{
 		if(LocalTime() < m_EmoteTime + EMOTE_ECHO_TIMEOUT)
@@ -1171,6 +1174,8 @@ int CMiniGames::CollectPlayers(int *pIds) const
 				continue;
 			if(GameClient()->m_aClients[ClientId].m_Friend != (Pass == 0))
 				continue;
+			if(GameClient()->m_MClientDetect.Enabled() && !GameClient()->m_MClientDetect.IsMClient(ClientId))
+				continue;
 			pIds[NumPlayers++] = ClientId;
 		}
 	}
@@ -1317,13 +1322,20 @@ void CMiniGames::RenderSelectModal()
 	CUIRect Title, Hint, Grid, ButtonRow;
 	Window.HSplitTop(22.0f, &Title, &Window);
 	Ui()->DoLabel(&Title, Localize(GameName()), 16.0f, TEXTALIGN_ML);
-	Window.HSplitTop(16.0f, &Hint, &Window);
-	Ui()->DoLabel(&Hint, Localize("Pick the player you want to challenge. Only players using M-Client can play."), 9.0f, TEXTALIGN_ML);
-	Window.HSplitTop(6.0f, nullptr, &Window);
-	Window.HSplitBottom(24.0f, &Grid, &ButtonRow);
-
 	int aPlayerIds[MAX_CLIENTS];
 	const int NumPlayers = CollectPlayers(aPlayerIds);
+
+	Window.HSplitTop(16.0f, &Hint, &Window);
+	const char *pHint;
+	if(NumPlayers > 0)
+		pHint = Localize("Pick the M-Client player you want to challenge.");
+	else if(GameClient()->m_MClientDetect.Enabled())
+		pHint = Localize("No other M-Client player has announced themselves on this server yet.");
+	else
+		pHint = Localize("There is nobody here to challenge.");
+	Ui()->DoLabel(&Hint, pHint, 9.0f, TEXTALIGN_ML);
+	Window.HSplitTop(6.0f, nullptr, &Window);
+	Window.HSplitBottom(24.0f, &Grid, &ButtonRow);
 
 	const float CellWidth = 60.0f;
 	const float CellHeight = 44.0f;
