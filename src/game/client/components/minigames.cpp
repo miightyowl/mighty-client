@@ -323,12 +323,15 @@ void CMiniGames::OpenGames()
 	m_Result = 0;
 	m_aStatus[0] = '\0';
 	m_State = STATE_GAMES;
+
+	GameClient()->m_MClientDetect.Announce();
 }
 
 void CMiniGames::OpenSelect()
 {
 	m_SelectedId = -1;
 	m_State = STATE_SELECT;
+	GameClient()->m_MClientDetect.Announce();
 }
 
 void CMiniGames::Close()
@@ -1333,8 +1336,10 @@ void CMiniGames::RenderSelectModal()
 	const char *pHint;
 	if(NumPlayers > 0)
 		pHint = Localize("Pick the M-Client player you want to challenge.");
+	else if(GameClient()->m_MClientDetect.Announcing())
+		pHint = Localize("Looking for other M-Client players on this server...");
 	else if(GameClient()->m_MClientDetect.Enabled())
-		pHint = Localize("No other M-Client player has announced themselves on this server yet.");
+		pHint = Localize("No other M-Client player answered on this server.");
 	else
 		pHint = Localize("There is nobody here to challenge.");
 	Ui()->DoLabel(&Hint, pHint, 9.0f, TEXTALIGN_ML);

@@ -18,6 +18,9 @@ public:
 
 	bool OnEmoticon(int ClientId, int Emoticon);
 
+	void Announce();
+	bool Announcing() const;
+
 	bool Enabled() const;
 	bool IsMClient(int ClientId) const;
 	int NumDetected() const;
@@ -50,10 +53,10 @@ private:
 	float m_EmoteGap = 0.4f;
 	int m_EmoteRetries = 0;
 
-	int m_AnnouncedId = -1;
-	char m_aAnnouncedName[MAX_NAME_LENGTH] = "";
 	bool m_AnnouncePending = false;
-	float m_AnnounceTime = 0.0f;
+	float m_AnnounceDeadline = 0.0f;
+	float m_AnnounceCooldown = 0.0f;
+	float m_AnnounceListenTime = 0.0f;
 
 	bool m_ReplyPending = false;
 	float m_ReplyTime = 0.0f;
