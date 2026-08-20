@@ -33,6 +33,17 @@ static bool DescriptionMatchesMap(const char *pDescription, const char *pMapName
 	return false;
 }
 
+static std::string VoteDescriptionInfo(const CVoteOptionClient *pOption)
+{
+	if(pOption == nullptr || str_find(pOption->m_aDescription, "⚑") == nullptr)
+		return "";
+
+	int Length = str_length(pOption->m_aDescription);
+	while(Length > 0 && pOption->m_aDescription[Length - 1] == ' ')
+		Length--;
+	return std::string(pOption->m_aDescription, Length);
+}
+
 static int VoteDescriptionStars(const char *pDescription)
 {
 	const char *pMatch = str_find(pDescription, "/5 ★");
@@ -120,6 +131,7 @@ void CUnfinishedMapVote::TogglePlayerSelection(const char *pName)
 	auto [Iterator, Inserted] = m_SelectedPlayers.emplace(pName);
 	if(!Inserted)
 		m_SelectedPlayers.erase(Iterator);
+	m_RemainingDirty = true;
 }
 
 void CUnfinishedMapVote::EnsureLocalPlayerSelected()
@@ -134,13 +146,30 @@ void CUnfinishedMapVote::EnsureLocalPlayerSelected()
 		return;
 	m_SelectedPlayers.emplace(pName);
 	m_LocalPlayerAutoSelected = true;
+	m_RemainingDirty = true;
+}
+
+std::vector<std::string> CUnfinishedMapVote::SelectedPlayerNames() const
+{
+	std::vector<std::string> vNames;
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(!GameClient()->m_Snap.m_apPlayerInfos[i])
+			continue;
+		const char *pName = GameClient()->m_aClients[i].m_aRealName;
+		if(!pName[0] || !IsPlayerSelected(pName))
+			continue;
+		if(std::find(vNames.begin(), vNames.end(), pName) == vNames.end())
+			vNames.emplace_back(pName);
+	}
+	return vNames;
 }
 
 bool CUnfinishedMapVote::CanStart()
 {
 	if(Client()->State() != IClient::STATE_ONLINE)
 		return false;
-	if(m_State != STATE_IDLE)
+	if(m_VotePending)
 	{
 		GameClient()->Echo("Unfinished map vote: already looking up maps, please wait.");
 		return false;
@@ -172,7 +201,6 @@ void CUnfinishedMapVote::Start(const char *pReason)
 			m_vPlayerNames.emplace_back(pName);
 	}
 
-	m_SelectedPlayersOnly = false;
 	Launch(pReason);
 }
 
@@ -181,43 +209,22 @@ void CUnfinishedMapVote::StartSelected(const char *pReason)
 	if(!CanStart())
 		return;
 
-	m_vPlayerNames.clear();
-	for(int i = 0; i < MAX_CLIENTS; i++)
-	{
-		if(!GameClient()->m_Snap.m_apPlayerInfos[i])
-			continue;
-		const char *pName = GameClient()->m_aClients[i].m_aRealName;
-		if(!pName[0] || !IsPlayerSelected(pName))
-			continue;
-		if(std::find(m_vPlayerNames.begin(), m_vPlayerNames.end(), pName) == m_vPlayerNames.end())
-			m_vPlayerNames.emplace_back(pName);
-	}
+	m_vPlayerNames = SelectedPlayerNames();
 	if(m_vPlayerNames.empty())
 	{
 		GameClient()->Echo("Unfinished map vote: no players selected, click the tees above the vote list to select them.");
 		return;
 	}
 
-	m_SelectedPlayersOnly = true;
 	Launch(pReason);
 }
 
 void CUnfinishedMapVote::Launch(const char *pReason)
 {
 	str_copy(m_aReason, pReason);
-
-	if(DetermineServerTypeFromVoteList())
-	{
-		StartPlayerRequests();
-		return;
-	}
-
-	char aEscaped[2 * MAX_MAP_LENGTH + 64];
-	EscapeUrl(aEscaped, m_aCurrentMap);
-	char aUrl[512];
-	str_format(aUrl, sizeof(aUrl), "https://ddnet.org/maps/?json=%s", aEscaped);
-	m_pMapInfoRequest = RunRequest(aUrl);
-	m_State = STATE_MAP_INFO;
+	m_FailedPlayers.clear();
+	m_ServerTypeFailed = false;
+	m_VotePending = true;
 }
 
 bool CUnfinishedMapVote::DetermineServerTypeFromVoteList()
@@ -259,6 +266,53 @@ bool CUnfinishedMapVote::DetermineServerTypeFromVoteList()
 	return false;
 }
 
+void CUnfinishedMapVote::UpdateServerType()
+{
+	if(m_aServerType[0] != '\0' || m_ServerTypeFailed)
+		return;
+
+	if(!m_aCurrentMap[0])
+	{
+		str_copy(m_aCurrentMap, Client()->ServerInfo().m_aMap);
+		if(!m_aCurrentMap[0])
+			return;
+	}
+
+	if(DetermineServerTypeFromVoteList())
+	{
+		m_RemainingDirty = true;
+		return;
+	}
+
+	if(!m_pMapInfoRequest)
+	{
+		char aEscaped[2 * MAX_MAP_LENGTH + 64];
+		EscapeUrl(aEscaped, m_aCurrentMap);
+		char aUrl[512];
+		str_format(aUrl, sizeof(aUrl), "https://ddnet.org/maps/?json=%s", aEscaped);
+		m_pMapInfoRequest = RunRequest(aUrl);
+		return;
+	}
+
+	if(!m_pMapInfoRequest->Done())
+		return;
+
+	if(m_pMapInfoRequest->State() == EHttpState::DONE)
+	{
+		json_value *pJson = m_pMapInfoRequest->ResultJson();
+		if(pJson)
+		{
+			const json_value *pType = json_object_get(pJson, "type");
+			if(pType->type == json_string)
+				str_copy(m_aServerType, json_string_get(pType));
+			json_value_free(pJson);
+		}
+	}
+	m_pMapInfoRequest = nullptr;
+	m_ServerTypeFailed = m_aServerType[0] == '\0';
+	m_RemainingDirty = true;
+}
+
 std::shared_ptr<IHttpRequest> CUnfinishedMapVote::RunRequest(const char *pUrl)
 {
 	std::shared_ptr<IHttpRequest> pRequest = HttpGet(pUrl);
@@ -268,107 +322,128 @@ std::shared_ptr<IHttpRequest> CUnfinishedMapVote::RunRequest(const char *pUrl)
 	return pRequest;
 }
 
-void CUnfinishedMapVote::OnRender()
+void CUnfinishedMapVote::RequestPlayer(const char *pName)
 {
-	if(m_State == STATE_MAP_INFO)
+	// the stats say which maps of this type exist, so the type has to be known first
+	if(!pName[0] || !m_aServerType[0])
+		return;
+	if(m_PlayerStats.contains(pName) || m_FailedPlayers.contains(pName) || m_PlayerRequests.contains(pName))
+		return;
+
+	char aEscaped[2 * MAX_NAME_LENGTH + 64];
+	EscapeUrl(aEscaped, pName);
+	char aUrl[512];
+	str_format(aUrl, sizeof(aUrl), "https://ddnet.org/players/?json2=%s", aEscaped);
+	m_PlayerRequests[pName] = RunRequest(aUrl);
+}
+
+bool CUnfinishedMapVote::PlayerReady(const char *pName) const
+{
+	return m_PlayerStats.contains(pName) || m_FailedPlayers.contains(pName);
+}
+
+void CUnfinishedMapVote::PollPlayerRequests()
+{
+	for(auto Request = m_PlayerRequests.begin(); Request != m_PlayerRequests.end();)
 	{
-		if(m_pMapInfoRequest->Done())
-			OnMapInfoDone();
-	}
-	else if(m_State == STATE_PLAYERS)
-	{
-		if(std::all_of(m_vPlayerRequests.begin(), m_vPlayerRequests.end(), [](const SPlayerRequest &Request) { return Request.m_pRequest->Done(); }))
-			OnPlayersDone();
+		if(!Request->second->Done())
+		{
+			++Request;
+			continue;
+		}
+
+		json_value *pJson = Request->second->State() == EHttpState::DONE ? Request->second->ResultJson() : nullptr;
+		if(pJson)
+		{
+			ParsePlayerStats(Request->first.c_str(), pJson);
+			json_value_free(pJson);
+		}
+		else
+		{
+			m_FailedPlayers.emplace(Request->first);
+		}
+		m_RemainingDirty = true;
+		Request = m_PlayerRequests.erase(Request);
 	}
 }
 
-void CUnfinishedMapVote::OnMapInfoDone()
+void CUnfinishedMapVote::ParsePlayerStats(const char *pName, const _json_value *pJson)
 {
-	if(m_pMapInfoRequest->State() != EHttpState::DONE)
-	{
-		Stop("Unfinished map vote: couldn't reach ddnet.org.");
+	SPlayerStats &Stats = m_PlayerStats[pName];
+	const json_value *pTypes = json_object_get(pJson, "types");
+	if(pTypes->type != json_object)
 		return;
-	}
 
-	json_value *pJson = m_pMapInfoRequest->ResultJson();
-	m_aServerType[0] = '\0';
-	if(pJson)
+	for(unsigned TypeIndex = 0; TypeIndex < pTypes->u.object.length; TypeIndex++)
 	{
-		const json_value *pType = json_object_get(pJson, "type");
-		if(pType->type == json_string)
-			str_copy(m_aServerType, json_string_get(pType));
-		json_value_free(pJson);
+		if(!str_startswith(pTypes->u.object.values[TypeIndex].name, m_aServerType))
+			continue;
+		const json_value *pMaps = json_object_get(pTypes->u.object.values[TypeIndex].value, "maps");
+		if(pMaps->type != json_object)
+			continue;
+		for(unsigned MapIndex = 0; MapIndex < pMaps->u.object.length; MapIndex++)
+		{
+			const char *pMapName = pMaps->u.object.values[MapIndex].name;
+			Stats.m_TypeMaps.emplace(pMapName);
+			const json_value *pFinishes = json_object_get(pMaps->u.object.values[MapIndex].value, "finishes");
+			if(pFinishes->type == json_integer && json_int_get(pFinishes) > 0)
+				Stats.m_FinishedMaps.emplace(pMapName);
+		}
 	}
-	m_pMapInfoRequest = nullptr;
+}
 
-	if(!m_aServerType[0])
+void CUnfinishedMapVote::OnRender()
+{
+	if(Client()->State() != IClient::STATE_ONLINE)
+		return;
+
+	PollPlayerRequests();
+	if(m_VotePending)
+		UpdateVote();
+}
+
+void CUnfinishedMapVote::UpdateVote()
+{
+	UpdateServerType();
+	if(m_ServerTypeFailed)
 	{
 		Stop("Unfinished map vote: the current map is unknown to ddnet.org, couldn't determine the server type.");
 		return;
 	}
+	if(!m_aServerType[0])
+		return;
 
-	StartPlayerRequests();
-}
+	for(const std::string &Name : m_vPlayerNames)
+		RequestPlayer(Name.c_str());
 
-void CUnfinishedMapVote::StartPlayerRequests()
-{
-	m_vPlayerRequests.clear();
 	for(const std::string &Name : m_vPlayerNames)
 	{
-		char aEscaped[2 * MAX_NAME_LENGTH + 64];
-		EscapeUrl(aEscaped, Name.c_str());
-		char aUrl[512];
-		str_format(aUrl, sizeof(aUrl), "https://ddnet.org/players/?json2=%s", aEscaped);
-		m_vPlayerRequests.push_back({Name, RunRequest(aUrl)});
+		if(m_FailedPlayers.contains(Name))
+		{
+			char aBuf[256];
+			str_format(aBuf, sizeof(aBuf), "Unfinished map vote: failed to fetch ddnet.org stats of '%s'.", Name.c_str());
+			Stop(aBuf);
+			return;
+		}
+		if(!PlayerReady(Name.c_str()))
+			return;
 	}
-	m_State = STATE_PLAYERS;
+
+	Analyze();
 }
 
-void CUnfinishedMapVote::OnPlayersDone()
+void CUnfinishedMapVote::Analyze()
 {
 	std::set<std::string> AllTypeMaps;
 	std::map<std::string, std::vector<std::string>> MapFinishers;
-
-	for(const SPlayerRequest &Request : m_vPlayerRequests)
+	for(const std::string &Name : m_vPlayerNames)
 	{
-		if(Request.m_pRequest->State() != EHttpState::DONE)
-		{
-			char aBuf[256];
-			str_format(aBuf, sizeof(aBuf), "Unfinished map vote: failed to fetch ddnet.org stats of '%s'.", Request.m_Name.c_str());
-			Stop(aBuf);
-			return;
-		}
-
-		json_value *pJson = Request.m_pRequest->ResultJson();
-		if(!pJson)
-		{
-			char aBuf[256];
-			str_format(aBuf, sizeof(aBuf), "Unfinished map vote: invalid response from ddnet.org for '%s'.", Request.m_Name.c_str());
-			Stop(aBuf);
-			return;
-		}
-
-		const json_value *pTypes = json_object_get(pJson, "types");
-		if(pTypes->type == json_object)
-		{
-			for(unsigned TypeIndex = 0; TypeIndex < pTypes->u.object.length; TypeIndex++)
-			{
-				if(!str_startswith(pTypes->u.object.values[TypeIndex].name, m_aServerType))
-					continue;
-				const json_value *pMaps = json_object_get(pTypes->u.object.values[TypeIndex].value, "maps");
-				if(pMaps->type != json_object)
-					continue;
-				for(unsigned MapIndex = 0; MapIndex < pMaps->u.object.length; MapIndex++)
-				{
-					const char *pMapName = pMaps->u.object.values[MapIndex].name;
-					const json_value *pFinishes = json_object_get(pMaps->u.object.values[MapIndex].value, "finishes");
-					AllTypeMaps.emplace(pMapName);
-					if(pFinishes->type == json_integer && json_int_get(pFinishes) > 0)
-						MapFinishers[pMapName].push_back(Request.m_Name);
-				}
-			}
-		}
-		json_value_free(pJson);
+		const auto Stats = m_PlayerStats.find(Name);
+		if(Stats == m_PlayerStats.end())
+			continue;
+		AllTypeMaps.insert(Stats->second.m_TypeMaps.begin(), Stats->second.m_TypeMaps.end());
+		for(const std::string &Map : Stats->second.m_FinishedMaps)
+			MapFinishers[Map].push_back(Name);
 	}
 
 	int StarsFilter = -1;
@@ -412,7 +487,7 @@ void CUnfinishedMapVote::OnPlayersDone()
 		const int FinishedCount = FinisherIt == MapFinishers.end() ? 0 : (int)FinisherIt->second.size();
 		const bool LocalUnfinished = !pLocalName[0] || FinisherIt == MapFinishers.end() ||
 					     std::find(FinisherIt->second.begin(), FinisherIt->second.end(), pLocalName) == FinisherIt->second.end();
-		vVotable.push_back({pBestMap, OptionIndex, (int)m_vPlayerRequests.size() - FinishedCount, LocalUnfinished});
+		vVotable.push_back({pBestMap, OptionIndex, (int)m_vPlayerNames.size() - FinishedCount, LocalUnfinished});
 	}
 
 	if(vVotable.empty())
@@ -426,7 +501,7 @@ void CUnfinishedMapVote::OnPlayersDone()
 		return;
 	}
 
-	const int PoolSize = (int)m_vPlayerRequests.size();
+	const int PoolSize = (int)m_vPlayerNames.size();
 
 	// every selected player has unfinished
 	std::vector<int> vCommon;
@@ -503,28 +578,121 @@ void CUnfinishedMapVote::OnPlayersDone()
 	Stop(aBuf);
 }
 
+void CUnfinishedMapVote::UpdateRemainingMaps()
+{
+	if(Client()->State() != IClient::STATE_ONLINE)
+		return;
+
+	const std::vector<std::string> vNames = SelectedPlayerNames();
+	if(!vNames.empty())
+		UpdateServerType();
+
+	if(vNames != m_vRemainingNames)
+	{
+		m_vRemainingNames = vNames;
+		m_RemainingDirty = true;
+	}
+	if(m_RemainingNumOptions != GameClient()->m_Voting.NumOptions())
+	{
+		m_RemainingNumOptions = GameClient()->m_Voting.NumOptions();
+		m_RemainingDirty = true;
+	}
+
+	m_RemainingLoading = !vNames.empty() && !m_aServerType[0] && !m_ServerTypeFailed;
+	for(const std::string &Name : vNames)
+	{
+		RequestPlayer(Name.c_str());
+		if(!PlayerReady(Name.c_str()))
+			m_RemainingLoading = true;
+	}
+
+	if(m_RemainingDirty && !m_RemainingLoading)
+		RecomputeRemainingMaps(vNames);
+}
+
+void CUnfinishedMapVote::RecomputeRemainingMaps(const std::vector<std::string> &vNames)
+{
+	m_RemainingDirty = false;
+	m_vRemainingMaps.clear();
+	if(vNames.empty() || !m_aServerType[0])
+		return;
+
+	const std::set<std::string> *pTypeMaps = nullptr;
+	for(const std::string &Name : vNames)
+	{
+		const auto Stats = m_PlayerStats.find(Name);
+		if(Stats != m_PlayerStats.end() && !Stats->second.m_TypeMaps.empty())
+		{
+			pTypeMaps = &Stats->second.m_TypeMaps;
+			break;
+		}
+	}
+	if(pTypeMaps == nullptr)
+		return;
+
+	std::set<std::string> TakenMaps;
+	int OptionIndex = 0;
+	for(const CVoteOptionClient *pOption = GameClient()->m_Voting.FirstOption(); pOption; pOption = pOption->m_pNext, OptionIndex++)
+	{
+		const std::string *pBestMap = nullptr;
+		for(const std::string &Map : *pTypeMaps)
+		{
+			if((!pBestMap || Map.length() > pBestMap->length()) && DescriptionMatchesMap(pOption->m_aDescription, Map.c_str()))
+				pBestMap = &Map;
+		}
+		if(pBestMap == nullptr || str_comp(pBestMap->c_str(), m_aCurrentMap) == 0)
+			continue;
+		if(!TakenMaps.emplace(*pBestMap).second)
+			continue;
+
+		bool Unfinished = true;
+		for(const std::string &Name : vNames)
+		{
+			const auto Stats = m_PlayerStats.find(Name);
+			if(Stats != m_PlayerStats.end() && Stats->second.m_FinishedMaps.contains(*pBestMap))
+			{
+				Unfinished = false;
+				break;
+			}
+		}
+		if(Unfinished)
+			m_vRemainingMaps.push_back({OptionIndex, pOption->m_aDescription, VoteDescriptionInfo(pOption->m_pNext)});
+	}
+}
+
 void CUnfinishedMapVote::Stop(const char *pErrorMessage)
 {
-	if(m_pMapInfoRequest)
-	{
-		m_pMapInfoRequest->Abort();
-		m_pMapInfoRequest = nullptr;
-	}
-	for(SPlayerRequest &Request : m_vPlayerRequests)
-		Request.m_pRequest->Abort();
-	m_vPlayerRequests.clear();
 	m_vPlayerNames.clear();
-	m_State = STATE_IDLE;
+	m_VotePending = false;
 	if(pErrorMessage)
 		GameClient()->Echo(pErrorMessage);
 }
 
 void CUnfinishedMapVote::OnStateChange(int NewState, int OldState)
 {
-	if(NewState != IClient::STATE_ONLINE)
+	if(NewState == IClient::STATE_ONLINE)
+		return;
+
+	Stop(nullptr);
+	if(m_pMapInfoRequest)
 	{
-		Stop(nullptr);
-		m_SelectedPlayers.clear();
-		m_LocalPlayerAutoSelected = false;
+		m_pMapInfoRequest->Abort();
+		m_pMapInfoRequest = nullptr;
 	}
+	for(auto &[Name, pRequest] : m_PlayerRequests)
+		pRequest->Abort();
+	m_PlayerRequests.clear();
+	// another server means another map type
+	m_PlayerStats.clear();
+	m_FailedPlayers.clear();
+	m_aServerType[0] = '\0';
+	m_ServerTypeFailed = false;
+	m_aCurrentMap[0] = '\0';
+	m_SelectedPlayers.clear();
+	m_LocalPlayerAutoSelected = false;
+	m_vRemainingMaps.clear();
+	m_vRemainingNames.clear();
+	m_RemainingDirty = true;
+	m_RemainingLoading = false;
+	m_RemainingNumOptions = -1;
 }
