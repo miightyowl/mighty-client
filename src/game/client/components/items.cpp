@@ -10,6 +10,7 @@
 #include <generated/protocol.h>
 
 #include <game/client/components/effects.h>
+#include <game/client/components/fast_practice.h>
 #include <game/client/gameclient.h>
 #include <game/client/laser_data.h>
 #include <game/client/pickup_data.h>
@@ -456,12 +457,16 @@ void CItems::OnRender()
 	bool BlinkingProj = (Ticks % 20) < 2;
 	bool BlinkingProjEx = (Ticks % 6) < 2;
 	bool BlinkingLight = (Ticks % 6) < 2;
-	int SwitcherTeam = GameClient()->SwitchStateTeam();
+	int SwitcherTeam = GameClient()->m_FastPractice.IsActive() ?
+				   GameClient()->m_FastPractice.SwitcherTeam() :
+				   GameClient()->SwitchStateTeam();
 	int DraggerStartTick = std::max((Client()->GameTick(g_Config.m_ClDummy) / 7) * 7, Client()->GameTick(g_Config.m_ClDummy) - 4);
 	int GunStartTick = (Client()->GameTick(g_Config.m_ClDummy) / 7) * 7;
 
 	bool UsePredicted = GameClient()->Predict() && GameClient()->AntiPingGunfire();
-	auto &aSwitchers = GameClient()->Switchers();
+	auto &aSwitchers = GameClient()->m_FastPractice.IsActive() ?
+				   GameClient()->m_FastPractice.RenderWorld()->Switchers() :
+				   GameClient()->Switchers();
 
 	CScreenRect ScreenRectLaser = Graphics()->GetScreen();
 	CScreenRect ScreenRectProjectile = ScreenRectLaser;
@@ -514,6 +519,54 @@ void CItems::OnRender()
 					RenderPickup(&Prev, &Data, true, pPickup->Flags());
 				}
 			}
+		}
+	}
+
+	if(GameClient()->m_FastPractice.IsActive())
+	{
+		CGameWorld *pPracticeWorld = GameClient()->m_FastPractice.RenderWorld();
+		const int PracticeTick = GameClient()->m_FastPractice.RenderTick();
+
+		const int SavedAntiPing = g_Config.m_ClAntiPing;
+		const int SavedAntiPingGrenade = g_Config.m_ClAntiPingGrenade;
+		g_Config.m_ClAntiPing = 1;
+		g_Config.m_ClAntiPingGrenade = 1;
+		const int PredictionTick = Client()->GetPredictionTick();
+
+		for(auto *pProj = (CProjectile *)pPracticeWorld->FindFirst(CGameWorld::ENTTYPE_PROJECTILE); pProj; pProj = (CProjectile *)pProj->NextEntity())
+		{
+			CProjectileData Data = pProj->GetData();
+			const int Age = PracticeTick - Data.m_StartTick;
+			Data.m_StartTick = PredictionTick - 1 - Age;
+			RenderProjectile(&Data, pProj->GetId(), ScreenRectProjectile);
+		}
+
+		for(CEntity *pEnt = pPracticeWorld->FindFirst(CGameWorld::ENTTYPE_LASER); pEnt; pEnt = pEnt->NextEntity())
+		{
+			auto *const pLaser = dynamic_cast<CLaser *>(pEnt);
+			if(!pLaser)
+				continue;
+			CLaserData Data = pLaser->GetData();
+			if(!IsLaserInside(Data))
+				continue;
+			const int Age = PracticeTick - Data.m_StartTick;
+			Data.m_StartTick = PredictionTick - Age;
+			RenderLaser(&Data, true);
+		}
+
+		g_Config.m_ClAntiPing = SavedAntiPing;
+		g_Config.m_ClAntiPingGrenade = SavedAntiPingGrenade;
+
+		for(auto *pPickup = (CPickup *)pPracticeWorld->FindFirst(CGameWorld::ENTTYPE_PICKUP); pPickup; pPickup = (CPickup *)pPickup->NextEntity())
+		{
+			if(pPickup->GetId() < CFastPractice::MAP_PICKUP_ID_OFFSET)
+				continue;
+			if(!ScreenRectPickup.Inside(pPickup->m_Pos))
+				continue;
+
+			CNetObj_Pickup Data;
+			pPickup->FillInfo(&Data);
+			RenderPickup(&Data, &Data, true, 0);
 		}
 	}
 

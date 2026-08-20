@@ -256,8 +256,8 @@ int CControls::SnapInput(int *pData)
 	// update player state
 	if(GameClient()->m_Chat.IsActive())
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_CHATTING;
-	else if(GameClient()->m_Menus.IsActive() || GameClient()->m_Ads.IsActive() || GameClient()->m_PracticeSetup.IsActive())
-		// active advertisement or practice setup modal freezes input
+	else if(GameClient()->m_Menus.IsActive() || GameClient()->m_Ads.IsActive())
+		// an active advertisement freezes input
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_IN_MENU;
 	else
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_PLAYING;
@@ -337,7 +337,7 @@ int CControls::SnapInput(int *pData)
 			m_aInputData[g_Config.m_ClDummy].m_Direction = 1;
 
 		// dummy copy moves
-		if(g_Config.m_ClDummyCopyMoves)
+		if(g_Config.m_ClDummyCopyMoves && !GameClient()->m_FastPractice.IsActive())
 		{
 			CNetObj_PlayerInput *pDummyInput = &GameClient()->m_DummyInput;
 
@@ -410,6 +410,15 @@ int CControls::SnapInput(int *pData)
 		return 0;
 
 	m_LastSendTime = time_get();
+
+	if(GameClient()->m_FastPractice.IsActive())
+	{
+		CNetObj_PlayerInput FrozenInput = GameClient()->m_FastPractice.FrozenInput();
+		FrozenInput.m_PlayerFlags = m_aInputData[g_Config.m_ClDummy].m_PlayerFlags;
+		mem_copy(pData, &FrozenInput, sizeof(FrozenInput));
+		return sizeof(FrozenInput);
+	}
+
 	mem_copy(pData, &m_aInputData[g_Config.m_ClDummy], sizeof(m_aInputData[0]));
 	return sizeof(m_aInputData[0]);
 }

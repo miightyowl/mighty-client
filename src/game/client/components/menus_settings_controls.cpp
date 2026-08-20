@@ -109,8 +109,9 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Show HUD"), "toggle cl_showhud 0 1"},
 		{EBindOptionGroup::MCLIENT, Localizable("Translate chat"), "+show_chat; chat translate"},
 		{EBindOptionGroup::MCLIENT, Localizable("Bind wheel"), "+bindwheel"},
-		{EBindOptionGroup::MCLIENT, Localizable("Fast practice"), "practice_setup"},
 		{EBindOptionGroup::MCLIENT, Localizable("Games"), "+minigames"},
+		{EBindOptionGroup::MCLIENT, Localizable("Fast practice"), "fast_practice"},
+		{EBindOptionGroup::MCLIENT, Localizable("Fast practice: set checkpoint"), "fast_practice_checkpoint"},
 	};
 	m_NumPredefinedBindOptions = m_vBindOptions.size();
 

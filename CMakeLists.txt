@@ -2576,6 +2576,8 @@ if(CLIENT)
     components/emoticon.h
     components/envelope_state.cpp
     components/envelope_state.h
+    components/fast_practice.cpp
+    components/fast_practice.h
     components/finish_fireworks.cpp
     components/finish_fireworks.h
     components/finish_rename.cpp
@@ -2645,8 +2647,6 @@ if(CLIENT)
     components/petting.h
     components/players.cpp
     components/players.h
-    components/practice_setup.cpp
-    components/practice_setup.h
     components/race_demo.cpp
     components/race_demo.h
     components/save_notice.cpp

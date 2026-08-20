@@ -43,6 +43,7 @@
 #include "components/debughud.h"
 #include "components/effects.h"
 #include "components/emoticon.h"
+#include "components/fast_practice.h"
 #include "components/finish_fireworks.h"
 #include "components/finish_rename.h"
 #include "components/flow.h"
@@ -67,7 +68,6 @@
 #include "components/pet_tee.h"
 #include "components/petting.h"
 #include "components/players.h"
-#include "components/practice_setup.h"
 #include "components/race_demo.h"
 #include "components/save_notice.h"
 #include "components/scoreboard.h"
@@ -190,11 +190,11 @@ public:
 	CSpectator m_Spectator;
 
 	CPlayers m_Players;
-	CPracticeSetup m_PracticeSetup;
 	CMiniGames m_MiniGames;
 	CSaveNotice m_SaveNotice;
 	CPetting m_Petting;
 	CPetTee m_PetTee;
+	CFastPractice m_FastPractice;
 	CAds m_Ads;
 	CMaodieWalk m_MaodieWalk;
 	CBindWheel m_BindWheel;

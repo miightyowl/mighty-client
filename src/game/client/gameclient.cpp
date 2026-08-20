@@ -148,6 +148,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Players,
 					      &m_Petting,
 					      &m_PetTee,
+					      &m_FastPractice,
 					      &m_MapLayersForeground,
 					      &m_Particles.m_RenderExplosions,
 					      &m_NamePlates,
@@ -171,7 +172,6 @@ void CGameClient::OnConsoleInit()
 					      &m_Motd,
 					      &m_Ads,
 					      &m_MaodieWalk,
-					      &m_PracticeSetup,
 					      &m_MiniGames,
 					      &m_SaveNotice,
 					      &m_Menus,
@@ -191,7 +191,6 @@ void CGameClient::OnConsoleInit()
 						  &m_Spectator,
 						  &m_Emoticon,
 						  &m_BindWheel,
-						  &m_PracticeSetup,
 						  &m_MiniGames,
 						  &m_ImportantAlert,
 						  &m_Menus,
@@ -795,6 +794,8 @@ void CGameClient::UpdatePositions()
 
 	if(!m_MultiViewActivated && m_MultiView.m_IsInit)
 		ResetMultiView();
+
+	m_FastPractice.OnUpdatePositions();
 
 	UpdateRenderedCharacters();
 }
@@ -3468,6 +3469,8 @@ void CGameClient::ConTeam(IConsole::IResult *pResult, void *pUserData)
 
 void CGameClient::ConKill(IConsole::IResult *pResult, void *pUserData)
 {
+	if(((CGameClient *)pUserData)->m_FastPractice.OnKill())
+		return;
 	((CGameClient *)pUserData)->SendKill();
 }
 
@@ -3943,10 +3946,14 @@ void CGameClient::UpdateRenderedCharacters()
 		CCharacter *pChar = m_PredictedWorld.GetCharacterById(i);
 		const bool IsDummy = PredictDummy() && i == m_aLocalIds[!g_Config.m_ClDummy];
 		bool AntiPingPlayer = AntiPingPlayers() == 1 || (AntiPingPlayers() >= 2 && (IsDummy || (pChar && pChar->IsInterfering())));
+		const bool PracticeTee = m_FastPractice.IsActive() && i == m_Snap.m_LocalClientId;
 		if(Predict() && (i == m_Snap.m_LocalClientId || (AntiPingPlayer && !IsOtherTeam(i))) && pChar)
 		{
 			m_aClients[i].m_Predicted.Write(&m_aClients[i].m_RenderCur);
 			m_aClients[i].m_PrevPredicted.Write(&m_aClients[i].m_RenderPrev);
+
+			if(PracticeTee)
+				m_FastPractice.ApplyRenderedCharacter(&m_aClients[i].m_RenderPrev, &m_aClients[i].m_RenderCur);
 
 			m_aClients[i].m_IsPredicted = true;
 
@@ -3955,8 +3962,7 @@ void CGameClient::UpdateRenderedCharacters()
 				vec2(m_aClients[i].m_RenderCur.m_X, m_aClients[i].m_RenderCur.m_Y),
 				m_aClients[i].m_IsPredicted ? Client()->PredIntraGameTick(g_Config.m_ClDummy) : Client()->IntraGameTick(g_Config.m_ClDummy));
 
-			// M-Client: fast input - render our local tee(s) at the extended fast-input position
-			if(g_Config.m_ClMClientFastInput && (i == m_Snap.m_LocalClientId || IsDummy))
+			if(g_Config.m_ClMClientFastInput && (i == m_Snap.m_LocalClientId || IsDummy) && !PracticeTee)
 				Pos = GetFastInputPos(i);
 
 			if(i == m_Snap.m_LocalClientId || IsDummy)
