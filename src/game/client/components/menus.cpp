@@ -1389,6 +1389,12 @@ void CMenus::RenderPopupMClientSetup(CUIRect Box)
 
 	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
 	LeftView.HSplitTop(RowH, &Row, &LeftView);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientPetTeeOthers, Localize("Show pets of other M-Client players"), g_Config.m_ClMClientPetTeeOthers, &Row))
+		g_Config.m_ClMClientPetTeeOthers ^= 1;
+	Hint(&LeftView, Localize("Shows the pets that other M-Client players announced"));
+
+	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
+	LeftView.HSplitTop(RowH, &Row, &LeftView);
 	if(DoButton_CheckBox(&g_Config.m_ClMClientFastInput, Localize("Fast input (lower input delay)"), g_Config.m_ClMClientFastInput, &Row))
 		g_Config.m_ClMClientFastInput ^= 1;
 	Hint(&LeftView, Localize("Reduces input delay by predicting your input early"));

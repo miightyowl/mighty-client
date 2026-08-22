@@ -31,9 +31,30 @@ namespace
 	const float REPLY_DELAY = 0.3f;
 	const float REPLY_JITTER = 1.5f;
 
-	int BeaconCheck(int Kind)
+	const float PET_COOLDOWN = 8.0f;
+	const float PET_RETRY = 5.0f;
+	const float FRAME_TIMEOUT = 15.0f;
+
+	const char PET_ALPHABET[] = "abcdefghijklmnopqrstuvwxyz0123456789_-";
+	const int PET_ALPHABET_SIZE = sizeof(PET_ALPHABET) - 1;
+
+	int FrameCheck(int Kind, const int *pPayload, int PayloadLen)
 	{
-		return (BEACON_OP + BEACON_MAGIC + Kind) % EMOTE_RADIX;
+		int Sum = BEACON_OP + BEACON_MAGIC + Kind;
+		for(int i = 0; i < PayloadLen; i++)
+			Sum += pPayload[i];
+		return Sum % EMOTE_RADIX;
+	}
+
+	int AlphabetIndex(char Char)
+	{
+		const char Lower = Char >= 'A' && Char <= 'Z' ? (char)(Char - 'A' + 'a') : Char;
+		for(int i = 0; i < PET_ALPHABET_SIZE; i++)
+		{
+			if(PET_ALPHABET[i] == Lower)
+				return i;
+		}
+		return -1;
 	}
 
 	float Jitter(float Amount)
@@ -77,6 +98,12 @@ bool CMClientDetect::CanEmote() const
 	return Client()->State() == IClient::STATE_ONLINE && GameClient()->m_Snap.m_pLocalCharacter != nullptr;
 }
 
+bool CMClientDetect::ChannelFree() const
+{
+	// a mini game that wants to move must not have our frame in front of it
+	return m_vEmoteQueue.empty() && !GameClient()->m_MiniGames.EmoteChannelBusy();
+}
+
 void CMClientDetect::ClearPeer(int ClientId)
 {
 	m_aPeers[ClientId] = CPeer{};
@@ -108,6 +135,14 @@ void CMClientDetect::OnReset()
 
 	m_ReplyPending = false;
 	m_ReplyTime = 0.0f;
+
+	m_PetOnSent = false;
+	m_aPetSkinSent[0] = '\0';
+	m_PetKnown = false;
+	m_PetLocalId = -1;
+	m_PetCooldown = 0.0f;
+	m_QueuedPetOn = false;
+	m_aQueuedPetSkin[0] = '\0';
 
 	m_aLocalName[0] = '\0';
 	m_BeaconHeardUntil = 0.0f;
@@ -165,7 +200,17 @@ void CMClientDetect::MarkAnswering()
 
 void CMClientDetect::OnBeaconSent()
 {
+	if(m_QueuedKind == KIND_PET)
+	{
+		m_PetOnSent = m_QueuedPetOn;
+		str_copy(m_aPetSkinSent, m_aQueuedPetSkin);
+		m_PetKnown = true;
+		m_PetCooldown = LocalTime() + PET_COOLDOWN;
+		return;
+	}
+
 	m_BeaconHeardUntil = LocalTime() + BEACON_ROUND;
+	m_PetKnown = false;
 	for(CPeer &Peer : m_aPeers)
 	{
 		Peer.m_Answering = false;
@@ -209,7 +254,7 @@ void CMClientDetect::UpdateAnnounce()
 		return;
 	}
 
-	if(!CanEmote() || !m_vEmoteQueue.empty())
+	if(!CanEmote() || !ChannelFree())
 		return;
 
 	SendBeacon(KIND_ANNOUNCE);
@@ -245,7 +290,7 @@ void CMClientDetect::UpdateReply()
 	if(!CanEmote())
 		return;
 
-	if(LocalTime() < m_ReplyTime || !m_vEmoteQueue.empty())
+	if(LocalTime() < m_ReplyTime || !ChannelFree())
 		return;
 
 	SendBeacon(KIND_REPLY);
@@ -253,12 +298,98 @@ void CMClientDetect::UpdateReply()
 	m_ReplyPending = false;
 }
 
+void CMClientDetect::LocalPet(bool *pOn, char *pSkin, int SkinSize) const
+{
+	*pOn = g_Config.m_ClMClientPetTee != 0;
+	str_copy(pSkin, g_Config.m_ClMClientForceSkin ? "maodie" : g_Config.m_ClMClientPetTeeSkin, SkinSize);
+}
+
+void CMClientDetect::UpdatePet()
+{
+	if(m_AnnouncePending || m_ReplyPending)
+		return;
+
+	const int LocalId = GameClient()->m_aLocalIds[g_Config.m_ClDummy];
+	if(LocalId != m_PetLocalId)
+	{
+		m_PetLocalId = LocalId;
+		m_PetKnown = false;
+	}
+
+	if(NumDetected() == 0)
+		return;
+	if(!CanEmote() || !ChannelFree())
+		return;
+	if(LocalTime() < m_PetCooldown)
+		return;
+
+	bool On;
+	char aSkin[MAX_SKIN_LENGTH];
+	LocalPet(&On, aSkin, sizeof(aSkin));
+
+	const bool Changed = On != m_PetOnSent || (On && str_comp(aSkin, m_aPetSkinSent) != 0);
+	if(!Changed && (m_PetKnown || !On))
+		return;
+
+	SendPetBeacon(On, aSkin);
+}
+
+void CMClientDetect::SendPetBeacon(bool On, const char *pSkin)
+{
+	int aIndices[MAX_PET_NAME];
+	int NameLen = 0;
+	int Head = PET_HEAD_NONE;
+	if(On)
+	{
+		Head = PET_HEAD_UNKNOWN;
+		NameLen = str_length(pSkin);
+		if(NameLen > 0 && NameLen <= MAX_PET_NAME)
+		{
+			int i = 0;
+			for(; i < NameLen; i++)
+			{
+				aIndices[i] = AlphabetIndex(pSkin[i]);
+				if(aIndices[i] < 0)
+					break;
+			}
+			if(i == NameLen)
+				Head = NameLen;
+		}
+	}
+
+	int aPayload[MAX_PAYLOAD];
+	int PayloadLen = 0;
+	aPayload[PayloadLen++] = Head / EMOTE_RADIX;
+	aPayload[PayloadLen++] = Head % EMOTE_RADIX;
+	if(Head >= 1 && Head <= MAX_PET_NAME)
+	{
+		for(int i = 0; i < NameLen; i += 2)
+		{
+			const int Value = aIndices[i] * PET_ALPHABET_SIZE + (i + 1 < NameLen ? aIndices[i + 1] : 0);
+			aPayload[PayloadLen++] = Value / (EMOTE_RADIX * EMOTE_RADIX);
+			aPayload[PayloadLen++] = (Value / EMOTE_RADIX) % EMOTE_RADIX;
+			aPayload[PayloadLen++] = Value % EMOTE_RADIX;
+		}
+	}
+
+	m_vEmoteQueue.push_back(BEACON_OP);
+	m_vEmoteQueue.push_back(BEACON_MAGIC);
+	m_vEmoteQueue.push_back(KIND_PET);
+	for(int i = 0; i < PayloadLen; i++)
+		m_vEmoteQueue.push_back(aPayload[i]);
+	m_vEmoteQueue.push_back(FrameCheck(KIND_PET, aPayload, PayloadLen));
+
+	m_QueuedKind = KIND_PET;
+	m_QueuedPetOn = On;
+	str_copy(m_aQueuedPetSkin, pSkin);
+}
+
 void CMClientDetect::SendBeacon(int Kind)
 {
 	m_vEmoteQueue.push_back(BEACON_OP);
 	m_vEmoteQueue.push_back(BEACON_MAGIC);
 	m_vEmoteQueue.push_back(Kind);
-	m_vEmoteQueue.push_back(BeaconCheck(Kind));
+	m_vEmoteQueue.push_back(FrameCheck(Kind, nullptr, 0));
 	m_QueuedKind = Kind;
 }
 
@@ -283,7 +414,18 @@ void CMClientDetect::AbortBeacon(bool Retry)
 			m_ReplyTime = LocalTime() + REPLY_DELAY + Jitter(REPLY_JITTER);
 		}
 	}
+	else if(m_QueuedKind == KIND_PET)
+	{
+		m_PetCooldown = LocalTime() + PET_RETRY;
+	}
 	m_QueuedKind = -1;
+}
+
+void CMClientDetect::YieldEmoteChannel()
+{
+	if(m_vEmoteQueue.empty())
+		return;
+	AbortBeacon(true);
 }
 
 void CMClientDetect::FlushEmoteQueue()
@@ -305,8 +447,11 @@ void CMClientDetect::FlushEmoteQueue()
 		m_EmoteRetries++;
 		if(m_EmoteRetries > MAX_ECHO_RETRIES)
 		{
+			const int Kind = m_QueuedKind;
 			AbortBeacon(false);
-			m_ReplyPending = false;
+			// a peer that asked for an answer while this frame was running still deserves one
+			if(Kind != KIND_PET)
+				m_ReplyPending = false;
 			return;
 		}
 
@@ -347,6 +492,10 @@ bool CMClientDetect::Decode(int ClientId, int Emoticon)
 {
 	CPeer &Peer = m_aPeers[ClientId];
 
+	if(Peer.m_Step != 0 && LocalTime() > Peer.m_SymbolTime + FRAME_TIMEOUT)
+		Peer.m_Step = 0;
+	Peer.m_SymbolTime = LocalTime();
+
 	if(Emoticon == BEACON_OP)
 	{
 		Peer.m_Step = 1;
@@ -366,12 +515,45 @@ bool CMClientDetect::Decode(int ClientId, int Emoticon)
 			GameClient()->m_aClients[ClientId].m_EmoticonStartTick = -1;
 		return true;
 	case 2:
+		if(Emoticon < 0 || Emoticon >= NUM_KINDS)
+		{
+			Peer.m_Step = 0;
+			return true;
+		}
 		Peer.m_Kind = Emoticon;
-		Peer.m_Step = Emoticon >= 0 && Emoticon < NUM_KINDS ? 3 : 0;
+		Peer.m_PayloadLen = 0;
+		Peer.m_PayloadNeed = Emoticon == KIND_PET ? 2 : 0;
+		Peer.m_Step = Peer.m_PayloadNeed > 0 ? 3 : 4;
 		return true;
 	case 3:
-		if(Emoticon == BeaconCheck(Peer.m_Kind))
-			OnBeacon(ClientId, Peer.m_Kind);
+		if(Peer.m_PayloadLen >= MAX_PAYLOAD)
+		{
+			Peer.m_Step = 0;
+			return true;
+		}
+		Peer.m_aPayload[Peer.m_PayloadLen++] = Emoticon;
+		if(Peer.m_Kind == KIND_PET && Peer.m_PayloadLen == 2)
+		{
+			const int Head = Peer.m_aPayload[0] * EMOTE_RADIX + Peer.m_aPayload[1];
+			if(Head > PET_HEAD_UNKNOWN)
+			{
+				Peer.m_Step = 0;
+				return true;
+			}
+			if(Head >= 1 && Head <= MAX_PET_NAME)
+				Peer.m_PayloadNeed = 2 + 3 * ((Head + 1) / 2);
+		}
+		if(Peer.m_PayloadLen >= Peer.m_PayloadNeed)
+			Peer.m_Step = 4;
+		return true;
+	case 4:
+		if(Emoticon == FrameCheck(Peer.m_Kind, Peer.m_aPayload, Peer.m_PayloadLen))
+		{
+			if(Peer.m_Kind == KIND_PET)
+				OnPetBeacon(ClientId);
+			else
+				OnBeacon(ClientId, Peer.m_Kind);
+		}
 		Peer.m_Step = 0;
 		return true;
 	default:
@@ -410,6 +592,50 @@ void CMClientDetect::OnBeacon(int ClientId, int Kind)
 	m_ReplyTime = LocalTime() + REPLY_DELAY + Jitter(REPLY_JITTER);
 }
 
+void CMClientDetect::OnPetBeacon(int ClientId)
+{
+	CPeer &Peer = m_aPeers[ClientId];
+	Peer.m_Detected = true;
+	str_copy(Peer.m_aName, GameClient()->m_aClients[ClientId].m_aRealName);
+
+	if(LocalTime() < m_BeaconHeardUntil)
+	{
+		Peer.m_WantsAnswer = false;
+		Peer.m_Answered = true;
+	}
+
+	const int Head = Peer.m_aPayload[0] * EMOTE_RADIX + Peer.m_aPayload[1];
+	Peer.m_PetOn = Head != PET_HEAD_NONE;
+	Peer.m_aPetSkin[0] = '\0';
+	if(Head < 1 || Head > MAX_PET_NAME)
+		return;
+
+	char aSkin[MAX_SKIN_LENGTH] = "";
+	int Pos = 2;
+	for(int i = 0; i < Head; i += 2)
+	{
+		const int Value = Peer.m_aPayload[Pos] * EMOTE_RADIX * EMOTE_RADIX + Peer.m_aPayload[Pos + 1] * EMOTE_RADIX + Peer.m_aPayload[Pos + 2];
+		Pos += 3;
+		if(Value >= PET_ALPHABET_SIZE * PET_ALPHABET_SIZE)
+			return;
+		aSkin[i] = PET_ALPHABET[Value / PET_ALPHABET_SIZE];
+		if(i + 1 < Head)
+			aSkin[i + 1] = PET_ALPHABET[Value % PET_ALPHABET_SIZE];
+	}
+	str_copy(Peer.m_aPetSkin, aSkin);
+}
+
+const char *CMClientDetect::PetSkin(int ClientId) const
+{
+	if(!Enabled() || ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return nullptr;
+
+	const CPeer &Peer = m_aPeers[ClientId];
+	if(!Peer.m_Detected || !Peer.m_PetOn)
+		return nullptr;
+	return Peer.m_aPetSkin[0] == '\0' ? "default" : Peer.m_aPetSkin;
+}
+
 bool CMClientDetect::OnEmoticon(int ClientId, int Emoticon)
 {
 	if(!Enabled() || ClientId < 0 || ClientId >= MAX_CLIENTS)
@@ -438,5 +664,6 @@ void CMClientDetect::OnRender()
 	ForgetOnRename();
 	UpdateAnnounce();
 	UpdateReply();
+	UpdatePet();
 	FlushEmoteQueue();
 }
