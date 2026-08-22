@@ -21,6 +21,7 @@ namespace
 	const float MAX_EMOTE_GAP = 3.5f;
 	const float EMOTE_GAP_GROWTH = 1.8f;
 	const float EMOTE_BACKOFF_START = 0.6f;
+	const float EMOTE_GAP_DECAY = 0.5f;
 
 	const float ECHO_TIMEOUT = 2.0f;
 	const int MAX_ECHO_RETRIES = 4;
@@ -32,7 +33,7 @@ namespace
 	const float REPLY_DELAY = 0.3f;
 	const float REPLY_JITTER = 1.5f;
 
-	const float PET_COOLDOWN = 8.0f;
+	const float PET_COOLDOWN = 2.0f;
 	const float PET_RETRY = 5.0f;
 	const float FRAME_TIMEOUT = 15.0f;
 
@@ -140,7 +141,6 @@ void CMClientDetect::OnReset()
 
 	m_PetOnSent = false;
 	m_aPetSkinSent[0] = '\0';
-	m_PetKnown = false;
 	m_PetLocalId = -1;
 	m_PetCooldown = 0.0f;
 	m_QueuedPetOn = false;
@@ -206,13 +206,12 @@ void CMClientDetect::OnBeaconSent()
 	{
 		m_PetOnSent = m_QueuedPetOn;
 		str_copy(m_aPetSkinSent, m_aQueuedPetSkin);
-		m_PetKnown = true;
+		MarkPetTold();
 		m_PetCooldown = LocalTime() + PET_COOLDOWN;
 		return;
 	}
 
 	m_BeaconHeardUntil = LocalTime() + BEACON_ROUND;
-	m_PetKnown = false;
 	for(CPeer &Peer : m_aPeers)
 	{
 		Peer.m_Answering = false;
@@ -306,6 +305,23 @@ void CMClientDetect::LocalPet(bool *pOn, char *pSkin, int SkinSize) const
 	str_copy(pSkin, g_Config.m_ClMClientForceSkin ? "maodie" : g_Config.m_ClMClientPetTeeSkin, SkinSize);
 }
 
+bool CMClientDetect::PetAudience() const
+{
+	return std::any_of(std::begin(m_aPeers), std::end(m_aPeers), [](const CPeer &Peer) { return Peer.m_Detected && !Peer.m_PetTold; });
+}
+
+void CMClientDetect::MarkPetTold()
+{
+	for(CPeer &Peer : m_aPeers)
+		Peer.m_PetTold = Peer.m_Detected;
+}
+
+void CMClientDetect::ForgetPetTold()
+{
+	for(CPeer &Peer : m_aPeers)
+		Peer.m_PetTold = false;
+}
+
 void CMClientDetect::UpdatePet()
 {
 	if(m_AnnouncePending || m_ReplyPending)
@@ -315,22 +331,28 @@ void CMClientDetect::UpdatePet()
 	if(LocalId != m_PetLocalId)
 	{
 		m_PetLocalId = LocalId;
-		m_PetKnown = false;
+		ForgetPetTold();
 	}
-
-	if(NumDetected() == 0)
-		return;
-	if(!CanEmote() || !ChannelFree())
-		return;
-	if(LocalTime() < m_PetCooldown)
-		return;
 
 	bool On;
 	char aSkin[MAX_SKIN_LENGTH];
 	LocalPet(&On, aSkin, sizeof(aSkin));
 
-	const bool Changed = On != m_PetOnSent || (On && str_comp(aSkin, m_aPetSkinSent) != 0);
-	if(!Changed && (m_PetKnown || !On))
+	if(On != m_PetOnSent || (On && str_comp(aSkin, m_aPetSkinSent) != 0))
+		ForgetPetTold();
+
+	if(!PetAudience())
+		return;
+
+	if(!On && !m_PetOnSent)
+	{
+		MarkPetTold();
+		return;
+	}
+
+	if(!CanEmote() || !ChannelFree())
+		return;
+	if(LocalTime() < m_PetCooldown)
 		return;
 
 	SendPetBeacon(On, aSkin);
@@ -513,6 +535,8 @@ bool CMClientDetect::HandleEcho(int Emoticon)
 	m_EmoteWaiting = false;
 	m_EmoteTime = 0.0f;
 	m_EmoteRetries = 0;
+	m_EmoteGap = std::max(m_EmoteGap * EMOTE_GAP_DECAY, MIN_EMOTE_GAP);
+	m_NextEmoteTime = std::min(m_NextEmoteTime, LocalTime() + m_EmoteGap);
 	return true;
 }
 
