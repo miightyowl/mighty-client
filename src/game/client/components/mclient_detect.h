@@ -67,6 +67,7 @@ private:
 		bool m_WantsAnswer;
 		bool m_Answering;
 		bool m_Answered;
+		bool m_PetTold;
 		bool m_PetOn;
 		char m_aPetSkin[MAX_SKIN_LENGTH];
 	};
@@ -93,7 +94,6 @@ private:
 	// the pet state the other M-Client players around us know about
 	bool m_PetOnSent = false;
 	char m_aPetSkinSent[MAX_SKIN_LENGTH] = "";
-	bool m_PetKnown = false;
 	int m_PetLocalId = -1;
 	float m_PetCooldown = 0.0f;
 	bool m_QueuedPetOn = false;
@@ -116,6 +116,9 @@ private:
 	void UpdateAnnounce();
 	void UpdateReply();
 	void UpdatePet();
+	bool PetAudience() const;
+	void MarkPetTold();
+	void ForgetPetTold();
 	void LocalPet(bool *pOn, char *pSkin, int SkinSize) const;
 	void SendBeacon(int Kind);
 	void SendPetBeacon(bool On, const char *pSkin);
