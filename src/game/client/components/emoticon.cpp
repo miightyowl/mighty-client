@@ -212,6 +212,8 @@ void CEmoticon::Emote(int Emoticon)
 {
 	if(GameClient()->m_MiniGames.QueueManualEmote(Emoticon))
 		return;
+	if(GameClient()->m_MClientDetect.QueueManualEmote(Emoticon))
+		return;
 
 	CNetMsg_Cl_Emoticon Msg;
 	Msg.m_Emoticon = Emoticon;
