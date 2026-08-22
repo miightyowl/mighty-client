@@ -615,8 +615,12 @@ void CMiniGames::FlushEmoteQueue()
 	if(!GameClient()->m_Snap.m_pLocalCharacter)
 		return;
 
-	if(!m_EmoteWaiting && GameClient()->m_MClientDetect.EmoteInFlight())
+	if(!m_EmoteWaiting && GameClient()->m_MClientDetect.EmoteChannelBusy())
+	{
+		// user detection sends long frames, it has to step aside for a game
+		GameClient()->m_MClientDetect.YieldEmoteChannel();
 		return;
+	}
 
 	if(m_EmoteWaiting)
 	{

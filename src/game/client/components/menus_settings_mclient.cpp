@@ -48,13 +48,15 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		MCLIENT_TAB_GAMEPLAY = 0,
 		MCLIENT_TAB_FROZEN,
 		MCLIENT_TAB_APPEARANCE,
+		MCLIENT_TAB_EXPERIMENTAL,
 		NUM_MCLIENT_TABS,
 	};
 	static int s_CurTab = MCLIENT_TAB_GAMEPLAY;
 	const char *apTabNames[NUM_MCLIENT_TABS] = {
 		Localize("Gameplay"),
 		Localize("Frozen"),
-		Localize("Appearance")};
+		Localize("Appearance"),
+		Localize("Experimental")};
 	static CButtonContainer s_aTabButtons[NUM_MCLIENT_TABS];
 	CUIRect TabRow = TabBar;
 	for(int Tab = 0; Tab < NUM_MCLIENT_TABS; ++Tab)
@@ -111,27 +113,11 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFatChat, Localize("Fat skins when someone writes \"fat\""), &g_Config.m_ClMClientFatChat, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMaodieWalk, Localize("Giant maodie walks across the screen"), &g_Config.m_ClMClientMaodieWalk, &LeftView, LineSize);
 
-		// experimental
-		LeftView.HSplitTop(MarginBetweenViews, nullptr, &LeftView);
-		Ui()->DoLabel_AutoLineSize(Localize("Experimental"), HeadlineFontSize, TEXTALIGN_ML, &LeftView, HeadlineHeight);
-		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFinishRename, Localize("Rename near finish if name has finished"), &g_Config.m_ClFinishRename, &LeftView, LineSize);
-		if(g_Config.m_ClFinishRename)
-		{
-			CUIRect NamesLabel;
-			LeftView.HSplitTop(LineSize, &Button, &LeftView);
-			Button.VSplitLeft(140.0f, &NamesLabel, &Button);
-			Ui()->DoLabel(&NamesLabel, Localize("Alternative names:"), ColorPickerLabelSize, TEXTALIGN_ML);
-			static CLineInput s_FinishRenameNamesInput;
-			s_FinishRenameNamesInput.SetBuffer(g_Config.m_ClFinishRenameNames, sizeof(g_Config.m_ClFinishRenameNames));
-			s_FinishRenameNamesInput.SetEmptyText("name1, name2, \xe2\x80\xa6");
-			Ui()->DoEditBox(&s_FinishRenameNamesInput, &Button, 12.0f);
-		}
-
 		// companion pet
 		Ui()->DoLabel_AutoLineSize(Localize("Companion pet"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
 		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPetTee, Localize("Show companion tee (pet)"), &g_Config.m_ClMClientPetTee, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPetTeeOthers, Localize("Show pets of other M-Client players"), &g_Config.m_ClMClientPetTeeOthers, &RightView, LineSize);
 		if(g_Config.m_ClMClientPetTee)
 		{
 			RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
@@ -284,6 +270,25 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
 		if(Ui()->DoScrollbarOption(&s_ChatBackgroundDarkness, &s_ChatBackgroundDarkness, &Button, Localize("Chat background darkness"), 0, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%"))
 			g_Config.m_ClChatBackgroundColor = ColorHSLA(0.0f, 0.0f, 0.0f, s_ChatBackgroundDarkness / 100.0f).Pack(true);
+	}
+	else if(s_CurTab == MCLIENT_TAB_EXPERIMENTAL)
+	{
+		MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+
+		Ui()->DoLabel_AutoLineSize(Localize("Experimental"), HeadlineFontSize, TEXTALIGN_ML, &LeftView, HeadlineHeight);
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFinishRename, Localize("Rename near finish if name has finished"), &g_Config.m_ClFinishRename, &LeftView, LineSize);
+		if(g_Config.m_ClFinishRename)
+		{
+			CUIRect NamesLabel;
+			LeftView.HSplitTop(LineSize, &Button, &LeftView);
+			Button.VSplitLeft(140.0f, &NamesLabel, &Button);
+			Ui()->DoLabel(&NamesLabel, Localize("Alternative names:"), ColorPickerLabelSize, TEXTALIGN_ML);
+			static CLineInput s_FinishRenameNamesInput;
+			s_FinishRenameNamesInput.SetBuffer(g_Config.m_ClFinishRenameNames, sizeof(g_Config.m_ClFinishRenameNames));
+			s_FinishRenameNamesInput.SetEmptyText("name1, name2, \xe2\x80\xa6");
+			Ui()->DoEditBox(&s_FinishRenameNamesInput, &Button, 12.0f);
+		}
 	}
 }
 void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
