@@ -48,8 +48,9 @@ private:
 		// the head of a pet frame holds the length of the skin name, or one of these
 		PET_HEAD_NONE = 0,
 		PET_HEAD_UNKNOWN = MAX_PET_NAME + 1,
+		PET_HEAD_WIDE = 32,
 		// two head digits, then three digits per pair of characters
-		MAX_PAYLOAD = 2 + 3 * ((MAX_PET_NAME + 1) / 2),
+		MAX_PAYLOAD = 2 + 4 * ((MAX_PET_NAME + 1) / 2),
 	};
 
 	struct CPeer
@@ -76,7 +77,7 @@ private:
 	bool m_EmoteWaiting = false;
 	float m_EmoteTime = 0.0f;
 	float m_NextEmoteTime = 0.0f;
-	float m_EmoteGap = 0.4f;
+	float m_EmoteGap = 0.0f;
 	int m_EmoteRetries = 0;
 
 	bool m_AnnouncePending = false;

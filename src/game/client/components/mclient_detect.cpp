@@ -17,9 +17,10 @@ namespace
 	const int BEACON_OP = 15;
 	const int BEACON_MAGIC = 5;
 
-	const float MIN_EMOTE_GAP = 0.4f;
+	const float MIN_EMOTE_GAP = 0.0f;
 	const float MAX_EMOTE_GAP = 3.5f;
 	const float EMOTE_GAP_GROWTH = 1.8f;
+	const float EMOTE_BACKOFF_START = 0.6f;
 
 	const float ECHO_TIMEOUT = 2.0f;
 	const int MAX_ECHO_RETRIES = 4;
@@ -35,8 +36,9 @@ namespace
 	const float PET_RETRY = 5.0f;
 	const float FRAME_TIMEOUT = 15.0f;
 
-	const char PET_ALPHABET[] = "abcdefghijklmnopqrstuvwxyz0123456789_-";
-	const int PET_ALPHABET_SIZE = sizeof(PET_ALPHABET) - 1;
+	const char PET_ALPHABET[] = "abcdefghijklmnopqrstuvwxyz0123456789_-ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	const int PET_NARROW_SIZE = 38;
+	const int PET_WIDE_SIZE = sizeof(PET_ALPHABET) - 1;
 
 	int FrameCheck(int Kind, const int *pPayload, int PayloadLen)
 	{
@@ -48,10 +50,9 @@ namespace
 
 	int AlphabetIndex(char Char)
 	{
-		const char Lower = Char >= 'A' && Char <= 'Z' ? (char)(Char - 'A' + 'a') : Char;
-		for(int i = 0; i < PET_ALPHABET_SIZE; i++)
+		for(int i = 0; i < PET_WIDE_SIZE; i++)
 		{
-			if(PET_ALPHABET[i] == Lower)
+			if(PET_ALPHABET[i] == Char)
 				return i;
 		}
 		return -1;
@@ -339,6 +340,7 @@ void CMClientDetect::SendPetBeacon(bool On, const char *pSkin)
 	int aIndices[MAX_PET_NAME];
 	int NameLen = 0;
 	int Head = PET_HEAD_NONE;
+	bool Wide = false;
 	if(On)
 	{
 		Head = PET_HEAD_UNKNOWN;
@@ -351,9 +353,11 @@ void CMClientDetect::SendPetBeacon(bool On, const char *pSkin)
 				aIndices[i] = AlphabetIndex(pSkin[i]);
 				if(aIndices[i] < 0)
 					break;
+				if(aIndices[i] >= PET_NARROW_SIZE)
+					Wide = true;
 			}
 			if(i == NameLen)
-				Head = NameLen;
+				Head = Wide ? PET_HEAD_WIDE + NameLen : NameLen;
 		}
 	}
 
@@ -361,14 +365,19 @@ void CMClientDetect::SendPetBeacon(bool On, const char *pSkin)
 	int PayloadLen = 0;
 	aPayload[PayloadLen++] = Head / EMOTE_RADIX;
 	aPayload[PayloadLen++] = Head % EMOTE_RADIX;
-	if(Head >= 1 && Head <= MAX_PET_NAME)
+	if(Head != PET_HEAD_NONE && Head != PET_HEAD_UNKNOWN)
 	{
+		const int Base = Wide ? PET_WIDE_SIZE : PET_NARROW_SIZE;
+		const int Digits = Wide ? 4 : 3;
 		for(int i = 0; i < NameLen; i += 2)
 		{
-			const int Value = aIndices[i] * PET_ALPHABET_SIZE + (i + 1 < NameLen ? aIndices[i + 1] : 0);
-			aPayload[PayloadLen++] = Value / (EMOTE_RADIX * EMOTE_RADIX);
-			aPayload[PayloadLen++] = (Value / EMOTE_RADIX) % EMOTE_RADIX;
-			aPayload[PayloadLen++] = Value % EMOTE_RADIX;
+			int Value = aIndices[i] * Base + (i + 1 < NameLen ? aIndices[i + 1] : 0);
+			for(int d = Digits - 1; d >= 0; d--)
+			{
+				aPayload[PayloadLen + d] = Value % EMOTE_RADIX;
+				Value /= EMOTE_RADIX;
+			}
+			PayloadLen += Digits;
 		}
 	}
 
@@ -455,7 +464,7 @@ void CMClientDetect::FlushEmoteQueue()
 			return;
 		}
 
-		m_EmoteGap = std::min(m_EmoteGap * EMOTE_GAP_GROWTH, MAX_EMOTE_GAP);
+		m_EmoteGap = std::min(std::max(m_EmoteGap * EMOTE_GAP_GROWTH, EMOTE_BACKOFF_START), MAX_EMOTE_GAP);
 		m_EmoteWaiting = false;
 		m_NextEmoteTime = LocalTime() + m_EmoteGap;
 	}
@@ -535,13 +544,15 @@ bool CMClientDetect::Decode(int ClientId, int Emoticon)
 		if(Peer.m_Kind == KIND_PET && Peer.m_PayloadLen == 2)
 		{
 			const int Head = Peer.m_aPayload[0] * EMOTE_RADIX + Peer.m_aPayload[1];
-			if(Head > PET_HEAD_UNKNOWN)
+			if(Head >= 1 && Head <= MAX_PET_NAME)
+				Peer.m_PayloadNeed = 2 + 3 * ((Head + 1) / 2);
+			else if(Head > PET_HEAD_WIDE && Head <= PET_HEAD_WIDE + MAX_PET_NAME)
+				Peer.m_PayloadNeed = 2 + 4 * ((Head - PET_HEAD_WIDE + 1) / 2);
+			else if(Head != PET_HEAD_NONE && Head != PET_HEAD_UNKNOWN)
 			{
 				Peer.m_Step = 0;
 				return true;
 			}
-			if(Head >= 1 && Head <= MAX_PET_NAME)
-				Peer.m_PayloadNeed = 2 + 3 * ((Head + 1) / 2);
 		}
 		if(Peer.m_PayloadLen >= Peer.m_PayloadNeed)
 			Peer.m_Step = 4;
@@ -607,20 +618,27 @@ void CMClientDetect::OnPetBeacon(int ClientId)
 	const int Head = Peer.m_aPayload[0] * EMOTE_RADIX + Peer.m_aPayload[1];
 	Peer.m_PetOn = Head != PET_HEAD_NONE;
 	Peer.m_aPetSkin[0] = '\0';
-	if(Head < 1 || Head > MAX_PET_NAME)
+
+	const bool Wide = Head > PET_HEAD_WIDE;
+	const int NameLen = Wide ? Head - PET_HEAD_WIDE : Head;
+	if(NameLen < 1 || NameLen > MAX_PET_NAME)
 		return;
 
+	const int Base = Wide ? PET_WIDE_SIZE : PET_NARROW_SIZE;
+	const int Digits = Wide ? 4 : 3;
 	char aSkin[MAX_SKIN_LENGTH] = "";
 	int Pos = 2;
-	for(int i = 0; i < Head; i += 2)
+	for(int i = 0; i < NameLen; i += 2)
 	{
-		const int Value = Peer.m_aPayload[Pos] * EMOTE_RADIX * EMOTE_RADIX + Peer.m_aPayload[Pos + 1] * EMOTE_RADIX + Peer.m_aPayload[Pos + 2];
-		Pos += 3;
-		if(Value >= PET_ALPHABET_SIZE * PET_ALPHABET_SIZE)
+		int Value = 0;
+		for(int d = 0; d < Digits; d++)
+			Value = Value * EMOTE_RADIX + Peer.m_aPayload[Pos + d];
+		Pos += Digits;
+		if(Value >= Base * Base)
 			return;
-		aSkin[i] = PET_ALPHABET[Value / PET_ALPHABET_SIZE];
-		if(i + 1 < Head)
-			aSkin[i + 1] = PET_ALPHABET[Value % PET_ALPHABET_SIZE];
+		aSkin[i] = PET_ALPHABET[Value / Base];
+		if(i + 1 < NameLen)
+			aSkin[i + 1] = PET_ALPHABET[Value % Base];
 	}
 	str_copy(Peer.m_aPetSkin, aSkin);
 }
