@@ -30,6 +30,7 @@ public:
 
 	bool EmoteInFlight() const { return m_EmoteWaiting; }
 	bool EmoteChannelBusy() const { return !m_vEmoteQueue.empty(); }
+	bool QueueManualEmote(int Emoticon);
 	// drop the frame we are sending so a mini game can have the emoticon channel
 	void YieldEmoteChannel();
 
@@ -74,6 +75,7 @@ private:
 
 	std::vector<int> m_vEmoteQueue;
 	int m_QueuedKind = -1;
+	int m_ProtocolLeft = 0;
 	bool m_EmoteWaiting = false;
 	float m_EmoteTime = 0.0f;
 	float m_NextEmoteTime = 0.0f;

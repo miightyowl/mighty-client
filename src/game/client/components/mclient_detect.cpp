@@ -121,6 +121,7 @@ void CMClientDetect::OnReset()
 	ClearPeers();
 
 	m_vEmoteQueue.clear();
+	m_ProtocolLeft = 0;
 	m_QueuedKind = -1;
 	m_EmoteWaiting = false;
 	m_EmoteTime = 0.0f;
@@ -388,6 +389,7 @@ void CMClientDetect::SendPetBeacon(bool On, const char *pSkin)
 		m_vEmoteQueue.push_back(aPayload[i]);
 	m_vEmoteQueue.push_back(FrameCheck(KIND_PET, aPayload, PayloadLen));
 
+	m_ProtocolLeft = (int)m_vEmoteQueue.size();
 	m_QueuedKind = KIND_PET;
 	m_QueuedPetOn = On;
 	str_copy(m_aQueuedPetSkin, pSkin);
@@ -399,12 +401,14 @@ void CMClientDetect::SendBeacon(int Kind)
 	m_vEmoteQueue.push_back(BEACON_MAGIC);
 	m_vEmoteQueue.push_back(Kind);
 	m_vEmoteQueue.push_back(FrameCheck(Kind, nullptr, 0));
+	m_ProtocolLeft = (int)m_vEmoteQueue.size();
 	m_QueuedKind = Kind;
 }
 
 void CMClientDetect::AbortBeacon(bool Retry)
 {
 	m_vEmoteQueue.clear();
+	m_ProtocolLeft = 0;
 	m_EmoteWaiting = false;
 	m_EmoteTime = 0.0f;
 	m_EmoteRetries = 0;
@@ -428,6 +432,17 @@ void CMClientDetect::AbortBeacon(bool Retry)
 		m_PetCooldown = LocalTime() + PET_RETRY;
 	}
 	m_QueuedKind = -1;
+}
+
+bool CMClientDetect::QueueManualEmote(int Emoticon)
+{
+	if(m_vEmoteQueue.empty())
+		return false;
+	if(Emoticon < 0 || Emoticon >= NUM_EMOTICONS)
+		return false;
+
+	m_vEmoteQueue.push_back(Emoticon);
+	return true;
 }
 
 void CMClientDetect::YieldEmoteChannel()
@@ -486,10 +501,14 @@ bool CMClientDetect::HandleEcho(int Emoticon)
 		return false;
 
 	m_vEmoteQueue.erase(m_vEmoteQueue.begin());
-	if(m_vEmoteQueue.empty())
+	if(m_ProtocolLeft > 0)
 	{
-		OnBeaconSent();
-		m_QueuedKind = -1;
+		m_ProtocolLeft--;
+		if(m_ProtocolLeft == 0)
+		{
+			OnBeaconSent();
+			m_QueuedKind = -1;
+		}
 	}
 	m_EmoteWaiting = false;
 	m_EmoteTime = 0.0f;
