@@ -10,6 +10,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -28,7 +29,9 @@ class CFinishRename : public CComponent
 	struct SLookup
 	{
 		std::shared_ptr<IHttpRequest> m_pRequest;
-		EStatus m_Status = STATUS_PENDING;
+		bool m_Done = false;
+		bool m_Failed = false;
+		std::set<std::string> m_FinishedMaps;
 	};
 	std::map<std::string, SLookup> m_Lookups;
 
@@ -51,8 +54,10 @@ class CFinishRename : public CComponent
 	void EnsureLookup(const char *pName);
 	void UpdateLookups();
 	EStatus LookupStatus(const char *pName) const;
-	EStatus StatusFromJson(const _json_value *pJson) const;
+	void ParseFinishedMaps(const _json_value *pJson, std::set<std::string> *pFinishedMaps) const;
 	float DistanceToFinish(vec2 Pos) const;
+	bool PathIsClear(vec2 From, vec2 To) const;
+	bool FinishReachable(vec2 Pos, float Range) const;
 	void ComputeDecision();
 	void Rename(const char *pName);
 	void RestoreName(bool SendUpdate);

@@ -1,6 +1,7 @@
 
 #include "finish_rename.h"
 
+#include <base/math.h>
 #include <base/str.h>
 
 #include <engine/http.h>
@@ -11,6 +12,8 @@
 #include <game/client/gameclient.h>
 #include <game/client/race.h>
 #include <game/mapitems.h>
+
+#include <algorithm>
 
 const char *CFinishRename::ActiveName() const
 {
@@ -42,12 +45,6 @@ std::vector<std::string> CFinishRename::AlternativeNames() const
 void CFinishRename::ResetMapState()
 {
 	RestoreName(false);
-	for(auto &[Name, Lookup] : m_Lookups)
-	{
-		if(Lookup.m_pRequest)
-			Lookup.m_pRequest->Abort();
-	}
-	m_Lookups.clear();
 	m_aMap[0] = '\0';
 	m_MapScanned = false;
 	m_vFinishTilePositions.clear();
@@ -104,39 +101,56 @@ void CFinishRename::UpdateLookups()
 			continue;
 		if(Lookup.m_pRequest->State() != EHttpState::DONE)
 		{
-			Lookup.m_Status = STATUS_FAILED;
+			Lookup.m_Failed = true;
 		}
 		else
 		{
 			json_value *pJson = Lookup.m_pRequest->ResultJson();
-			Lookup.m_Status = pJson ? StatusFromJson(pJson) : STATUS_FAILED;
 			if(pJson)
+			{
+				ParseFinishedMaps(pJson, &Lookup.m_FinishedMaps);
 				json_value_free(pJson);
+			}
+			else
+			{
+				Lookup.m_Failed = true;
+			}
 		}
 		Lookup.m_pRequest = nullptr;
+		Lookup.m_Done = true;
+		m_Decided = false;
 	}
 }
 
-CFinishRename::EStatus CFinishRename::StatusFromJson(const _json_value *pJson) const
+void CFinishRename::ParseFinishedMaps(const _json_value *pJson, std::set<std::string> *pFinishedMaps) const
 {
 	const json_value *pTypes = json_object_get(pJson, "types");
 	if(pTypes->type != json_object)
-		return STATUS_UNFINISHED;
+		return;
 	for(unsigned TypeIndex = 0; TypeIndex < pTypes->u.object.length; TypeIndex++)
 	{
-		const json_value *pMap = json_object_get(json_object_get(pTypes->u.object.values[TypeIndex].value, "maps"), m_aMap);
-		if(pMap->type != json_object)
+		const json_value *pMaps = json_object_get(pTypes->u.object.values[TypeIndex].value, "maps");
+		if(pMaps->type != json_object)
 			continue;
-		const json_value *pFinishes = json_object_get(pMap, "finishes");
-		return pFinishes->type == json_integer && json_int_get(pFinishes) > 0 ? STATUS_FINISHED : STATUS_UNFINISHED;
+		for(unsigned MapIndex = 0; MapIndex < pMaps->u.object.length; MapIndex++)
+		{
+			const json_value *pFinishes = json_object_get(pMaps->u.object.values[MapIndex].value, "finishes");
+			if(pFinishes->type == json_integer && json_int_get(pFinishes) > 0)
+				pFinishedMaps->emplace(pMaps->u.object.values[MapIndex].name);
+		}
 	}
-	return STATUS_UNFINISHED;
 }
 
 CFinishRename::EStatus CFinishRename::LookupStatus(const char *pName) const
 {
 	const auto Lookup = m_Lookups.find(pName);
-	return Lookup == m_Lookups.end() ? STATUS_PENDING : Lookup->second.m_Status;
+	if(Lookup == m_Lookups.end())
+		return STATUS_PENDING;
+	if(Lookup->second.m_FinishedMaps.contains(m_aMap))
+		return STATUS_FINISHED;
+	if(!Lookup->second.m_Done)
+		return STATUS_PENDING;
+	return Lookup->second.m_Failed ? STATUS_FAILED : STATUS_UNFINISHED;
 }
 
 float CFinishRename::DistanceToFinish(vec2 Pos) const
@@ -151,10 +165,42 @@ float CFinishRename::DistanceToFinish(vec2 Pos) const
 	return Nearest;
 }
 
+bool CFinishRename::PathIsClear(vec2 From, vec2 To) const
+{
+	const int Steps = std::max(1, round_to_int(distance(From, To) / 16.0f));
+	for(int Step = 0; Step <= Steps; Step++)
+	{
+		const vec2 Pos = mix(From, To, (float)Step / (float)Steps);
+		if(Collision()->CheckPoint(Pos))
+			return false;
+		const int Index = Collision()->GetPureMapIndex(Pos);
+		if(Collision()->IsTeleport(Index) || Collision()->IsEvilTeleport(Index) ||
+			Collision()->IsTeleportWeapon(Index) || Collision()->IsTeleportHook(Index) ||
+			Collision()->IsCheckTeleport(Index) || Collision()->IsCheckEvilTeleport(Index))
+			return false;
+	}
+	return true;
+}
+
+bool CFinishRename::FinishReachable(vec2 Pos, float Range) const
+{
+	for(const vec2 &TilePos : m_vFinishTilePositions)
+	{
+		if(distance(Pos, TilePos) <= Range && PathIsClear(Pos, TilePos))
+			return true;
+	}
+	return false;
+}
+
 void CFinishRename::OnRender()
 {
 	if(!g_Config.m_ClFinishRename || Client()->State() != IClient::STATE_ONLINE)
 		return;
+
+	EnsureLookup(ActiveName());
+	for(const std::string &Name : AlternativeNames())
+		EnsureLookup(Name.c_str());
+	UpdateLookups();
 
 	if(m_aMap[0] == '\0')
 	{
@@ -162,11 +208,8 @@ void CFinishRename::OnRender()
 		if(!ServerInfo.m_aMap[0])
 			return;
 		str_copy(m_aMap, ServerInfo.m_aMap);
+		m_Decided = false;
 	}
-	EnsureLookup(ActiveName());
-	for(const std::string &Name : AlternativeNames())
-		EnsureLookup(Name.c_str());
-	UpdateLookups();
 
 	std::string Inputs = std::string(ActiveName()) + "\n" + g_Config.m_ClFinishRenameNames;
 	if(Inputs != m_DecisionInputs)
@@ -196,10 +239,13 @@ void CFinishRename::OnRender()
 	}
 	if(Distance > TriggerDistance || !m_Armed)
 		return;
+	if(!m_Decided || m_aTargetName[0] == '\0')
+		return;
+	if(!FinishReachable(GameClient()->m_LocalCharacterPos, TriggerDistance))
+		return;
 
 	m_Armed = false;
-	if(m_Decided && m_aTargetName[0] != '\0')
-		Rename(m_aTargetName);
+	Rename(m_aTargetName);
 }
 
 void CFinishRename::ComputeDecision()
@@ -279,6 +325,23 @@ void CFinishRename::OnMessage(int MsgType, void *pRawMsg)
 	if(Client()->State() != IClient::STATE_ONLINE)
 		return;
 
+	if(MsgType == NETMSGTYPE_SV_KILLMSG)
+	{
+		const CNetMsg_Sv_KillMsg *pMsg = (CNetMsg_Sv_KillMsg *)pRawMsg;
+		for(const int LocalId : GameClient()->m_aLocalIds)
+			if(LocalId >= 0 && pMsg->m_Victim == LocalId)
+				m_Armed = true;
+		return;
+	}
+	if(MsgType == NETMSGTYPE_SV_KILLMSGTEAM)
+	{
+		const CNetMsg_Sv_KillMsgTeam *pMsg = (CNetMsg_Sv_KillMsgTeam *)pRawMsg;
+		for(const int LocalId : GameClient()->m_aLocalIds)
+			if(LocalId >= 0 && GameClient()->m_Teams.Team(LocalId) == pMsg->m_Team)
+				m_Armed = true;
+		return;
+	}
+
 	int FinishedClientId = -1;
 	if(MsgType == NETMSGTYPE_SV_RACEFINISH)
 	{
@@ -303,8 +366,8 @@ void CFinishRename::OnMessage(int MsgType, void *pRawMsg)
 
 	const char *pFinishedName = GameClient()->m_aClients[FinishedClientId].m_aName;
 	const auto Lookup = m_Lookups.find(pFinishedName);
-	if(Lookup != m_Lookups.end())
-		Lookup->second.m_Status = STATUS_FINISHED;
+	if(m_aMap[0] != '\0' && Lookup != m_Lookups.end() && Lookup->second.m_FinishedMaps.emplace(m_aMap).second)
+		m_Decided = false;
 
 	if(m_RenamedDummy >= 0 && GameClient()->m_aLocalIds[m_RenamedDummy] == FinishedClientId)
 		RestoreName(true);
