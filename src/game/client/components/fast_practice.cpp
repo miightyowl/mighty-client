@@ -59,6 +59,7 @@ void CFastPractice::OnReset()
 	m_World.Clear();
 	m_RenderWorld.Clear();
 	mem_zero(&m_FrozenInput, sizeof(m_FrozenInput));
+	m_HasRescue = false;
 }
 
 void CFastPractice::OnMapLoad()
@@ -361,6 +362,15 @@ void CFastPractice::FlushPredictedEvents(CGameWorld *pWorld, bool Emit)
 	pWorld->m_PredictedEvents.clear();
 }
 
+static int PracticeEyeEmote(const CCharacterCore &Core)
+{
+	if(Core.m_DeepFrozen || Core.m_LiveFrozen)
+		return EMOTE_PAIN;
+	if(Core.m_FreezeEnd != 0)
+		return EMOTE_BLINK;
+	return EMOTE_NORMAL;
+}
+
 void CFastPractice::ApplyRenderedCharacter(CNetObj_Character *pPrev, CNetObj_Character *pCur)
 {
 	if(!m_Active)
@@ -370,6 +380,7 @@ void CFastPractice::ApplyRenderedCharacter(CNetObj_Character *pPrev, CNetObj_Cha
 		return;
 
 	pPrev->m_Weapon = pCur->m_Weapon = pChar->GetActiveWeapon();
+	pPrev->m_Emote = pCur->m_Emote = PracticeEyeEmote(pChar->GetCore());
 
 	const int Age = m_World.GameTick() - pChar->GetAttackTick();
 	pPrev->m_AttackTick = pCur->m_AttackTick = Client()->GameTick(g_Config.m_ClDummy) - Age;
@@ -465,6 +476,10 @@ void CFastPractice::ApplyAction(CCharacter *pChar, int Action)
 		ApplyRespawn(pChar);
 		break;
 
+	case ACTION_RESCUE:
+		ApplyRescue(pChar);
+		break;
+
 	case ACTION_TELEPORT:
 	{
 		CCharacterCore Core = pChar->GetCore();
@@ -473,7 +488,7 @@ void CFastPractice::ApplyAction(CCharacter *pChar, int Action)
 		ClearFreeze(&Core);
 		pChar->SetCore(Core);
 		pChar->SetCoreWorld(pChar->GameWorld());
-		pChar->ResetHook();
+		// the server's /tp only moves the tee, a hook that is attached stays attached
 		pChar->m_Pos = Core.m_Pos;
 		pChar->m_PrevPos = Core.m_Pos;
 		pChar->m_PrevPrevPos = Core.m_Pos;
@@ -667,7 +682,7 @@ void CFastPractice::RenderPracticeTee()
 	Core.Write(&Render);
 	Render.m_Tick = Client()->GameTick(g_Config.m_ClDummy);
 	Render.m_Weapon = Core.m_ActiveWeapon;
-	Render.m_Emote = EMOTE_NORMAL;
+	Render.m_Emote = PracticeEyeEmote(Core);
 	if(const CCharacter *pChar = m_World.GetCharacterById(m_ClientId))
 		Render.m_AttackTick = Client()->GameTick(g_Config.m_ClDummy) - (m_World.GameTick() - pChar->GetAttackTick());
 
@@ -719,6 +734,51 @@ void CFastPractice::RenderRealTee()
 	g_Config.m_ClRaceGhostAlpha = 35;
 	GameClient()->m_Players.RenderPlayer(ScreenRect, &Prev, &Cur, &TeeRenderInfo, -2, Client()->IntraGameTick(g_Config.m_ClDummy));
 	g_Config.m_ClRaceGhostAlpha = SavedGhostAlpha;
+}
+
+void CFastPractice::TrackRescue(CCharacter *pChar)
+{
+	const CCharacterCore Core = pChar->GetCore();
+	if(!pChar->IsGrounded() || Core.m_IsInFreeze || Core.m_DeepFrozen)
+		return;
+	m_RescueCore = Core;
+	m_RescueTele = pChar->m_TeleCheckpoint;
+	m_RescueTick = m_World.GameTick();
+	m_HasRescue = true;
+}
+
+void CFastPractice::ApplyRescue(CCharacter *pChar)
+{
+	if(!m_HasRescue)
+	{
+		Notify(Localize("Fast practice: no rescue position saved yet."));
+		return;
+	}
+
+	CGameWorld *pWorld = pChar->GameWorld();
+	CCharacterCore Core = m_RescueCore;
+	RebaseCore(&Core, pWorld->GameTick() - m_RescueTick);
+
+	const CCharacterCore Current = pChar->GetCore();
+	for(int Weapon = 0; Weapon < NUM_WEAPONS; Weapon++)
+		Core.m_aWeapons[Weapon] = Current.m_aWeapons[Weapon];
+	Core.m_ActiveWeapon = Current.m_ActiveWeapon;
+	Core.m_Jetpack = Current.m_Jetpack;
+
+	Core.m_Vel = vec2(0.0f, 0.0f);
+	Core.m_HookState = HOOK_IDLE;
+	ClearFreeze(&Core);
+
+	pChar->SetCore(Core);
+	pChar->SetCoreWorld(pWorld);
+	pChar->ResetHook();
+	pWorld->ReleaseHooked(pChar->GetCid());
+	pChar->m_Pos = Core.m_Pos;
+	pChar->m_PrevPos = Core.m_Pos;
+	pChar->m_PrevPrevPos = Core.m_Pos;
+	pChar->m_FreezeTime = 0;
+	pChar->m_FrozenLastTick = false;
+	pChar->m_TeleCheckpoint = m_RescueTele;
 }
 
 void CFastPractice::ApplyRespawn(CCharacter *pChar)
@@ -786,6 +846,7 @@ void CFastPractice::Advance(int Ticks)
 
 		EmitCoreEvents(pChar);
 		HandleTeleports(pChar);
+		TrackRescue(pChar);
 
 		if(g_Config.m_ClAutoswitchWeapons)
 		{
@@ -898,6 +959,8 @@ bool CFastPractice::OnChatCommand(const char *pLine)
 		int m_Action;
 	} s_aSimple[] = {
 		{"kill", ACTION_KILL},
+		{"r", ACTION_RESCUE},
+		{"rescue", ACTION_RESCUE},
 		{"unfreeze", ACTION_UNFREEZE},
 		{"hammer", ACTION_GIVE_HAMMER},
 		{"gun", ACTION_GIVE_GUN},

@@ -60,6 +60,11 @@ private:
 	int m_CheckpointTele = 0;
 	vec2 m_TeleportTarget = vec2(0.0f, 0.0f);
 
+	CCharacterCore m_RescueCore;
+	int m_RescueTele = 0;
+	int m_RescueTick = 0;
+	bool m_HasRescue = false;
+
 	CCharacterCore m_aRespawnCore[MAX_CLIENTS];
 	int m_aRespawnTele[MAX_CLIENTS] = {0};
 	int m_aRespawnTick[MAX_CLIENTS] = {0};
@@ -72,6 +77,7 @@ private:
 		ACTION_NONE = 0,
 		ACTION_KILL,
 		ACTION_TELEPORT,
+		ACTION_RESCUE,
 		ACTION_UNFREEZE,
 		ACTION_GIVE_HAMMER,
 		ACTION_GIVE_GUN,
@@ -110,6 +116,8 @@ private:
 	void HandleTeleports(class CCharacter *pChar);
 	bool IsDead(class CCharacter *pChar) const;
 	void SetRespawn(int ClientId, const CCharacterCore &Core, int TeleCheckpoint, int Tick);
+	void TrackRescue(class CCharacter *pChar);
+	void ApplyRescue(class CCharacter *pChar);
 	void ApplyRespawn(class CCharacter *pChar);
 	void ApplyAction(class CCharacter *pChar, int Action);
 	bool Suspended() const;
