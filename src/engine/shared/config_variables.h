@@ -240,6 +240,7 @@ MACRO_CONFIG_INT(ClMClientInfoBarPred, cl_mclient_infobar_pred, 1, 0, 3, CFGFLAG
 MACRO_CONFIG_INT(ClMClientInfoBarPos, cl_mclient_infobar_pos, 3, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: info bar position widget (0 off, 1 left, 2 center, 3 right)")
 MACRO_CONFIG_INT(ClMClientInfoBarAngle, cl_mclient_infobar_angle, 0, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: info bar angle widget (0 off, 1 left, 2 center, 3 right)")
 MACRO_CONFIG_INT(ClMClientInfoBarSpeed, cl_mclient_infobar_speed, 0, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: info bar speed widget (0 off, 1 left, 2 center, 3 right)")
+MACRO_CONFIG_INT(ClMClientInfoBarEdgeJump, cl_mclient_infobar_edge_jump, 0, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: info bar edge jump widget (0 off, 1 left, 2 center, 3 right)")
 MACRO_CONFIG_COL(ClMClientInfoBarBgColor, cl_mclient_infobar_bg_color, 0, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: info bar background color")
 MACRO_CONFIG_COL(ClMClientInfoBarLabelColor, cl_mclient_infobar_label_color, 160, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: info bar label text color")
 MACRO_CONFIG_COL(ClMClientInfoBarValueColor, cl_mclient_infobar_value_color, 255, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: info bar value text color")

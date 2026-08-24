@@ -112,6 +112,7 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 		{EBindOptionGroup::MCLIENT, Localizable("Games"), "+minigames"},
 		{EBindOptionGroup::MCLIENT, Localizable("Fast practice"), "fast_practice"},
 		{EBindOptionGroup::MCLIENT, Localizable("Fast practice: set checkpoint"), "fast_practice_checkpoint"},
+		{EBindOptionGroup::MCLIENT, Localizable("Edge jump"), "+edge_jump"},
 	};
 	m_NumPredefinedBindOptions = m_vBindOptions.size();
 

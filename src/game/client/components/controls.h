@@ -40,6 +40,13 @@ public:
 	int m_aInputDirectionRight[NUM_DUMMIES];
 	int m_aShowHookColl[NUM_DUMMIES];
 
+	bool m_aEdgeJumpActive[NUM_DUMMIES] = {false, false};
+	int m_aEdgeJumpDir[NUM_DUMMIES] = {0, 0};
+	bool m_aEdgeJumpKeptJump[NUM_DUMMIES] = {false, false};
+	bool m_aEdgeJumpKeptDirection[NUM_DUMMIES] = {false, false};
+	int m_aEdgeJumpMemoryDir[NUM_DUMMIES] = {0, 0};
+	int64_t m_aEdgeJumpMemoryTime[NUM_DUMMIES] = {0, 0};
+
 	CNetObj_PlayerInput m_aFastInput[NUM_DUMMIES];
 	bool m_FastInputHookAction = false;
 	bool m_FastInputFireAction = false;
@@ -62,6 +69,7 @@ public:
 
 private:
 	static void ConKeyInputState(IConsole::IResult *pResult, void *pUserData);
+	static void ConKeyEdgeJump(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputSet(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputNextPrevWeapon(IConsole::IResult *pResult, void *pUserData);

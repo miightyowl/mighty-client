@@ -53,6 +53,13 @@ void CControls::ResetInput(int Dummy)
 
 	m_aInputDirectionLeft[Dummy] = 0;
 	m_aInputDirectionRight[Dummy] = 0;
+
+	m_aEdgeJumpActive[Dummy] = false;
+	m_aEdgeJumpDir[Dummy] = 0;
+	m_aEdgeJumpKeptJump[Dummy] = false;
+	m_aEdgeJumpKeptDirection[Dummy] = false;
+	m_aEdgeJumpMemoryDir[Dummy] = 0;
+	m_aEdgeJumpMemoryTime[Dummy] = 0;
 }
 
 // fast input
@@ -144,6 +151,61 @@ void CControls::ConKeyInputState(IConsole::IResult *pResult, void *pUserData)
 	*pState->m_apVariables[g_Config.m_ClDummy] = pResult->GetInteger(0);
 }
 
+void CControls::ConKeyEdgeJump(IConsole::IResult *pResult, void *pUserData)
+{
+	CControls *pSelf = (CControls *)pUserData;
+	if(pSelf->GameClient()->m_GameInfo.m_BugDDRaceInput && pSelf->GameClient()->m_Snap.m_SpecInfo.m_Active)
+		return;
+
+	const int Dummy = g_Config.m_ClDummy;
+	const auto &&DirectionVariable = [pSelf, Dummy](int Dir) {
+		return Dir > 0 ? &pSelf->m_aInputDirectionRight[Dummy] : &pSelf->m_aInputDirectionLeft[Dummy];
+	};
+
+	if(pResult->GetInteger(0))
+	{
+		if(pSelf->m_aEdgeJumpActive[Dummy])
+			return;
+		pSelf->m_aEdgeJumpActive[Dummy] = true;
+		bool Double = false;
+		int Dir = pSelf->GameClient()->m_WidgetBar.CurrentEdgeJumpDirection(nullptr, &Double);
+		bool Steer = true;
+		if(Dir != 0)
+		{
+			pSelf->m_aEdgeJumpMemoryDir[Dummy] = Dir;
+			pSelf->m_aEdgeJumpMemoryTime[Dummy] = time_get();
+			Steer = !Double;
+		}
+		else if(pSelf->m_aEdgeJumpMemoryDir[Dummy] != 0 && time_get() - pSelf->m_aEdgeJumpMemoryTime[Dummy] < time_freq() * 3 / 2)
+		{
+			Dir = pSelf->m_aEdgeJumpMemoryDir[Dummy];
+		}
+		pSelf->m_aEdgeJumpDir[Dummy] = Dir;
+
+		pSelf->m_aEdgeJumpKeptJump[Dummy] = pSelf->m_aInputData[Dummy].m_Jump != 0;
+		pSelf->m_aInputData[Dummy].m_Jump = 1;
+		if(!Steer)
+			pSelf->m_aEdgeJumpDir[Dummy] = 0;
+		if(pSelf->m_aEdgeJumpDir[Dummy] != 0)
+		{
+			int *pDirection = DirectionVariable(pSelf->m_aEdgeJumpDir[Dummy]);
+			pSelf->m_aEdgeJumpKeptDirection[Dummy] = *pDirection != 0;
+			*pDirection = 1;
+		}
+	}
+	else
+	{
+		if(!pSelf->m_aEdgeJumpActive[Dummy])
+			return;
+		if(!pSelf->m_aEdgeJumpKeptJump[Dummy])
+			pSelf->m_aInputData[Dummy].m_Jump = 0;
+		if(pSelf->m_aEdgeJumpDir[Dummy] != 0 && !pSelf->m_aEdgeJumpKeptDirection[Dummy])
+			*DirectionVariable(pSelf->m_aEdgeJumpDir[Dummy]) = 0;
+		pSelf->m_aEdgeJumpActive[Dummy] = false;
+		pSelf->m_aEdgeJumpDir[Dummy] = 0;
+	}
+}
+
 void CControls::ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData)
 {
 	CInputState *pState = (CInputState *)pUserData;
@@ -207,6 +269,7 @@ void CControls::OnConsoleInit()
 		static CInputState s_State = {this, {&m_aShowHookColl[0], &m_aShowHookColl[1]}};
 		Console()->Register("+showhookcoll", "", CFGFLAG_CLIENT, ConKeyInputState, &s_State, "Show Hook Collision");
 	}
+	Console()->Register("+edge_jump", "", CFGFLAG_CLIENT, ConKeyEdgeJump, this, "M-Client: jump off a triple freeze edge");
 
 	{
 		static CInputSet s_Set = {this, {&m_aInputData[0].m_WantedWeapon, &m_aInputData[1].m_WantedWeapon}, 1};
@@ -425,6 +488,15 @@ int CControls::SnapInput(int *pData)
 
 void CControls::OnRender()
 {
+	{
+		const int EdgeDir = GameClient()->m_WidgetBar.CurrentEdgeJumpDirection();
+		if(EdgeDir != 0)
+		{
+			m_aEdgeJumpMemoryDir[g_Config.m_ClDummy] = EdgeDir;
+			m_aEdgeJumpMemoryTime[g_Config.m_ClDummy] = time_get();
+		}
+	}
+
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
