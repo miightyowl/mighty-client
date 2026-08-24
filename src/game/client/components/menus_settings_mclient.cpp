@@ -905,7 +905,7 @@ void CMenus::RenderSettingsWidgetBar(CUIRect MainView)
 	// widgets
 	const std::vector<const char *> vLabels = {Localize("Off"), Localize("Left"), Localize("Center"), Localize("Right")};
 	const std::vector<int> vValues = {0, 1, 2, 3};
-	static std::vector<CButtonContainer> s_vClock(4), s_vFps(4), s_vPing(4), s_vPred(4), s_vPos(4), s_vAngle(4), s_vSpeed(4);
+	static std::vector<CButtonContainer> s_vClock(4), s_vFps(4), s_vPing(4), s_vPred(4), s_vPos(4), s_vAngle(4), s_vSpeed(4), s_vEdgeJump(4);
 	DoLine_RadioMenu(Right, Localize("Clock"), s_vClock, vLabels, vValues, g_Config.m_ClMClientInfoBarClock);
 	DoLine_RadioMenu(Right, Localize("FPS"), s_vFps, vLabels, vValues, g_Config.m_ClMClientInfoBarFps);
 	DoLine_RadioMenu(Right, Localize("Ping"), s_vPing, vLabels, vValues, g_Config.m_ClMClientInfoBarPing);
@@ -913,6 +913,7 @@ void CMenus::RenderSettingsWidgetBar(CUIRect MainView)
 	DoLine_RadioMenu(Right, Localize("Position"), s_vPos, vLabels, vValues, g_Config.m_ClMClientInfoBarPos);
 	DoLine_RadioMenu(Right, Localize("Angle"), s_vAngle, vLabels, vValues, g_Config.m_ClMClientInfoBarAngle);
 	DoLine_RadioMenu(Right, Localize("Speed"), s_vSpeed, vLabels, vValues, g_Config.m_ClMClientInfoBarSpeed);
+	DoLine_RadioMenu(Right, Localize("Edge jump"), s_vEdgeJump, vLabels, vValues, g_Config.m_ClMClientInfoBarEdgeJump);
 }
 void CMenus::RenderSettingsProfiles(CUIRect MainView)
 {
