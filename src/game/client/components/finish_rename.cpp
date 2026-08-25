@@ -185,12 +185,9 @@ bool CFinishRename::PathIsClear(vec2 From, vec2 To) const
 
 bool CFinishRename::FinishReachable(vec2 Pos, float Range) const
 {
-	for(const vec2 &TilePos : m_vFinishTilePositions)
-	{
-		if(distance(Pos, TilePos) <= Range && PathIsClear(Pos, TilePos))
-			return true;
-	}
-	return false;
+	return std::ranges::any_of(m_vFinishTilePositions, [&](const vec2 &TilePos) {
+		return distance(Pos, TilePos) <= Range && PathIsClear(Pos, TilePos);
+	});
 }
 
 void CFinishRename::OnRender()
