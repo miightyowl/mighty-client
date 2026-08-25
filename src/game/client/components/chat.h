@@ -79,14 +79,30 @@ class CChat : public CComponent
 	int m_CurrentLine;
 
 	// chat translation
+	enum
+	{
+		MAX_RUNNING_TRANSLATIONS = 6,
+		MAX_PENDING_TRANSLATIONS = 32,
+		TRANSLATE_BURST = 6,
+		TRANSLATE_INTERVAL_MS = 250,
+		TRANSLATE_QUEUE_TIMEOUT_MS = 8000,
+		TRANSLATE_QUEUE_TIMEOUT_OUTGOING_MS = 2000,
+		TRANSLATE_BACKOFF_BASE_MS = 30000,
+		TRANSLATE_BACKOFF_MAX_MS = 600000,
+		TRANSLATE_BACKOFF_ERROR_MS = 5000,
+	};
 	struct CPendingTranslation
 	{
 		std::shared_ptr<IHttpRequest> m_pRequest;
 		bool m_Outgoing;
 		int m_LineId;
 		int m_PrefixLen = 0;
+		int64_t m_QueueTime = 0;
 		std::vector<std::string> m_vProtectedNames;
 		char m_aOriginal[MAX_LINE_LENGTH];
+		char m_aProtected[MAX_LINE_LENGTH];
+		char m_aSourceLang[8];
+		char m_aTargetLang[8];
 	};
 	std::vector<CPendingTranslation> m_vPendingTranslations;
 	struct CCachedTranslation
@@ -96,15 +112,23 @@ class CChat : public CComponent
 	};
 	std::unordered_map<std::string, CCachedTranslation> m_TranslationCache;
 	int m_NextLineId = 0;
+	int64_t m_TranslateAllowanceTime = 0;
+	int64_t m_TranslateBlockedUntil = 0;
+	int m_TranslateFailStreak = 0;
 
 	static bool IsTranslatableText(const char *pText);
 	int NameTagPrefixLength(const char *pText) const;
 	void ProtectPlayerNames(const char *pIn, char *pOut, int OutSize, std::vector<std::string> &vNames) const;
 	std::shared_ptr<IHttpRequest> CreateTranslateRequest(const char *pText, const char *pSourceLang, const char *pTargetLang);
+	void QueueTranslation(CPendingTranslation &&Pending);
+	void StartQueuedTranslations();
+	bool ResolveTranslationFromCache(const CPendingTranslation &Pending);
+	void OnTranslateFailed(int StatusCode);
 	void MaybeTranslateLine(CLine &Line);
 	void SendChatTranslated(const char *pLine);
 	void PollTranslations();
 	void ApplyTranslation(CLine &Line, const char *pTranslated, const char *pLangName = "");
+	void ApplyTranslationToLine(int LineId, const char *pOriginal, int PrefixLen, const char *pTranslated, const char *pLangName);
 
 	enum
 	{

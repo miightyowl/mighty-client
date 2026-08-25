@@ -139,7 +139,10 @@ void CChat::Reset()
 	ClearLines();
 
 	for(CPendingTranslation &Pending : m_vPendingTranslations)
-		Pending.m_pRequest->Abort();
+	{
+		if(Pending.m_pRequest != nullptr)
+			Pending.m_pRequest->Abort();
+	}
 	m_vPendingTranslations.clear();
 	m_TranslationCache.clear();
 
@@ -1348,13 +1351,15 @@ void CChat::MaybeTranslateLine(CLine &Line)
 	const char *pInTarget = g_Config.m_ClChatTranslateInTarget[0] != '\0' && str_comp(g_Config.m_ClChatTranslateInTarget, "cat") != 0 ? g_Config.m_ClChatTranslateInTarget : "en";
 
 	CPendingTranslation Pending;
-	Pending.m_pRequest = CreateTranslateRequest(aProtected, "auto", pInTarget);
 	Pending.m_Outgoing = false;
 	Pending.m_LineId = Line.m_Id;
 	Pending.m_PrefixLen = PrefixLen;
 	Pending.m_vProtectedNames = std::move(vProtectedNames);
 	str_copy(Pending.m_aOriginal, Line.m_aText);
-	m_vPendingTranslations.push_back(std::move(Pending));
+	str_copy(Pending.m_aProtected, aProtected);
+	str_copy(Pending.m_aSourceLang, "auto");
+	str_copy(Pending.m_aTargetLang, pInTarget);
+	QueueTranslation(std::move(Pending));
 }
 
 std::shared_ptr<IHttpRequest> CChat::CreateTranslateRequest(const char *pText, const char *pSourceLang, const char *pTargetLang)
@@ -1367,10 +1372,120 @@ std::shared_ptr<IHttpRequest> CChat::CreateTranslateRequest(const char *pText, c
 
 	std::shared_ptr<IHttpRequest> pRequest = HttpGet(aUrl);
 	pRequest->Timeout(CTimeout{4000, 8000, 500, 5});
-	pRequest->LogProgress(HTTPLOG::FAILURE);
+	pRequest->LogProgress(HTTPLOG::NONE);
 	pRequest->HeaderString("User-Agent", "Mozilla/5.0 (compatible; DDNet)");
 	Http()->Run(pRequest);
 	return pRequest;
+}
+
+void CChat::QueueTranslation(CPendingTranslation &&Pending)
+{
+	if(!Pending.m_Outgoing && m_vPendingTranslations.size() >= MAX_PENDING_TRANSLATIONS)
+		return;
+
+	Pending.m_QueueTime = time();
+	m_vPendingTranslations.push_back(std::move(Pending));
+}
+
+void CChat::StartQueuedTranslations()
+{
+	const int64_t Now = time();
+	if(Now < m_TranslateBlockedUntil)
+		return;
+
+	const int64_t Interval = time_freq() * TRANSLATE_INTERVAL_MS / 1000;
+	const int64_t BurstWindow = Interval * TRANSLATE_BURST;
+
+	while(true)
+	{
+		int NumRunning = 0;
+		const char *apRunning[MAX_RUNNING_TRANSLATIONS] = {nullptr};
+		for(const CPendingTranslation &Pending : m_vPendingTranslations)
+		{
+			if(Pending.m_pRequest == nullptr || Pending.m_pRequest->Done())
+				continue;
+			if(NumRunning < MAX_RUNNING_TRANSLATIONS)
+				apRunning[NumRunning] = Pending.m_aOriginal + Pending.m_PrefixLen;
+			NumRunning++;
+		}
+		if(NumRunning >= MAX_RUNNING_TRANSLATIONS)
+			return;
+
+		CPendingTranslation *pNext = nullptr;
+		for(CPendingTranslation &Pending : m_vPendingTranslations)
+		{
+			if(Pending.m_pRequest != nullptr)
+				continue;
+
+			if(!Pending.m_Outgoing)
+			{
+				bool AlreadyRunning = false;
+				for(int Running = 0; Running < NumRunning; ++Running)
+					AlreadyRunning |= str_comp(apRunning[Running], Pending.m_aOriginal + Pending.m_PrefixLen) == 0;
+				if(AlreadyRunning)
+					continue;
+			}
+
+			if(pNext == nullptr || (Pending.m_Outgoing && !pNext->m_Outgoing))
+				pNext = &Pending;
+			if(pNext->m_Outgoing)
+				break;
+		}
+		if(pNext == nullptr)
+			return;
+
+		if(!pNext->m_Outgoing && m_TranslateAllowanceTime - Now >= BurstWindow)
+			return;
+		m_TranslateAllowanceTime = std::max(Now, m_TranslateAllowanceTime) + Interval;
+
+		pNext->m_pRequest = CreateTranslateRequest(pNext->m_aProtected, pNext->m_aSourceLang, pNext->m_aTargetLang);
+	}
+}
+
+bool CChat::ResolveTranslationFromCache(const CPendingTranslation &Pending)
+{
+	const auto CacheHit = m_TranslationCache.find(Pending.m_aOriginal + Pending.m_PrefixLen);
+	if(CacheHit == m_TranslationCache.end())
+		return false;
+
+	if(!CacheHit->second.m_Text.empty())
+		ApplyTranslationToLine(Pending.m_LineId, Pending.m_aOriginal, Pending.m_PrefixLen, CacheHit->second.m_Text.c_str(), CacheHit->second.m_Lang.c_str());
+	return true;
+}
+
+void CChat::OnTranslateFailed(int StatusCode)
+{
+	int64_t BlockMs;
+	if(StatusCode == 429 || StatusCode == 403)
+	{
+		m_TranslateFailStreak = std::min(m_TranslateFailStreak + 1, 8);
+		BlockMs = std::min<int64_t>((int64_t)TRANSLATE_BACKOFF_BASE_MS << (m_TranslateFailStreak - 1), TRANSLATE_BACKOFF_MAX_MS);
+	}
+	else
+	{
+		BlockMs = TRANSLATE_BACKOFF_ERROR_MS;
+	}
+
+	const int64_t BlockedUntil = time() + time_freq() * BlockMs / 1000;
+	if(BlockedUntil <= m_TranslateBlockedUntil)
+		return;
+	m_TranslateBlockedUntil = BlockedUntil;
+
+	log_info("chat", "translation unavailable (http status %d), pausing translations for %d seconds", StatusCode, (int)(BlockMs / 1000));
+}
+
+void CChat::ApplyTranslationToLine(int LineId, const char *pOriginal, int PrefixLen, const char *pTranslated, const char *pLangName)
+{
+	for(CLine &Line : m_aLines)
+	{
+		if(!Line.m_Initialized || Line.m_Id != LineId)
+			continue;
+
+		char aFull[MAX_LINE_LENGTH];
+		ComposeWithPrefix(aFull, sizeof(aFull), pOriginal, PrefixLen, pTranslated);
+		ApplyTranslation(Line, aFull, pLangName);
+		break;
+	}
 }
 
 void CChat::SendChatTranslated(const char *pLine)
@@ -1398,21 +1513,59 @@ void CChat::SendChatTranslated(const char *pLine)
 		return;
 	}
 
+	if(time() < m_TranslateBlockedUntil)
+	{
+		SendChat(0, pLine);
+		return;
+	}
+
 	CPendingTranslation Pending;
-	Pending.m_pRequest = CreateTranslateRequest(aProtected, g_Config.m_ClChatTranslateOutSource, g_Config.m_ClChatTranslateOutTarget);
 	Pending.m_Outgoing = true;
 	Pending.m_LineId = -1;
 	Pending.m_PrefixLen = PrefixLen;
 	Pending.m_vProtectedNames = std::move(vProtectedNames);
 	str_copy(Pending.m_aOriginal, pLine);
-	m_vPendingTranslations.push_back(std::move(Pending));
+	str_copy(Pending.m_aProtected, aProtected);
+	str_copy(Pending.m_aSourceLang, g_Config.m_ClChatTranslateOutSource);
+	str_copy(Pending.m_aTargetLang, g_Config.m_ClChatTranslateOutTarget);
+	QueueTranslation(std::move(Pending));
 }
 
 void CChat::PollTranslations()
 {
+	StartQueuedTranslations();
+
+	auto &&RemovePending = [&](size_t Index) {
+		if(Index != m_vPendingTranslations.size() - 1)
+			m_vPendingTranslations[Index] = std::move(m_vPendingTranslations.back());
+		m_vPendingTranslations.pop_back();
+	};
+
 	for(size_t i = 0; i < m_vPendingTranslations.size();)
 	{
 		CPendingTranslation &Pending = m_vPendingTranslations[i];
+
+		if(Pending.m_pRequest == nullptr)
+		{
+			if(!Pending.m_Outgoing && ResolveTranslationFromCache(Pending))
+			{
+				RemovePending(i);
+				continue;
+			}
+
+			const int TimeoutMs = Pending.m_Outgoing ? TRANSLATE_QUEUE_TIMEOUT_OUTGOING_MS : TRANSLATE_QUEUE_TIMEOUT_MS;
+			if(time() < Pending.m_QueueTime + time_freq() * TimeoutMs / 1000)
+			{
+				++i;
+				continue;
+			}
+
+			if(Pending.m_Outgoing && Client()->State() == IClient::STATE_ONLINE)
+				SendChat(0, Pending.m_aOriginal);
+			RemovePending(i);
+			continue;
+		}
+
 		if(!Pending.m_pRequest->Done())
 		{
 			++i;
@@ -1421,6 +1574,8 @@ void CChat::PollTranslations()
 
 		if(Pending.m_pRequest->State() == EHttpState::DONE)
 		{
+			m_TranslateFailStreak = 0;
+
 			// googles endpoint returns
 			json_value *pJson = Pending.m_pRequest->ResultJson();
 
@@ -1484,31 +1639,21 @@ void CChat::PollTranslations()
 					m_TranslationCache[pOriginalBody] = {KeepOriginal ? std::string() : std::string(aTranslated), std::string(pLangName)};
 
 				if(!KeepOriginal)
-				{
-					for(CLine &Line : m_aLines)
-					{
-						if(Line.m_Initialized && Line.m_Id == Pending.m_LineId)
-						{
-							char aFull[MAX_LINE_LENGTH];
-							ComposeWithPrefix(aFull, sizeof(aFull), Pending.m_aOriginal, Pending.m_PrefixLen, aTranslated);
-							ApplyTranslation(Line, aFull, pLangName);
-							break;
-						}
-					}
-				}
+					ApplyTranslationToLine(Pending.m_LineId, Pending.m_aOriginal, Pending.m_PrefixLen, aTranslated, pLangName);
 			}
 
 			if(pJson != nullptr)
 				json_value_free(pJson);
 		}
-		else if(Pending.m_Outgoing && Client()->State() == IClient::STATE_ONLINE)
+		else
 		{
-			SendChat(0, Pending.m_aOriginal);
+			if(Pending.m_pRequest->State() == EHttpState::ERROR)
+				OnTranslateFailed(Pending.m_pRequest->StatusCode());
+			if(Pending.m_Outgoing && Client()->State() == IClient::STATE_ONLINE)
+				SendChat(0, Pending.m_aOriginal);
 		}
 
-		if(i != m_vPendingTranslations.size() - 1)
-			m_vPendingTranslations[i] = std::move(m_vPendingTranslations.back());
-		m_vPendingTranslations.pop_back();
+		RemovePending(i);
 	}
 }
 
