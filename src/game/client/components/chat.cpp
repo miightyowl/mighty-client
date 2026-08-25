@@ -1069,7 +1069,15 @@ static bool IsTranslatableWord(const char *pWord)
 	if(NumLetters == 0)
 		return false;
 	if(NonAsciiLetter)
+	{
+		static const char *s_apCyrillicEmoteWords[] = {"\xD0\xB3\xD0\xB3", "\xD0\xBB\xD0\xBE\xD0\xBB", "\xD0\xBA\xD0\xB5\xD0\xBA", "\xD1\x85\xD0\xB4", "\xD0\xB8\xD0\xB7\xD0\xB8"};
+		for(const char *pEmote : s_apCyrillicEmoteWords)
+		{
+			if(str_utf8_comp_nocase(pWord, pEmote) == 0)
+				return false;
+		}
 		return true;
+	}
 	if(NumLetters <= 1 && !g_Config.m_ClChatTranslateShortWords)
 		return false;
 
@@ -1463,7 +1471,7 @@ void CChat::PollTranslations()
 			else
 			{
 				const bool ForeignScript = StrHasNonLatinScript(pOriginalBody);
-				const bool Misdetected = ForeignScript && (pDetectedLang[0] == '\0' || str_comp_nocase(pDetectedLang, "en") == 0);
+				const bool Misdetected = ForeignScript && (pDetectedLang[0] == '\0' || str_comp_nocase(pDetectedLang, "en") == 0 || !IsCommonLanguage(pDetectedLang));
 				// short latin-script messages are frequently misdetected into obscure/wrong languages
 				const bool ShortLatin = !ForeignScript && CountLetters(pOriginalBody) < 6;
 
@@ -1473,7 +1481,7 @@ void CChat::PollTranslations()
 					ShortLatin ||
 					(!Misdetected && (pDetectedLang[0] == '\0' || IsIgnoredLanguage(pDetectedLang) || !IsCommonLanguage(pDetectedLang)));
 
-				const char *pLangName = !KeepOriginal && pDetectedLang[0] != '\0' ? LanguageName(pDetectedLang) : "";
+				const char *pLangName = !KeepOriginal && !Misdetected && pDetectedLang[0] != '\0' ? LanguageName(pDetectedLang) : "";
 
 				if(m_TranslationCache.size() < 4096)
 					m_TranslationCache[pOriginalBody] = {KeepOriginal ? std::string() : std::string(aTranslated), std::string(pLangName)};

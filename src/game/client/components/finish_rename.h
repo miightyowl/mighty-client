@@ -39,6 +39,7 @@ class CFinishRename : public CComponent
 	bool m_MapScanned = false;
 	std::vector<vec2> m_vFinishTilePositions;
 	bool m_Armed = true;
+	bool m_JustFinished = false;
 
 	bool m_Decided = false;
 	char m_aTargetName[MAX_NAME_LENGTH] = "";
