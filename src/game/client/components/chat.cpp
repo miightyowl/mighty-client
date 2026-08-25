@@ -1374,6 +1374,7 @@ std::shared_ptr<IHttpRequest> CChat::CreateTranslateRequest(const char *pText, c
 	pRequest->Timeout(CTimeout{4000, 8000, 500, 5});
 	pRequest->LogProgress(HTTPLOG::NONE);
 	pRequest->HeaderString("User-Agent", "Mozilla/5.0 (compatible; DDNet)");
+	pRequest->FailOnErrorStatus(false);
 	Http()->Run(pRequest);
 	return pRequest;
 }
@@ -1572,7 +1573,7 @@ void CChat::PollTranslations()
 			continue;
 		}
 
-		if(Pending.m_pRequest->State() == EHttpState::DONE)
+		if(Pending.m_pRequest->State() == EHttpState::DONE && Pending.m_pRequest->StatusCode() < 400)
 		{
 			m_TranslateFailStreak = 0;
 
@@ -1647,8 +1648,10 @@ void CChat::PollTranslations()
 		}
 		else
 		{
-			if(Pending.m_pRequest->State() == EHttpState::ERROR)
+			if(Pending.m_pRequest->State() == EHttpState::DONE)
 				OnTranslateFailed(Pending.m_pRequest->StatusCode());
+			else if(Pending.m_pRequest->State() == EHttpState::ERROR)
+				OnTranslateFailed(0);
 			if(Pending.m_Outgoing && Client()->State() == IClient::STATE_ONLINE)
 				SendChat(0, Pending.m_aOriginal);
 		}
