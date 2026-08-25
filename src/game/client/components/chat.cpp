@@ -1071,12 +1071,9 @@ static bool IsTranslatableWord(const char *pWord)
 	if(NonAsciiLetter)
 	{
 		static const char *s_apCyrillicEmoteWords[] = {"\xD0\xB3\xD0\xB3", "\xD0\xBB\xD0\xBE\xD0\xBB", "\xD0\xBA\xD0\xB5\xD0\xBA", "\xD1\x85\xD0\xB4", "\xD0\xB8\xD0\xB7\xD0\xB8"};
-		for(const char *pEmote : s_apCyrillicEmoteWords)
-		{
-			if(str_utf8_comp_nocase(pWord, pEmote) == 0)
-				return false;
-		}
-		return true;
+		return std::ranges::none_of(s_apCyrillicEmoteWords, [&](const char *pEmote) {
+			return str_utf8_comp_nocase(pWord, pEmote) == 0;
+		});
 	}
 	if(NumLetters <= 1 && !g_Config.m_ClChatTranslateShortWords)
 		return false;
