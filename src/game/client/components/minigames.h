@@ -27,6 +27,7 @@ public:
 
 	void OnConsoleInit() override;
 	void OnReset() override;
+	void OnUpdate() override;
 	void OnRender() override;
 	void OnRelease() override;
 	bool OnInput(const IInput::CEvent &Event) override;
@@ -35,6 +36,7 @@ public:
 	bool IsActive() const { return m_State != STATE_IDLE; }
 
 	bool OnWhisper(int ClientId, int Team, const char *pMessage);
+	void QueueWhisper(int ClientId, const char *pMessage);
 
 	void OnChatMessage(int ClientId, const char *pMessage);
 

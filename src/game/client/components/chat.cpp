@@ -587,9 +587,12 @@ void CChat::OnMessage(int MsgType, void *pRawMsg)
 			AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage);
 		*/
 
-		if(GameClient()->m_MiniGames.OnWhisper(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage))
+		const bool ProtocolWhisper = GameClient()->m_MClientDetect.OnWhisper(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage) ||
+					     GameClient()->m_MiniGames.OnWhisper(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage);
+		if(ProtocolWhisper && g_Config.m_ClMClientHideProtocolWhispers)
 			return;
-		GameClient()->m_MiniGames.OnChatMessage(pMsg->m_ClientId, pMsg->m_pMessage);
+		if(!ProtocolWhisper)
+			GameClient()->m_MiniGames.OnChatMessage(pMsg->m_ClientId, pMsg->m_pMessage);
 
 		const bool OwnMessage = pMsg->m_ClientId >= 0 &&
 					(pMsg->m_ClientId == GameClient()->m_aLocalIds[0] || pMsg->m_ClientId == GameClient()->m_aLocalIds[1]);

@@ -14,9 +14,10 @@ public:
 
 	void OnReset() override;
 	void OnStateChange(int NewState, int OldState) override;
-	void OnRender() override;
+	void OnUpdate() override;
 
 	bool OnEmoticon(int ClientId, int Emoticon);
+	bool OnWhisper(int ClientId, int Team, const char *pMessage);
 
 	void Announce();
 	bool Announcing() const;
@@ -65,7 +66,6 @@ private:
 		int m_PayloadNeed;
 		float m_SymbolTime;
 		bool m_WantsAnswer;
-		bool m_Answering;
 		bool m_Answered;
 		bool m_PetTold;
 		bool m_PetOn;
@@ -87,6 +87,16 @@ private:
 	float m_AnnounceDeadline = 0.0f;
 	float m_AnnounceCooldown = 0.0f;
 	float m_AnnounceListenTime = 0.0f;
+	bool m_ColorBeaconActive = false;
+	bool m_ColorBeaconObserved = false;
+	int m_ColorBeaconConn = 0;
+	int m_ColorBeaconSentTick = 0;
+	int m_ColorRestoreAttemptTick = 0;
+	float m_ColorBeaconSendTime = 0.0f;
+	int m_OriginalColorBody = 0;
+	int m_OriginalColorFeet = 0;
+	int m_MarkerColorBody = 0;
+	int m_MarkerColorFeet = 0;
 
 	bool m_ReplyPending = false;
 	float m_ReplyTime = 0.0f;
@@ -110,19 +120,21 @@ private:
 	void ForgetLeftPeers();
 	void ForgetOnRename();
 	bool AnswerOwed() const;
-	void MarkAnswering();
 	void OnBeaconSent();
-	void OnBeaconLost();
 	void UpdateAnnounce();
 	void UpdateReply();
+	void DetectColorBeacons();
+	void SendColorBeacon();
+	void RestoreColorBeacon();
+	void SendInfoColors(int Conn, int ColorBody, int ColorFeet) const;
 	void UpdatePet();
 	bool PetAudience() const;
 	void MarkPetTold();
 	void ForgetPetTold();
 	void LocalPet(bool *pOn, char *pSkin, int SkinSize) const;
-	void SendBeacon(int Kind);
+	void SendPetWhisper(int ClientId, bool On, const char *pSkin);
 	void SendPetBeacon(bool On, const char *pSkin);
-	void AbortBeacon(bool Retry);
+	void AbortBeacon();
 	void FlushEmoteQueue();
 	bool HandleEcho(int Emoticon);
 	bool Decode(int ClientId, int Emoticon);
