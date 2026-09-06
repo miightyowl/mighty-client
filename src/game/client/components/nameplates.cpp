@@ -350,7 +350,7 @@ protected:
 			return false;
 		m_Color = Data.m_Color;
 		// M-Client players get a golden name
-		if(str_comp(Data.m_aName, "mighty") == 0 || This.m_MClientDetect.IsMClient(Data.m_ClientId))
+		if(This.m_MClientDetect.IsMClient(Data.m_ClientId))
 		{
 			const float Shine = 0.5f + 0.5f * std::sin(This.Client()->LocalTime() * 4.0f);
 			m_Color = ColorRGBA(1.0f, 0.72f + 0.23f * Shine, 0.05f + 0.35f * Shine, Data.m_Color.a);

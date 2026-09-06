@@ -16,6 +16,10 @@ namespace
 	const int EMOTE_RADIX = 12;
 	const int BEACON_OP = 15;
 	const int BEACON_MAGIC = 5;
+	const unsigned COLOR_VALUE_MASK = 0x00ffffffu;
+	const unsigned COLOR_BEACON_BODY = 0x4du;
+	const unsigned COLOR_BEACON_FEET = 0x43u;
+	const char *PET_WHISPER_PREFIX = "MCPET1 ";
 
 	const float MIN_EMOTE_GAP = 0.0f;
 	const float MAX_EMOTE_GAP = 3.5f;
@@ -28,7 +32,7 @@ namespace
 
 	const float ANNOUNCE_TIMEOUT = 10.0f;
 	const float ANNOUNCE_COOLDOWN = 30.0f;
-	const float ANNOUNCE_LISTEN = 8.0f;
+	const float ANNOUNCE_LISTEN = 12.0f;
 	const float BEACON_ROUND = 10.0f;
 	const float REPLY_DELAY = 0.3f;
 	const float REPLY_JITTER = 1.5f;
@@ -62,6 +66,51 @@ namespace
 	float Jitter(float Amount)
 	{
 		return Amount * (float)(rand() % 1001) / 1000.0f;
+	}
+
+	char HexDigit(unsigned Value)
+	{
+		return Value < 10 ? '0' + Value : 'a' + Value - 10;
+	}
+
+	int HexValue(char Digit)
+	{
+		if(Digit >= '0' && Digit <= '9')
+			return Digit - '0';
+		if(Digit >= 'a' && Digit <= 'f')
+			return Digit - 'a' + 10;
+		if(Digit >= 'A' && Digit <= 'F')
+			return Digit - 'A' + 10;
+		return -1;
+	}
+
+	void HexEncode(const char *pText, char *pOutput, int OutputSize)
+	{
+		int Out = 0;
+		for(int i = 0; pText[i] != '\0' && Out + 2 < OutputSize; i++)
+		{
+			const unsigned Char = static_cast<unsigned char>(pText[i]);
+			pOutput[Out++] = HexDigit(Char >> 4);
+			pOutput[Out++] = HexDigit(Char & 0xf);
+		}
+		pOutput[Out] = '\0';
+	}
+
+	bool HexDecode(const char *pText, char *pOutput, int OutputSize)
+	{
+		const int Length = str_length(pText);
+		if(Length % 2 != 0 || Length / 2 >= OutputSize)
+			return false;
+		for(int i = 0; i < Length; i += 2)
+		{
+			const int High = HexValue(pText[i]);
+			const int Low = HexValue(pText[i + 1]);
+			if(High < 0 || Low < 0 || (High == 0 && Low == 0))
+				return false;
+			pOutput[i / 2] = static_cast<char>((High << 4) | Low);
+		}
+		pOutput[Length / 2] = '\0';
+		return true;
 	}
 }
 
@@ -135,6 +184,16 @@ void CMClientDetect::OnReset()
 	m_AnnounceDeadline = 0.0f;
 	m_AnnounceCooldown = 0.0f;
 	m_AnnounceListenTime = 0.0f;
+	m_ColorBeaconActive = false;
+	m_ColorBeaconObserved = false;
+	m_ColorBeaconConn = IClient::CONN_MAIN;
+	m_ColorBeaconSentTick = 0;
+	m_ColorRestoreAttemptTick = 0;
+	m_ColorBeaconSendTime = 0.0f;
+	m_OriginalColorBody = 0;
+	m_OriginalColorFeet = 0;
+	m_MarkerColorBody = 0;
+	m_MarkerColorFeet = 0;
 
 	m_ReplyPending = false;
 	m_ReplyTime = 0.0f;
@@ -153,7 +212,16 @@ void CMClientDetect::OnReset()
 void CMClientDetect::OnStateChange(int NewState, int OldState)
 {
 	if(NewState != IClient::STATE_ONLINE)
+	{
 		OnReset();
+		return;
+	}
+
+	if(OldState != IClient::STATE_ONLINE && Enabled())
+	{
+		m_AnnouncePending = true;
+		m_AnnounceDeadline = LocalTime() + ANNOUNCE_TIMEOUT;
+	}
 }
 
 void CMClientDetect::ForgetLeftPeers()
@@ -178,10 +246,7 @@ void CMClientDetect::ForgetOnRename()
 	str_copy(m_aLocalName, pName);
 	m_BeaconHeardUntil = 0.0f;
 	for(CPeer &Peer : m_aPeers)
-	{
-		Peer.m_Answering = false;
 		Peer.m_Answered = false;
-	}
 }
 
 bool CMClientDetect::AnswerOwed() const
@@ -189,48 +254,12 @@ bool CMClientDetect::AnswerOwed() const
 	return std::any_of(std::begin(m_aPeers), std::end(m_aPeers), [](const CPeer &Peer) { return Peer.m_WantsAnswer; });
 }
 
-void CMClientDetect::MarkAnswering()
-{
-	for(CPeer &Peer : m_aPeers)
-	{
-		if(!Peer.m_WantsAnswer)
-			continue;
-		Peer.m_WantsAnswer = false;
-		Peer.m_Answering = true;
-	}
-}
-
 void CMClientDetect::OnBeaconSent()
 {
-	if(m_QueuedKind == KIND_PET)
-	{
-		m_PetOnSent = m_QueuedPetOn;
-		str_copy(m_aPetSkinSent, m_aQueuedPetSkin);
-		MarkPetTold();
-		m_PetCooldown = LocalTime() + PET_COOLDOWN;
-		return;
-	}
-
-	m_BeaconHeardUntil = LocalTime() + BEACON_ROUND;
-	for(CPeer &Peer : m_aPeers)
-	{
-		Peer.m_Answering = false;
-		if(!Peer.m_Detected)
-			continue;
-		Peer.m_WantsAnswer = false;
-		Peer.m_Answered = true;
-	}
-}
-
-void CMClientDetect::OnBeaconLost()
-{
-	for(CPeer &Peer : m_aPeers)
-	{
-		if(!Peer.m_Answering)
-			continue;
-		Peer.m_Answering = false;
-		Peer.m_WantsAnswer = true;
-	}
+	m_PetOnSent = m_QueuedPetOn;
+	str_copy(m_aPetSkinSent, m_aQueuedPetSkin);
+	MarkPetTold();
+	m_PetCooldown = LocalTime() + PET_COOLDOWN;
 }
 
 void CMClientDetect::Announce()
@@ -255,10 +284,13 @@ void CMClientDetect::UpdateAnnounce()
 		return;
 	}
 
-	if(!CanEmote() || !ChannelFree())
+	if(Client()->IsSixup() || m_ColorBeaconActive)
+		return;
+	const int Conn = g_Config.m_ClDummy ? IClient::CONN_DUMMY : IClient::CONN_MAIN;
+	if(GameClient()->m_aLocalIds[Conn] < 0 || GameClient()->m_aNextChangeInfo[Conn] > Client()->GameTick(Conn))
 		return;
 
-	SendBeacon(KIND_ANNOUNCE);
+	SendColorBeacon();
 	m_AnnouncePending = false;
 	m_AnnounceCooldown = LocalTime() + ANNOUNCE_COOLDOWN;
 	m_AnnounceListenTime = LocalTime() + ANNOUNCE_LISTEN;
@@ -266,7 +298,7 @@ void CMClientDetect::UpdateAnnounce()
 
 bool CMClientDetect::Announcing() const
 {
-	return m_AnnouncePending || LocalTime() < m_AnnounceListenTime;
+	return m_AnnouncePending || m_ColorBeaconActive || LocalTime() < m_AnnounceListenTime;
 }
 
 void CMClientDetect::UpdateReply()
@@ -274,29 +306,129 @@ void CMClientDetect::UpdateReply()
 	if(!m_ReplyPending)
 		return;
 
-	if(!g_Config.m_ClMClientMiniGames)
-	{
-		for(CPeer &Peer : m_aPeers)
-			Peer.m_WantsAnswer = false;
-		m_ReplyPending = false;
-		return;
-	}
-
 	if(!AnswerOwed())
 	{
 		m_ReplyPending = false;
 		return;
 	}
 
-	if(!CanEmote())
+	if(LocalTime() < m_ReplyTime || m_ColorBeaconActive)
 		return;
 
-	if(LocalTime() < m_ReplyTime || !ChannelFree())
-		return;
-
-	SendBeacon(KIND_REPLY);
-	MarkAnswering();
+	m_AnnouncePending = true;
+	m_AnnounceDeadline = LocalTime() + ANNOUNCE_TIMEOUT;
 	m_ReplyPending = false;
+}
+
+void CMClientDetect::DetectColorBeacons()
+{
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+	{
+		const CGameClient::CClientData &Client = GameClient()->m_aClients[ClientId];
+		if(!Client.m_Active || IsLocal(ClientId))
+			continue;
+
+		const unsigned ColorBody = static_cast<unsigned>(Client.m_ColorBody);
+		const unsigned ColorFeet = static_cast<unsigned>(Client.m_ColorFeet);
+		if((ColorBody >> 24) != COLOR_BEACON_BODY || (ColorFeet >> 24) != COLOR_BEACON_FEET)
+			continue;
+
+		CPeer &Peer = m_aPeers[ClientId];
+		const bool WasDetected = Peer.m_Detected;
+		Peer.m_Detected = true;
+		str_copy(Peer.m_aName, Client.m_aRealName);
+		if(WasDetected || LocalTime() < m_AnnounceListenTime || Peer.m_Answered)
+			continue;
+
+		Peer.m_WantsAnswer = true;
+		if(!m_ReplyPending)
+		{
+			m_ReplyPending = true;
+			m_ReplyTime = LocalTime() + REPLY_DELAY + Jitter(REPLY_JITTER);
+		}
+	}
+}
+
+void CMClientDetect::SendInfoColors(int Conn, int ColorBody, int ColorFeet) const
+{
+	const bool Dummy = Conn == IClient::CONN_DUMMY;
+	CNetMsg_Cl_ChangeInfo Msg;
+	Msg.m_pName = Dummy ? Client()->DummyName() : Client()->PlayerName();
+	Msg.m_pClan = Dummy ? g_Config.m_ClDummyClan : g_Config.m_PlayerClan;
+	Msg.m_Country = Dummy ? g_Config.m_ClDummyCountry : g_Config.m_PlayerCountry;
+	Msg.m_pSkin = Dummy ? g_Config.m_ClDummySkin : g_Config.m_ClPlayerSkin;
+	Msg.m_UseCustomColor = Dummy ? g_Config.m_ClDummyUseCustomColor : g_Config.m_ClPlayerUseCustomColor;
+	Msg.m_ColorBody = ColorBody;
+	Msg.m_ColorFeet = ColorFeet;
+	CMsgPacker Packer(&Msg);
+	Msg.Pack(&Packer);
+	Client()->SendMsg(Conn, &Packer, MSGFLAG_VITAL);
+}
+
+void CMClientDetect::SendColorBeacon()
+{
+	m_ColorBeaconConn = g_Config.m_ClDummy ? IClient::CONN_DUMMY : IClient::CONN_MAIN;
+	const bool Dummy = m_ColorBeaconConn == IClient::CONN_DUMMY;
+	m_OriginalColorBody = Dummy ? g_Config.m_ClDummyColorBody : g_Config.m_ClPlayerColorBody;
+	m_OriginalColorFeet = Dummy ? g_Config.m_ClDummyColorFeet : g_Config.m_ClPlayerColorFeet;
+	m_MarkerColorBody = static_cast<int>((static_cast<unsigned>(m_OriginalColorBody) & COLOR_VALUE_MASK) | (COLOR_BEACON_BODY << 24));
+	m_MarkerColorFeet = static_cast<int>((static_cast<unsigned>(m_OriginalColorFeet) & COLOR_VALUE_MASK) | (COLOR_BEACON_FEET << 24));
+	SendInfoColors(m_ColorBeaconConn, m_MarkerColorBody, m_MarkerColorFeet);
+	m_ColorBeaconSentTick = Client()->GameTick(m_ColorBeaconConn);
+	m_ColorRestoreAttemptTick = 0;
+	m_ColorBeaconSendTime = LocalTime();
+	m_ColorBeaconActive = true;
+	m_ColorBeaconObserved = false;
+	for(CPeer &Peer : m_aPeers)
+	{
+		if(!Peer.m_WantsAnswer)
+			continue;
+		Peer.m_WantsAnswer = false;
+		Peer.m_Answered = true;
+	}
+	m_BeaconHeardUntil = LocalTime() + BEACON_ROUND;
+}
+
+void CMClientDetect::RestoreColorBeacon()
+{
+	if(!m_ColorBeaconActive)
+		return;
+
+	const int LocalId = GameClient()->m_aLocalIds[m_ColorBeaconConn];
+	if(LocalId < 0)
+	{
+		m_ColorBeaconActive = false;
+		return;
+	}
+
+	const CGameClient::CClientData &LocalClient = GameClient()->m_aClients[LocalId];
+	const bool MarkerVisible = LocalClient.m_ColorBody == m_MarkerColorBody && LocalClient.m_ColorFeet == m_MarkerColorFeet;
+	if(!m_ColorBeaconObserved)
+	{
+		if(MarkerVisible)
+			m_ColorBeaconObserved = true;
+		else if(LocalTime() >= m_ColorBeaconSendTime + ECHO_TIMEOUT)
+		{
+			m_ColorBeaconActive = false;
+			if(Enabled() && LocalTime() < m_AnnounceDeadline)
+				m_AnnouncePending = true;
+		}
+		return;
+	}
+
+	if(!MarkerVisible)
+	{
+		m_ColorBeaconActive = false;
+		return;
+	}
+
+	const int CurrentTick = Client()->GameTick(m_ColorBeaconConn);
+	const int RestoreTick = std::max({m_ColorBeaconSentTick + Client()->GameTickSpeed(), m_ColorRestoreAttemptTick + Client()->GameTickSpeed(), GameClient()->m_aNextChangeInfo[m_ColorBeaconConn]});
+	if(CurrentTick < RestoreTick)
+		return;
+
+	SendInfoColors(m_ColorBeaconConn, m_OriginalColorBody, m_OriginalColorFeet);
+	m_ColorRestoreAttemptTick = CurrentTick;
 }
 
 void CMClientDetect::LocalPet(bool *pOn, char *pSkin, int SkinSize) const
@@ -324,9 +456,6 @@ void CMClientDetect::ForgetPetTold()
 
 void CMClientDetect::UpdatePet()
 {
-	if(m_AnnouncePending || m_ReplyPending)
-		return;
-
 	const int LocalId = GameClient()->m_aLocalIds[g_Config.m_ClDummy];
 	if(LocalId != m_PetLocalId)
 	{
@@ -338,24 +467,40 @@ void CMClientDetect::UpdatePet()
 	char aSkin[MAX_SKIN_LENGTH];
 	LocalPet(&On, aSkin, sizeof(aSkin));
 
-	if(On != m_PetOnSent || (On && str_comp(aSkin, m_aPetSkinSent) != 0))
+	if(On != m_PetOnSent || str_comp(aSkin, m_aPetSkinSent) != 0)
+	{
 		ForgetPetTold();
+		m_PetOnSent = On;
+		str_copy(m_aPetSkinSent, aSkin);
+	}
 
 	if(!PetAudience())
 		return;
+	if(!GameClient()->m_Chat.ServerHasCommand("w"))
+		return;
 
-	if(!On && !m_PetOnSent)
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
 	{
-		MarkPetTold();
-		return;
+		CPeer &Peer = m_aPeers[ClientId];
+		if(!Peer.m_Detected || Peer.m_PetTold)
+			continue;
+		SendPetWhisper(ClientId, On, aSkin);
+		Peer.m_PetTold = true;
 	}
+}
 
-	if(!CanEmote() || !ChannelFree())
-		return;
-	if(LocalTime() < m_PetCooldown)
-		return;
-
-	SendPetBeacon(On, aSkin);
+void CMClientDetect::SendPetWhisper(int ClientId, bool On, const char *pSkin)
+{
+	char aEncodedSkin[2 * MAX_SKIN_LENGTH];
+	if(!On)
+		str_copy(aEncodedSkin, "!");
+	else
+		HexEncode(pSkin, aEncodedSkin, sizeof(aEncodedSkin));
+	if(On && aEncodedSkin[0] == '\0')
+		str_copy(aEncodedSkin, "-");
+	char aMessage[128];
+	str_format(aMessage, sizeof(aMessage), "%s%s", PET_WHISPER_PREFIX, aEncodedSkin);
+	GameClient()->m_MiniGames.QueueWhisper(ClientId, aMessage);
 }
 
 void CMClientDetect::SendPetBeacon(bool On, const char *pSkin)
@@ -417,17 +562,7 @@ void CMClientDetect::SendPetBeacon(bool On, const char *pSkin)
 	str_copy(m_aQueuedPetSkin, pSkin);
 }
 
-void CMClientDetect::SendBeacon(int Kind)
-{
-	m_vEmoteQueue.push_back(BEACON_OP);
-	m_vEmoteQueue.push_back(BEACON_MAGIC);
-	m_vEmoteQueue.push_back(Kind);
-	m_vEmoteQueue.push_back(FrameCheck(Kind, nullptr, 0));
-	m_ProtocolLeft = (int)m_vEmoteQueue.size();
-	m_QueuedKind = Kind;
-}
-
-void CMClientDetect::AbortBeacon(bool Retry)
+void CMClientDetect::AbortBeacon()
 {
 	m_vEmoteQueue.clear();
 	m_ProtocolLeft = 0;
@@ -435,21 +570,7 @@ void CMClientDetect::AbortBeacon(bool Retry)
 	m_EmoteTime = 0.0f;
 	m_EmoteRetries = 0;
 
-	if(Retry && m_QueuedKind == KIND_ANNOUNCE)
-	{
-		m_AnnouncePending = true;
-		m_AnnounceDeadline = LocalTime() + ANNOUNCE_TIMEOUT;
-	}
-	else if(m_QueuedKind == KIND_REPLY)
-	{
-		OnBeaconLost();
-		if(Retry)
-		{
-			m_ReplyPending = true;
-			m_ReplyTime = LocalTime() + REPLY_DELAY + Jitter(REPLY_JITTER);
-		}
-	}
-	else if(m_QueuedKind == KIND_PET)
+	if(m_QueuedKind == KIND_PET)
 	{
 		m_PetCooldown = LocalTime() + PET_RETRY;
 	}
@@ -471,7 +592,7 @@ void CMClientDetect::YieldEmoteChannel()
 {
 	if(m_vEmoteQueue.empty())
 		return;
-	AbortBeacon(true);
+	AbortBeacon();
 }
 
 void CMClientDetect::FlushEmoteQueue()
@@ -481,7 +602,7 @@ void CMClientDetect::FlushEmoteQueue()
 
 	if(!CanEmote())
 	{
-		AbortBeacon(true);
+		AbortBeacon();
 		return;
 	}
 
@@ -494,7 +615,7 @@ void CMClientDetect::FlushEmoteQueue()
 		if(m_EmoteRetries > MAX_ECHO_RETRIES)
 		{
 			const int Kind = m_QueuedKind;
-			AbortBeacon(false);
+			AbortBeacon();
 			// a peer that asked for an answer while this frame was running still deserves one
 			if(Kind != KIND_PET)
 				m_ReplyPending = false;
@@ -634,7 +755,7 @@ void CMClientDetect::OnBeacon(int ClientId, int Kind)
 	if(!g_Config.m_ClMClientMiniGames)
 		return;
 
-	if(Peer.m_Answered || Peer.m_Answering)
+	if(Peer.m_Answered)
 		return;
 
 	Peer.m_WantsAnswer = true;
@@ -697,6 +818,36 @@ const char *CMClientDetect::PetSkin(int ClientId) const
 	return Peer.m_aPetSkin[0] == '\0' ? "default" : Peer.m_aPetSkin;
 }
 
+bool CMClientDetect::OnWhisper(int ClientId, int Team, const char *pMessage)
+{
+	const char *pArgs = str_startswith(pMessage, PET_WHISPER_PREFIX);
+	if(!pArgs)
+		return false;
+	if(Team == TEAM_WHISPER_SEND)
+		return true;
+	if(Team != TEAM_WHISPER_RECV || ClientId < 0 || ClientId >= MAX_CLIENTS || !Enabled())
+		return true;
+
+	CPeer &Peer = m_aPeers[ClientId];
+	if(!Peer.m_Detected)
+		return true;
+
+	char aEncodedSkin[2 * MAX_SKIN_LENGTH] = "";
+	if(sscanf(pArgs, "%46s", aEncodedSkin) != 1)
+		return true;
+
+	char aSkin[MAX_SKIN_LENGTH];
+	const bool On = str_comp(aEncodedSkin, "!") != 0;
+	if(!On || str_comp(aEncodedSkin, "-") == 0)
+		aSkin[0] = '\0';
+	else if(!HexDecode(aEncodedSkin, aSkin, sizeof(aSkin)))
+		return true;
+
+	Peer.m_PetOn = On;
+	str_copy(Peer.m_aPetSkin, aSkin);
+	return true;
+}
+
 bool CMClientDetect::OnEmoticon(int ClientId, int Emoticon)
 {
 	if(!Enabled() || ClientId < 0 || ClientId >= MAX_CLIENTS)
@@ -709,10 +860,16 @@ bool CMClientDetect::OnEmoticon(int ClientId, int Emoticon)
 	return Decode(ClientId, Emoticon);
 }
 
-void CMClientDetect::OnRender()
+void CMClientDetect::OnUpdate()
 {
 	if(!Enabled())
 	{
+		if(m_ColorBeaconActive && Client()->State() == IClient::STATE_ONLINE)
+		{
+			RestoreColorBeacon();
+			if(m_ColorBeaconActive)
+				return;
+		}
 		if(m_AnnouncePending || m_ReplyPending || !m_vEmoteQueue.empty() || NumDetected() > 0)
 			OnReset();
 		return;
@@ -723,8 +880,10 @@ void CMClientDetect::OnRender()
 
 	ForgetLeftPeers();
 	ForgetOnRename();
+	DetectColorBeacons();
 	UpdateAnnounce();
 	UpdateReply();
+	RestoreColorBeacon();
 	UpdatePet();
 	FlushEmoteQueue();
 }

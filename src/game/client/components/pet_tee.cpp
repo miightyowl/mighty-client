@@ -69,6 +69,8 @@ void CPetTee::OnRender()
 		else if(g_Config.m_ClMClientPetTeeOthers)
 		{
 			pSkinName = GameClient()->m_MClientDetect.PetSkin(ClientId);
+			Scale = (float)g_Config.m_ClMClientPetTeeSize / 100.0f;
+			Alpha = (float)g_Config.m_ClMClientPetTeeAlpha / 100.0f;
 		}
 
 		if(pSkinName == nullptr)

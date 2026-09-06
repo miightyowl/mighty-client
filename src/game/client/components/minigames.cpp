@@ -418,7 +418,7 @@ void CMiniGames::StartGame(int OpponentId, bool Challenger)
 	ResetEmoteChannel();
 }
 
-void CMiniGames::SendTo(int ClientId, const char *pMessage)
+void CMiniGames::QueueWhisper(int ClientId, const char *pMessage)
 {
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !GameClient()->m_aClients[ClientId].m_Active)
 		return;
@@ -435,8 +435,15 @@ void CMiniGames::SendTo(int ClientId, const char *pMessage)
 	aName[Out] = '\0';
 
 	char aLine[256];
-	str_format(aLine, sizeof(aLine), "/w \"%s\" %s%s", aName, PROTOCOL_PREFIX, pMessage);
+	str_format(aLine, sizeof(aLine), "/w \"%s\" %s", aName, pMessage);
 	m_vSendQueue.emplace_back(aLine);
+}
+
+void CMiniGames::SendTo(int ClientId, const char *pMessage)
+{
+	char aProtocolMessage[256];
+	str_format(aProtocolMessage, sizeof(aProtocolMessage), "%s%s", PROTOCOL_PREFIX, pMessage);
+	QueueWhisper(ClientId, aProtocolMessage);
 }
 
 void CMiniGames::SendProtocol(const char *pMessage, int MaxRetries)
@@ -1786,9 +1793,13 @@ void CMiniGames::RenderChessBoard(CUIRect Grid, bool Interactive, float Alpha)
 	}
 }
 
-void CMiniGames::OnRender()
+void CMiniGames::OnUpdate()
 {
 	FlushSendQueue();
+}
+
+void CMiniGames::OnRender()
+{
 	FlushEmoteQueue();
 
 	if(g_Config.m_ClMClientMiniGamesHold && m_ViewActive && ViewKeyState() == 0)
