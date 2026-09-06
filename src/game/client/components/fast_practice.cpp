@@ -115,9 +115,7 @@ void CFastPractice::Start()
 	}
 
 	m_FrozenInput = GameClient()->m_Controls.m_aInputData[g_Config.m_ClDummy];
-	m_FrozenInput.m_Direction = 0;
 	m_FrozenInput.m_Jump = 0;
-	m_FrozenInput.m_Hook = 0;
 	if((m_FrozenInput.m_Fire & 1) != 0)
 		m_FrozenInput.m_Fire++;
 	if(m_FrozenInput.m_TargetX == 0 && m_FrozenInput.m_TargetY == 0)
@@ -136,6 +134,8 @@ void CFastPractice::Stop()
 	if(m_ClientId >= 0)
 	{
 		CNetObj_PlayerInput &Live = GameClient()->m_Controls.m_aInputData[g_Config.m_ClDummy];
+		Live.m_Direction = m_FrozenInput.m_Direction;
+		Live.m_Hook = m_FrozenInput.m_Hook;
 		Live.m_Fire = ((m_FrozenInput.m_Fire & INPUT_STATE_MASK) + (Live.m_Fire & 1)) & INPUT_STATE_MASK;
 		Live.m_NextWeapon = m_FrozenInput.m_NextWeapon;
 		Live.m_PrevWeapon = m_FrozenInput.m_PrevWeapon;
