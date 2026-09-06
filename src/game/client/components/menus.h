@@ -582,7 +582,8 @@ protected:
 	void LoadProfiles();
 	// writes the combined mclient.json (profiles + bind wheel); loads profiles first if needed
 	void SaveMClient();
-	void ApplyProfile(const CProfile &Profile);
+	void SaveProfile(bool Dummy);
+	void ApplyProfile(const CProfile &Profile, bool Dummy);
 	static void ConLoadProfile(IConsole::IResult *pResult, void *pUserData);
 	void RenderUnfinishedVoteTeeSelection(CUIRect *pMainView);
 	void RenderIngameHint();
