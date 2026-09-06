@@ -944,11 +944,12 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 	Ui()->DoLabel(&Headline, Localize("Profiles"), 20.0f, TEXTALIGN_ML);
 	MainView.HSplitTop(5.0f, nullptr, &MainView);
 
-	// current player + "save current profile" button
+	// current player + player/dummy save buttons
 	MainView.HSplitTop(34.0f, &TopBar, &MainView);
 	MainView.HSplitTop(6.0f, nullptr, &MainView);
-	CUIRect CurTee, CurInfo, CurLabel, SaveButton, CurFlag;
-	TopBar.VSplitRight(170.0f, &TopBar, &SaveButton);
+	CUIRect CurTee, CurInfo, CurLabel, SavePlayerButton, SaveDummyButton, CurFlag;
+	TopBar.VSplitRight(250.0f, &TopBar, &SavePlayerButton);
+	SavePlayerButton.VSplitMid(&SavePlayerButton, &SaveDummyButton, 5.0f);
 	TopBar.VSplitRight(10.0f, &TopBar, nullptr);
 	TopBar.VSplitLeft(TopBar.h, &CurTee, &CurInfo);
 	CurInfo.VSplitLeft(8.0f, nullptr, &CurInfo);
@@ -969,22 +970,16 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 	if(g_Config.m_PlayerCountry >= 0)
 		GameClient()->m_CountryFlags.Render(g_Config.m_PlayerCountry, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), CurFlag.x, CurFlag.y, CurFlag.w, CurFlag.h);
 
-	SaveButton.HMargin((SaveButton.h - 24.0f) / 2.0f, &SaveButton);
-	static CButtonContainer s_SaveButton;
-	MenuButton(SaveButton, Localize("Save current profile"), 14.0f, Ui()->HotItem() == &s_SaveButton);
-	if(Ui()->DoButtonLogic(&s_SaveButton, 0, &SaveButton, BUTTONFLAG_LEFT))
-	{
-		CProfile Profile;
-		str_copy(Profile.m_aName, g_Config.m_PlayerName);
-		str_copy(Profile.m_aClan, g_Config.m_PlayerClan);
-		Profile.m_Country = g_Config.m_PlayerCountry;
-		str_copy(Profile.m_aSkin, g_Config.m_ClPlayerSkin);
-		Profile.m_UseCustomColor = g_Config.m_ClPlayerUseCustomColor;
-		Profile.m_ColorBody = g_Config.m_ClPlayerColorBody;
-		Profile.m_ColorFeet = g_Config.m_ClPlayerColorFeet;
-		m_vProfiles.push_back(Profile);
-		SaveMClient();
-	}
+	SavePlayerButton.HMargin((SavePlayerButton.h - 24.0f) / 2.0f, &SavePlayerButton);
+	SaveDummyButton.HMargin((SaveDummyButton.h - 24.0f) / 2.0f, &SaveDummyButton);
+	static CButtonContainer s_SavePlayerButton;
+	static CButtonContainer s_SaveDummyButton;
+	MenuButton(SavePlayerButton, Localize("Save player"), 13.0f, Ui()->HotItem() == &s_SavePlayerButton);
+	MenuButton(SaveDummyButton, Localize("Save dummy"), 13.0f, Ui()->HotItem() == &s_SaveDummyButton);
+	if(Ui()->DoButtonLogic(&s_SavePlayerButton, 0, &SavePlayerButton, BUTTONFLAG_LEFT))
+		SaveProfile(false);
+	if(Ui()->DoButtonLogic(&s_SaveDummyButton, 0, &SaveDummyButton, BUTTONFLAG_LEFT))
+		SaveProfile(true);
 
 	MainView.HSplitTop(1.0f, &Divider, &MainView);
 	Divider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_NONE, 0.0f);
@@ -996,7 +991,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		Props.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
 		CUIRect Hint;
 		MainView.HSplitTop(24.0f, &Hint, nullptr);
-		Ui()->DoLabel(&Hint, Localize("No profiles saved yet. Click \"Save current profile\" to add one."), 12.0f, TEXTALIGN_ML, Props);
+		Ui()->DoLabel(&Hint, Localize("No profiles saved yet. Save your player or dummy to add one."), 12.0f, TEXTALIGN_ML, Props);
 		return;
 	}
 
@@ -1093,7 +1088,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 	s_Selected = s_ListBox.DoEnd();
 
 	if(LoadIndex >= 0)
-		ApplyProfile(m_vProfiles[LoadIndex]);
+		ApplyProfile(m_vProfiles[LoadIndex], g_Config.m_ClDummy != 0);
 
 	if(DeleteIndex >= 0)
 	{
@@ -1252,21 +1247,59 @@ void CMenus::SaveMClient()
 
 	Writer.EndObject();
 }
-void CMenus::ApplyProfile(const CProfile &Profile)
+void CMenus::SaveProfile(bool Dummy)
 {
-	str_copy(g_Config.m_PlayerName, Profile.m_aName);
-	str_copy(g_Config.m_PlayerClan, Profile.m_aClan);
-	if(Profile.m_Country >= 0)
-		g_Config.m_PlayerCountry = Profile.m_Country;
-	str_copy(g_Config.m_ClPlayerSkin, Profile.m_aSkin);
-	g_Config.m_ClPlayerUseCustomColor = Profile.m_UseCustomColor;
-	g_Config.m_ClPlayerColorBody = Profile.m_ColorBody;
-	g_Config.m_ClPlayerColorFeet = Profile.m_ColorFeet;
+	CProfile Profile;
+	str_copy(Profile.m_aName, Dummy ? g_Config.m_ClDummyName : g_Config.m_PlayerName);
+	str_copy(Profile.m_aClan, Dummy ? g_Config.m_ClDummyClan : g_Config.m_PlayerClan);
+	Profile.m_Country = Dummy ? g_Config.m_ClDummyCountry : g_Config.m_PlayerCountry;
+	str_copy(Profile.m_aSkin, Dummy ? g_Config.m_ClDummySkin : g_Config.m_ClPlayerSkin);
+	Profile.m_UseCustomColor = Dummy ? g_Config.m_ClDummyUseCustomColor : g_Config.m_ClPlayerUseCustomColor;
+	Profile.m_ColorBody = Dummy ? g_Config.m_ClDummyColorBody : g_Config.m_ClPlayerColorBody;
+	Profile.m_ColorFeet = Dummy ? g_Config.m_ClDummyColorFeet : g_Config.m_ClPlayerColorFeet;
+	m_vProfiles.push_back(Profile);
+	SaveMClient();
+}
+
+void CMenus::ApplyProfile(const CProfile &Profile, bool Dummy)
+{
+	if(Dummy)
+	{
+		str_copy(g_Config.m_ClDummyName, Profile.m_aName);
+		str_copy(g_Config.m_ClDummyClan, Profile.m_aClan);
+		if(Profile.m_Country >= 0)
+			g_Config.m_ClDummyCountry = Profile.m_Country;
+		str_copy(g_Config.m_ClDummySkin, Profile.m_aSkin);
+		g_Config.m_ClDummyUseCustomColor = Profile.m_UseCustomColor;
+		g_Config.m_ClDummyColorBody = Profile.m_ColorBody;
+		g_Config.m_ClDummyColorFeet = Profile.m_ColorFeet;
+	}
+	else
+	{
+		str_copy(g_Config.m_PlayerName, Profile.m_aName);
+		str_copy(g_Config.m_PlayerClan, Profile.m_aClan);
+		if(Profile.m_Country >= 0)
+			g_Config.m_PlayerCountry = Profile.m_Country;
+		str_copy(g_Config.m_ClPlayerSkin, Profile.m_aSkin);
+		g_Config.m_ClPlayerUseCustomColor = Profile.m_UseCustomColor;
+		g_Config.m_ClPlayerColorBody = Profile.m_ColorBody;
+		g_Config.m_ClPlayerColorFeet = Profile.m_ColorFeet;
+	}
 
 	if(Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK)
-		GameClient()->SendInfo(false);
+	{
+		if(Dummy)
+			GameClient()->SendDummyInfo(false);
+		else
+			GameClient()->SendInfo(false);
+	}
 	else
-		m_NeedSendinfo = true;
+	{
+		if(Dummy)
+			m_NeedSendDummyinfo = true;
+		else
+			m_NeedSendinfo = true;
+	}
 }
 void CMenus::ConLoadProfile(IConsole::IResult *pResult, void *pUserData)
 {
@@ -1279,7 +1312,7 @@ void CMenus::ConLoadProfile(IConsole::IResult *pResult, void *pUserData)
 		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "mclient", "no saved profile with that number");
 		return;
 	}
-	pSelf->ApplyProfile(pSelf->m_vProfiles[Index]);
+	pSelf->ApplyProfile(pSelf->m_vProfiles[Index], g_Config.m_ClDummy != 0);
 }
 void CMenus::OnConsoleInit()
 {
