@@ -2,6 +2,7 @@
 #define GAME_CLIENT_COMPONENTS_UNFINISHED_MAP_VOTE_H
 
 #include <engine/console.h>
+#include <engine/graphics.h>
 #include <engine/map.h>
 
 #include <game/client/component.h>
@@ -22,8 +23,18 @@ public:
 	struct SRemainingMap
 	{
 		int m_OptionIndex;
+		std::string m_MapName;
 		std::string m_Description;
 		std::string m_Info;
+	};
+
+	struct SMapRelease
+	{
+		std::string m_Name;
+		std::string m_Type;
+		std::string m_ThumbnailUrl;
+		std::string m_Tags;
+		std::vector<std::string> m_vTags;
 	};
 
 private:
@@ -34,6 +45,19 @@ private:
 	bool m_VotePending = false;
 
 	std::shared_ptr<IHttpRequest> m_pMapInfoRequest;
+	std::shared_ptr<IHttpRequest> m_pMapReleasesRequest;
+	bool m_MapReleasesFailed = false;
+	std::vector<SMapRelease> m_vMapReleases;
+	std::map<std::string, int> m_MapReleaseIndices;
+	std::map<std::string, int> m_VoteDescriptionReleaseCache;
+
+	struct SMapPreview
+	{
+		std::shared_ptr<IHttpRequest> m_pRequest;
+		IGraphics::CTextureHandle m_Texture;
+		bool m_Failed = false;
+	};
+	std::map<std::string, SMapPreview> m_MapPreviews;
 
 	struct SPlayerStats
 	{
@@ -60,7 +84,9 @@ private:
 	std::vector<std::string> SelectedPlayerNames() const;
 	bool DetermineServerTypeFromVoteList();
 	void UpdateServerType();
-	std::shared_ptr<IHttpRequest> RunRequest(const char *pUrl);
+	std::shared_ptr<IHttpRequest> RunRequest(const char *pUrl, int64_t MaxResponseSize = 16 * 1024 * 1024);
+	void PollMapReleases();
+	void PollMapPreviews();
 	void RequestPlayer(const char *pName);
 	bool PlayerReady(const char *pName) const;
 	void PollPlayerRequests();
@@ -77,6 +103,7 @@ public:
 	int Sizeof() const override { return sizeof(*this); }
 	void OnConsoleInit() override;
 	void OnRender() override;
+	void OnShutdown() override;
 	void OnStateChange(int NewState, int OldState) override;
 
 	void Start(const char *pReason);
@@ -85,7 +112,14 @@ public:
 
 	bool IsPlayerSelected(const char *pName) const { return m_SelectedPlayers.contains(pName); }
 	void TogglePlayerSelection(const char *pName);
+	void SetAllPlayersSelected(bool Selected);
+	bool AreAllPlayersSelected() const;
 	void EnsureLocalPlayerSelected();
+	static bool VoteDescriptionContains(const char *pDescription, const char *pNeedle);
+	void UpdateMapReleases();
+	const SMapRelease *FindMapRelease(const char *pMapName);
+	const SMapRelease *FindMapReleaseForVote(const char *pDescription);
+	IGraphics::CTextureHandle RequestMapPreview(const SMapRelease *pRelease);
 
 	void UpdateRemainingMaps();
 	const std::vector<SRemainingMap> &RemainingMaps() const { return m_vRemainingMaps; }
