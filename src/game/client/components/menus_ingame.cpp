@@ -1075,9 +1075,9 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 		m_CallvoteSelectedMapType = vMapTypes.empty() ? -1 : vMapTypes.front();
 
 	const bool ShowPlayers = m_CallvoteUnfinishedMaps && DDNetCommunity;
-	CUIRect Header, FilterBar, PlayerArea, MapTypeButton, UnfinishedButton, TagsButton;
+	CUIRect Header, FilterBar, PlayerArea, MapTypeButton, UnfinishedButton, TagsButton, StarsButton;
 	MainView.HSplitTop(40.0f, &Header, &MainView);
-	Header.VSplitLeft(std::min(580.0f, Header.w), &FilterBar, &PlayerArea);
+	Header.VSplitLeft(std::min(710.0f, Header.w), &FilterBar, &PlayerArea);
 	PlayerArea.VSplitLeft(8.0f, nullptr, &PlayerArea);
 	FilterBar.HMargin(7.0f, &FilterBar);
 	if(ShowPlayers)
@@ -1094,7 +1094,10 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 	{
 		m_CallvoteMapTypeMenuOpen = !m_CallvoteMapTypeMenuOpen;
 		if(m_CallvoteMapTypeMenuOpen)
+		{
 			m_CallvoteMapTagsMenuOpen = false;
+			m_CallvoteMapStarsMenuOpen = false;
+		}
 	}
 
 	FilterBar.VSplitLeft(std::min(8.0f, FilterBar.w), nullptr, &FilterBar);
@@ -1110,7 +1113,29 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 	{
 		m_CallvoteMapTagsMenuOpen = !m_CallvoteMapTagsMenuOpen;
 		if(m_CallvoteMapTagsMenuOpen)
+		{
 			m_CallvoteMapTypeMenuOpen = false;
+			m_CallvoteMapStarsMenuOpen = false;
+		}
+	}
+
+	FilterBar.VSplitLeft(std::min(8.0f, FilterBar.w), nullptr, &FilterBar);
+	const float StarsWidth = std::min(120.0f, std::max(0.0f, FilterBar.w * 0.36f));
+	FilterBar.VSplitLeft(StarsWidth, &StarsButton, &FilterBar);
+	char aStarsButtonText[64];
+	if(m_CallvoteSelectedMapStars.empty())
+		str_copy(aStarsButtonText, Localize("Stars"));
+	else
+		str_format(aStarsButtonText, sizeof(aStarsButtonText), "%s (%d)", Localize("Stars"), (int)m_CallvoteSelectedMapStars.size());
+	static CButtonContainer s_StarsButton;
+	if(DoButton_Menu(&s_StarsButton, aStarsButtonText, !m_CallvoteSelectedMapStars.empty(), &StarsButton))
+	{
+		m_CallvoteMapStarsMenuOpen = !m_CallvoteMapStarsMenuOpen;
+		if(m_CallvoteMapStarsMenuOpen)
+		{
+			m_CallvoteMapTypeMenuOpen = false;
+			m_CallvoteMapTagsMenuOpen = false;
+		}
 	}
 
 	FilterBar.VSplitLeft(std::min(8.0f, FilterBar.w), nullptr, &FilterBar);
@@ -1141,6 +1166,7 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 		std::string m_Info;
 		const CUnfinishedMapVote::SMapRelease *m_pRelease;
 		bool m_Random;
+		int m_Stars;
 	};
 	std::vector<SCard> vCards;
 	auto AddMapCard = [&](int Option, const char *pName, const char *pDescription, const char *pInfo, const CUnfinishedMapVote::SMapRelease *pRelease) {
@@ -1150,7 +1176,7 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 		{
 			Title.append(" ").append(std::to_string(Stars)).append("/5 ★");
 		}
-		vCards.push_back({Option, std::move(Title), VoteCardInfo(pName, pDescription, pInfo), pRelease, false});
+		vCards.push_back({Option, std::move(Title), VoteCardInfo(pName, pDescription, pInfo), pRelease, false, Stars});
 	};
 	int RandomOption = -1;
 	for(int OptionIndex = 0; OptionIndex < (int)vpOptions.size(); OptionIndex++)
@@ -1167,7 +1193,7 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 	}
 	if(m_CallvoteUnfinishedMaps)
 	{
-		vCards.push_back({UnfinishedVote.AreAllPlayersSelected() ? CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL : CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_SELECTED, "Random unfinished map", "", nullptr, true});
+		vCards.push_back({UnfinishedVote.AreAllPlayersSelected() ? CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL : CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_SELECTED, "Random unfinished map", "", nullptr, true, -1});
 		if(!UnfinishedVote.RemainingMapsLoading())
 			for(const auto &Map : UnfinishedVote.RemainingMaps())
 			{
@@ -1180,7 +1206,7 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 	}
 	else
 	{
-		vCards.push_back({RandomOption >= 0 ? RandomOption : CALLVOTE_OPTION_NONE, "Random map", "", nullptr, true});
+		vCards.push_back({RandomOption >= 0 ? RandomOption : CALLVOTE_OPTION_RANDOM_MAP_FALLBACK, "Random map", "", nullptr, true, -1});
 		for(int OptionIndex = 0; OptionIndex < (int)vpOptions.size(); OptionIndex++)
 		{
 			const CVoteOptionClient *pOption = vpOptions[OptionIndex];
@@ -1203,24 +1229,36 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 			continue;
 		AvailableTags.insert(Card.m_pRelease->m_vTags.begin(), Card.m_pRelease->m_vTags.end());
 	}
-	if(!m_CallvoteSelectedMapTags.empty())
+	if(!m_CallvoteSelectedMapTags.empty() || !m_CallvoteSelectedMapStars.empty())
 	{
 		std::vector<SCard> vFilteredCards;
 		vFilteredCards.reserve(vCards.size());
 		for(SCard &Card : vCards)
 		{
 			bool Matches = Card.m_Random;
-			if(Card.m_pRelease != nullptr)
+			if(!Card.m_Random)
 			{
-				Matches = std::all_of(m_CallvoteSelectedMapTags.begin(), m_CallvoteSelectedMapTags.end(), [&](const std::string &Tag) {
-					return std::find(Card.m_pRelease->m_vTags.begin(), Card.m_pRelease->m_vTags.end(), Tag) != Card.m_pRelease->m_vTags.end();
-				});
+				Matches = m_CallvoteSelectedMapStars.empty() || m_CallvoteSelectedMapStars.contains(Card.m_Stars);
+				if(Matches && !m_CallvoteSelectedMapTags.empty())
+				{
+					Matches = Card.m_pRelease != nullptr && std::all_of(m_CallvoteSelectedMapTags.begin(), m_CallvoteSelectedMapTags.end(), [&](const std::string &Tag) {
+						return std::find(Card.m_pRelease->m_vTags.begin(), Card.m_pRelease->m_vTags.end(), Tag) != Card.m_pRelease->m_vTags.end();
+					});
+				}
 			}
 			if(Matches)
 				vFilteredCards.push_back(std::move(Card));
 		}
 		vCards = std::move(vFilteredCards);
 	}
+	m_vCallvoteRandomMapOptions.clear();
+	for(const SCard &Card : vCards)
+	{
+		if(!Card.m_Random && Card.m_Option >= 0)
+			m_vCallvoteRandomMapOptions.push_back(Card.m_Option);
+	}
+	if(!vCards.empty() && vCards.front().m_Option == CALLVOTE_OPTION_RANDOM_MAP_FALLBACK && m_vCallvoteRandomMapOptions.empty())
+		vCards.front().m_Option = CALLVOTE_OPTION_NONE;
 
 	std::vector<std::string> vAvailableTags(AvailableTags.begin(), AvailableTags.end());
 	const bool ShowTagsMenu = m_CallvoteMapTagsMenuOpen && !vAvailableTags.empty();
@@ -1231,6 +1269,15 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 		TagsDropDown.y = Header.y + Header.h + 2.0f;
 		TagsDropDown.w = std::max(150.0f, TagsButton.w);
 		TagsDropDown.h = std::min(22.0f * (vAvailableTags.size() + !m_CallvoteSelectedMapTags.empty()), MainView.y + MainView.h - TagsDropDown.y);
+	}
+	const bool ShowStarsMenu = m_CallvoteMapStarsMenuOpen;
+	CUIRect StarsDropDown;
+	if(ShowStarsMenu)
+	{
+		StarsDropDown.x = StarsButton.x;
+		StarsDropDown.y = Header.y + Header.h + 2.0f;
+		StarsDropDown.w = std::max(120.0f, StarsButton.w);
+		StarsDropDown.h = 22.0f * (5 + !m_CallvoteSelectedMapStars.empty());
 	}
 
 	const float Gap = 8.0f;
@@ -1263,16 +1310,17 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 		Cell.x += Column * (CardWidth + Gap);
 		Cell.w = CardWidth;
 		Cell.Draw(m_CallvoteSelectedOption == vCards[CardIndex].m_Option ? AccentColor().WithAlpha(0.35f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_ALL, 5.0f);
-		if(!ShowMapTypeMenu && !ShowTagsMenu && Ui()->DoButtonLogic(&s_aCardIds[CardIndex], 0, &Cell, BUTTONFLAG_LEFT))
+		const int CardClicked = !ShowMapTypeMenu && !ShowTagsMenu && !ShowStarsMenu ? Ui()->DoButtonLogic(&s_aCardIds[CardIndex], 0, &Cell, BUTTONFLAG_LEFT) : 0;
+		if(CardClicked)
 		{
-			int SelectedOption = vCards[CardIndex].m_Option;
-			if(!m_CallvoteUnfinishedMaps && vCards[CardIndex].m_Random && SelectedOption == CALLVOTE_OPTION_NONE && vCards.size() > 1)
-				SelectedOption = vCards[1 + secure_rand_below((int)vCards.size() - 1)].m_Option;
+			const int SelectedOption = vCards[CardIndex].m_Option;
 			if(SelectedOption != CALLVOTE_OPTION_NONE)
 			{
 				m_CallvoteSelectedOption = SelectedOption;
 				m_CallvoteSelectedRemaining = m_CallvoteUnfinishedMaps && CardIndex > 0;
-				Activated = true;
+				if(m_CallvoteUnfinishedMaps && vCards[CardIndex].m_Random)
+					m_CallvoteReasonInput.Clear();
+				Activated = CardClicked == 1 && Ui()->DoDoubleClickLogic(&s_aCardIds[CardIndex]);
 			}
 		}
 		CUIRect Preview, Text;
@@ -1404,6 +1452,40 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 			ButtonIndex++;
 		}
 		s_TagsDropDownScrollRegion.End();
+	}
+
+	if(ShowStarsMenu)
+	{
+		StarsDropDown.Draw(ColorRGBA(0.08f, 0.08f, 0.08f, 0.98f), IGraphics::CORNER_ALL, 5.0f);
+		CUIRect DropDownContent = StarsDropDown;
+		static CButtonContainer s_aStarsButtonIds[6];
+		int ButtonIndex = 0;
+		if(!m_CallvoteSelectedMapStars.empty())
+		{
+			CUIRect DropDownRow;
+			DropDownContent.HSplitTop(22.0f, &DropDownRow, &DropDownContent);
+			if(DoButton_Menu(&s_aStarsButtonIds[ButtonIndex], Localize("Clear stars"), 0, &DropDownRow))
+			{
+				m_CallvoteSelectedMapStars.clear();
+				m_CallvoteSelectedOption = -1;
+			}
+			ButtonIndex++;
+		}
+		for(int Stars = 1; Stars <= 5; Stars++, ButtonIndex++)
+		{
+			CUIRect DropDownRow;
+			DropDownContent.HSplitTop(22.0f, &DropDownRow, &DropDownContent);
+			const bool Selected = m_CallvoteSelectedMapStars.contains(Stars);
+			char aLabel[64];
+			str_format(aLabel, sizeof(aLabel), "%s %d/5 ★", Selected ? "☒" : "☐", Stars);
+			if(DoButton_Menu(&s_aStarsButtonIds[ButtonIndex], aLabel, Selected, &DropDownRow))
+			{
+				auto [Iterator, Inserted] = m_CallvoteSelectedMapStars.emplace(Stars);
+				if(!Inserted)
+					m_CallvoteSelectedMapStars.erase(Iterator);
+				m_CallvoteSelectedOption = -1;
+			}
+		}
 	}
 	return Activated;
 }
@@ -2097,6 +2179,8 @@ void CMenus::RenderServerControl(CUIRect MainView)
 		Call = RenderServerControlKick(MainView, false, Searching);
 	else if(s_ControlPage == EServerControlTab::SPECVOTE)
 		Call = RenderServerControlKick(MainView, true, Searching);
+	const bool RandomUnfinishedSelected = s_ControlPage == EServerControlTab::SETTINGS &&
+					      (m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL || m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_SELECTED);
 
 	// call vote
 	Bottom.VSplitRight(10.0f, &Bottom, nullptr);
@@ -2107,12 +2191,19 @@ void CMenus::RenderServerControl(CUIRect MainView)
 	{
 		if(s_ControlPage == EServerControlTab::SETTINGS)
 		{
-			if(m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL || m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_SELECTED)
+			if(RandomUnfinishedSelected)
 			{
 				if(m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL)
-					GameClient()->m_UnfinishedMapVote.Start(m_CallvoteReasonInput.GetString());
+					GameClient()->m_UnfinishedMapVote.Start("");
 				else
-					GameClient()->m_UnfinishedMapVote.StartSelected(m_CallvoteReasonInput.GetString());
+					GameClient()->m_UnfinishedMapVote.StartSelected("");
+				if(g_Config.m_UiCloseWindowAfterChangingSetting)
+					SetActive(false);
+			}
+			else if(m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_MAP_FALLBACK && !m_vCallvoteRandomMapOptions.empty())
+			{
+				const int Option = m_vCallvoteRandomMapOptions[secure_rand_below((int)m_vCallvoteRandomMapOptions.size())];
+				GameClient()->m_Voting.CallvoteOption(Option, m_CallvoteReasonInput.GetString());
 				if(g_Config.m_UiCloseWindowAfterChangingSetting)
 					SetActive(false);
 			}
@@ -2152,12 +2243,20 @@ void CMenus::RenderServerControl(CUIRect MainView)
 	Ui()->DoLabel(&Reason, pLabel, 14.0f, TEXTALIGN_ML);
 	float w = TextRender()->TextWidth(14.0f, pLabel, -1, -1.0f);
 	Reason.VSplitLeft(w + 10.0f, nullptr, &Reason);
-	if(Input()->KeyPress(KEY_R) && Input()->ModifierIsPressed())
+	if(!RandomUnfinishedSelected && Input()->KeyPress(KEY_R) && Input()->ModifierIsPressed())
 	{
 		Ui()->SetActiveItem(&m_CallvoteReasonInput);
 		m_CallvoteReasonInput.SelectAll();
 	}
-	Ui()->DoEditBox(&m_CallvoteReasonInput, &Reason, 14.0f);
+	if(RandomUnfinishedSelected)
+	{
+		Reason.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.04f), IGraphics::CORNER_ALL, 3.0f);
+		SLabelProperties DisabledProps;
+		DisabledProps.SetColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.35f));
+		Ui()->DoLabel(&Reason, Localize("Not available"), 12.0f, TEXTALIGN_MC, DisabledProps);
+	}
+	else
+		Ui()->DoEditBox(&m_CallvoteReasonInput, &Reason, 14.0f);
 
 	// vote option loading indicator
 	if(s_ControlPage == EServerControlTab::SETTINGS && GameClient()->m_Voting.IsReceivingOptions())
