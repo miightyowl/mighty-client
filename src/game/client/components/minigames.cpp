@@ -1303,7 +1303,7 @@ void CMiniGames::RenderGameMenu()
 	Window.HSplitTop(TitleHeight, &Title, &Window);
 	Ui()->DoLabel(&Title, Localize("Games"), 16.0f, TEXTALIGN_ML);
 	Window.HSplitTop(HintHeight, &Hint, &Window);
-	Ui()->DoLabel(&Hint, Localize("Pick a game to challenge someone to."), 9.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&Hint, Localize("Only works when the other player is nearby and not in solo or a different team."), 9.0f, TEXTALIGN_ML);
 	Window.HSplitTop(Spacing, nullptr, &Window);
 	Window.HSplitTop(TileHeight, &Row, &Window);
 

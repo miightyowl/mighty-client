@@ -284,6 +284,7 @@ protected:
 		CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL = -2,
 		CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_SELECTED = -3,
 		CALLVOTE_OPTION_NONE = -4,
+		CALLVOTE_OPTION_RANDOM_MAP_FALLBACK = -5,
 	};
 	int m_CallvoteSelectedOption;
 	bool m_CallvoteSelectedRemaining = false;
@@ -291,7 +292,10 @@ protected:
 	int m_CallvoteSelectedMapType = -1;
 	bool m_CallvoteMapTypeMenuOpen = false;
 	bool m_CallvoteMapTagsMenuOpen = false;
+	bool m_CallvoteMapStarsMenuOpen = false;
 	std::set<std::string> m_CallvoteSelectedMapTags;
+	std::set<int> m_CallvoteSelectedMapStars;
+	std::vector<int> m_vCallvoteRandomMapOptions;
 	int m_CallvoteSelectedPlayer;
 	CLineInputBuffered<VOTE_REASON_LENGTH> m_CallvoteReasonInput;
 	CLineInputBuffered<64> m_FilterInput;
