@@ -331,7 +331,8 @@ void CMiniGames::OpenSelect()
 {
 	m_SelectedId = -1;
 	m_State = STATE_SELECT;
-	GameClient()->m_MClientDetect.Announce();
+	if(GameClient()->m_MClientDetect.NumDetected() == 0)
+		GameClient()->m_MClientDetect.Refresh();
 }
 
 void CMiniGames::Close()
@@ -1345,10 +1346,10 @@ void CMiniGames::RenderSelectModal()
 
 	Window.HSplitTop(16.0f, &Hint, &Window);
 	const char *pHint;
-	if(NumPlayers > 0)
-		pHint = Localize("Pick the M-Client player you want to challenge.");
-	else if(GameClient()->m_MClientDetect.Announcing())
+	if(GameClient()->m_MClientDetect.Refreshing())
 		pHint = Localize("Looking for other M-Client players on this server...");
+	else if(NumPlayers > 0)
+		pHint = Localize("Pick the M-Client player you want to challenge.");
 	else if(GameClient()->m_MClientDetect.Enabled())
 		pHint = Localize("No other M-Client player answered on this server.");
 	else
@@ -1413,12 +1414,15 @@ void CMiniGames::RenderSelectModal()
 	}
 	s_ScrollRegion.End();
 
-	CUIRect ChallengeButton, CancelButton;
+	CUIRect ChallengeButton, RefreshButton, CancelButton;
 	ButtonRow.VSplitRight(90.0f, &ButtonRow, &ChallengeButton);
+	ButtonRow.VSplitRight(8.0f, &ButtonRow, nullptr);
+	ButtonRow.VSplitRight(90.0f, &ButtonRow, &RefreshButton);
 	ButtonRow.VSplitRight(8.0f, &ButtonRow, nullptr);
 	ButtonRow.VSplitRight(90.0f, nullptr, &CancelButton);
 
 	static CButtonContainer s_ChallengeButton;
+	static CButtonContainer s_RefreshButton;
 	static CButtonContainer s_CancelButton;
 
 	const bool CanChallenge = m_SelectedId >= 0;
@@ -1429,6 +1433,11 @@ void CMiniGames::RenderSelectModal()
 		Challenge(m_SelectedId);
 		return;
 	}
+
+	RefreshButton.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_RefreshButton ? 0.2f : 0.1f), IGraphics::CORNER_ALL, 5.0f);
+	Ui()->DoLabel(&RefreshButton, Localize("Refresh"), 11.0f, TEXTALIGN_MC);
+	if(Ui()->DoButtonLogic(&s_RefreshButton, 0, &RefreshButton, BUTTONFLAG_LEFT))
+		GameClient()->m_MClientDetect.Refresh();
 
 	CancelButton.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_CancelButton ? 0.2f : 0.1f), IGraphics::CORNER_ALL, 5.0f);
 	Ui()->DoLabel(&CancelButton, Localize("Cancel"), 11.0f, TEXTALIGN_MC);
