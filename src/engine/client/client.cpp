@@ -5323,9 +5323,11 @@ int CClient::GetPredictionTick()
 
 void CClient::GetSmoothTick(int *pSmoothTick, float *pSmoothIntraTick, float MixAmount)
 {
-	int64_t GameTime = m_aGameTime[g_Config.m_ClDummy].Get(time_get());
-	int64_t PredTime = m_PredictedTime.Get(time_get());
-	int64_t SmoothTime = std::clamp(GameTime + (int64_t)(MixAmount * (PredTime - GameTime)), GameTime, PredTime);
+	const int64_t GameTime = m_aGameTime[g_Config.m_ClDummy].Get(time_get());
+	const int64_t PredTime = m_PredictedTime.Get(time_get());
+	const int64_t MinTime = std::min(GameTime, PredTime);
+	const int64_t MaxTime = std::max(GameTime, PredTime);
+	const int64_t SmoothTime = std::clamp(GameTime + (int64_t)(MixAmount * (PredTime - GameTime)), MinTime, MaxTime);
 
 	*pSmoothTick = (int)(SmoothTime * GameTickSpeed() / time_freq()) + 1;
 	*pSmoothIntraTick = (SmoothTime - (*pSmoothTick - 1) * time_freq() / GameTickSpeed()) / (float)(time_freq() / GameTickSpeed());
