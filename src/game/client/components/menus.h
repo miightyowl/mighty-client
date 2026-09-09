@@ -30,6 +30,7 @@
 #include <chrono>
 #include <initializer_list>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -286,6 +287,11 @@ protected:
 	};
 	int m_CallvoteSelectedOption;
 	bool m_CallvoteSelectedRemaining = false;
+	bool m_CallvoteUnfinishedMaps = false;
+	int m_CallvoteSelectedMapType = -1;
+	bool m_CallvoteMapTypeMenuOpen = false;
+	bool m_CallvoteMapTagsMenuOpen = false;
+	std::set<std::string> m_CallvoteSelectedMapTags;
 	int m_CallvoteSelectedPlayer;
 	CLineInputBuffered<VOTE_REASON_LENGTH> m_CallvoteReasonInput;
 	CLineInputBuffered<64> m_FilterInput;
@@ -545,6 +551,7 @@ protected:
 	void RenderServerControl(CUIRect MainView);
 	bool RenderServerControlKick(CUIRect MainView, bool FilterSpectators, bool UpdateScroll);
 	bool RenderServerControlServer(CUIRect MainView, bool UpdateScroll);
+	bool RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll);
 	void RenderServerControlSaveMaps(CUIRect MainView);
 	void RenderServerControlSavedTeams(CUIRect MainView);
 

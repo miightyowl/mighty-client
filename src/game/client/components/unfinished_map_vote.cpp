@@ -106,6 +106,24 @@ static void NormalizeVoteDescription(char *pDst, int DstSize, const char *pSrc)
 	pDst[Length] = '\0';
 }
 
+static bool NormalizedDescriptionMatchesMap(const char *pDescription, const char *pMapName)
+{
+	char aDescription[VOTE_DESC_LENGTH];
+	char aMapName[MAX_MAP_LENGTH];
+	NormalizeVoteDescription(aDescription, sizeof(aDescription), pDescription);
+	NormalizeVoteDescription(aMapName, sizeof(aMapName), pMapName);
+	return DescriptionMatchesMap(aDescription, aMapName);
+}
+
+bool CUnfinishedMapVote::VoteDescriptionContains(const char *pDescription, const char *pNeedle)
+{
+	char aDescription[VOTE_DESC_LENGTH];
+	char aNeedle[VOTE_DESC_LENGTH];
+	NormalizeVoteDescription(aDescription, sizeof(aDescription), pDescription);
+	NormalizeVoteDescription(aNeedle, sizeof(aNeedle), pNeedle);
+	return str_find(aDescription, aNeedle) != nullptr;
+}
+
 void CUnfinishedMapVote::OnConsoleInit()
 {
 	Console()->Register("vote_random_unfinished_by_all", "?r[reason]", CFGFLAG_CLIENT, ConVoteRandomUnfinishedByAll, this, "Call a vote for a random map of the current server type that no player on the server has finished (uses ddnet.org stats, reason 1-5 picks maps with that star rating)");
@@ -132,6 +150,35 @@ void CUnfinishedMapVote::TogglePlayerSelection(const char *pName)
 	if(!Inserted)
 		m_SelectedPlayers.erase(Iterator);
 	m_RemainingDirty = true;
+}
+
+void CUnfinishedMapVote::SetAllPlayersSelected(bool Selected)
+{
+	if(Selected)
+	{
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(GameClient()->m_Snap.m_apPlayerInfos[i] && GameClient()->m_aClients[i].m_aRealName[0])
+				m_SelectedPlayers.emplace(GameClient()->m_aClients[i].m_aRealName);
+		}
+	}
+	else
+		m_SelectedPlayers.clear();
+	m_RemainingDirty = true;
+}
+
+bool CUnfinishedMapVote::AreAllPlayersSelected() const
+{
+	bool HasPlayers = false;
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(!GameClient()->m_Snap.m_apPlayerInfos[i] || !GameClient()->m_aClients[i].m_aRealName[0])
+			continue;
+		HasPlayers = true;
+		if(!IsPlayerSelected(GameClient()->m_aClients[i].m_aRealName))
+			return false;
+	}
+	return HasPlayers;
 }
 
 void CUnfinishedMapVote::EnsureLocalPlayerSelected()
@@ -248,17 +295,31 @@ bool CUnfinishedMapVote::DetermineServerTypeFromVoteList()
 
 	for(const CVoteOptionClient *pOption = GameClient()->m_Voting.FirstOption(); pOption; pOption = pOption->m_pNext)
 	{
-		if(!str_startswith(pOption->m_aDescription, "☒"))
+		const char *pDescription = str_skip_whitespaces_const(pOption->m_aDescription);
+		if(!str_startswith(pDescription, "☒") && !str_startswith(pDescription, "☑"))
 			continue;
 		char aNormalized[VOTE_DESC_LENGTH];
-		NormalizeVoteDescription(aNormalized, sizeof(aNormalized), pOption->m_aDescription);
+		NormalizeVoteDescription(aNormalized, sizeof(aNormalized), pDescription);
 		if(!str_find(aNormalized, "maps"))
 			continue;
 		for(const auto &Category : s_aCategories)
 		{
 			if(str_find(aNormalized, Category.m_pNormalized))
 			{
-				str_copy(m_aServerType, Category.m_pType);
+				if(str_comp(m_aServerType, Category.m_pType) != 0)
+				{
+					str_copy(m_aServerType, Category.m_pType);
+					m_PlayerStats.clear();
+					m_FailedPlayers.clear();
+					m_vRemainingMaps.clear();
+					m_RemainingDirty = true;
+				}
+				m_ServerTypeFailed = false;
+				if(m_pMapInfoRequest)
+				{
+					m_pMapInfoRequest->Abort();
+					m_pMapInfoRequest = nullptr;
+				}
 				return true;
 			}
 		}
@@ -268,6 +329,9 @@ bool CUnfinishedMapVote::DetermineServerTypeFromVoteList()
 
 void CUnfinishedMapVote::UpdateServerType()
 {
+	if(DetermineServerTypeFromVoteList())
+		return;
+
 	if(m_aServerType[0] != '\0' || m_ServerTypeFailed)
 		return;
 
@@ -276,12 +340,6 @@ void CUnfinishedMapVote::UpdateServerType()
 		str_copy(m_aCurrentMap, Client()->ServerInfo().m_aMap);
 		if(!m_aCurrentMap[0])
 			return;
-	}
-
-	if(DetermineServerTypeFromVoteList())
-	{
-		m_RemainingDirty = true;
-		return;
 	}
 
 	if(!m_pMapInfoRequest)
@@ -313,13 +371,150 @@ void CUnfinishedMapVote::UpdateServerType()
 	m_RemainingDirty = true;
 }
 
-std::shared_ptr<IHttpRequest> CUnfinishedMapVote::RunRequest(const char *pUrl)
+std::shared_ptr<IHttpRequest> CUnfinishedMapVote::RunRequest(const char *pUrl, int64_t MaxResponseSize)
 {
 	std::shared_ptr<IHttpRequest> pRequest = HttpGet(pUrl);
 	pRequest->Timeout(CTimeout{10000, 0, 500, 10});
+	pRequest->MaxResponseSize(MaxResponseSize);
 	pRequest->LogProgress(HTTPLOG::FAILURE);
 	Http()->Run(pRequest);
 	return pRequest;
+}
+
+void CUnfinishedMapVote::UpdateMapReleases()
+{
+	PollMapReleases();
+	if(m_pMapReleasesRequest || !m_vMapReleases.empty() || m_MapReleasesFailed)
+		return;
+	m_pMapReleasesRequest = RunRequest("https://ddnet.org/releases/maps.json", 2 * 1024 * 1024);
+}
+
+void CUnfinishedMapVote::PollMapReleases()
+{
+	if(!m_pMapReleasesRequest || !m_pMapReleasesRequest->Done())
+		return;
+
+	json_value *pJson = m_pMapReleasesRequest->State() == EHttpState::DONE ? m_pMapReleasesRequest->ResultJson() : nullptr;
+	if(pJson && pJson->type == json_array)
+	{
+		m_vMapReleases.reserve(json_array_length(pJson));
+		for(int MapIndex = 0; MapIndex < json_array_length(pJson); MapIndex++)
+		{
+			const json_value *pMap = json_array_get(pJson, MapIndex);
+			if(!pMap || pMap->type != json_object)
+				continue;
+			const json_value *pName = json_object_get(pMap, "name");
+			const json_value *pType = json_object_get(pMap, "type");
+			const json_value *pThumbnail = json_object_get(pMap, "thumbnail");
+			if(pName->type != json_string || pType->type != json_string || pThumbnail->type != json_string)
+				continue;
+
+			SMapRelease Release;
+			Release.m_Name = json_string_get(pName);
+			Release.m_Type = json_string_get(pType);
+			Release.m_ThumbnailUrl = json_string_get(pThumbnail);
+			const json_value *pTiles = json_object_get(pMap, "tiles");
+			if(pTiles->type == json_array)
+			{
+				int NumShownTags = 0;
+				for(int TileIndex = 0; TileIndex < json_array_length(pTiles); TileIndex++)
+				{
+					const json_value *pTile = json_array_get(pTiles, TileIndex);
+					if(!pTile || pTile->type != json_string)
+						continue;
+					const char *pTag = json_string_get(pTile);
+					Release.m_vTags.emplace_back(pTag);
+					if(NumShownTags < 5)
+					{
+						if(!Release.m_Tags.empty())
+							Release.m_Tags.append(" · ");
+						Release.m_Tags.append(pTag);
+						NumShownTags++;
+					}
+				}
+			}
+			m_MapReleaseIndices[Release.m_Name] = m_vMapReleases.size();
+			m_vMapReleases.push_back(std::move(Release));
+		}
+	}
+	if(pJson)
+		json_value_free(pJson);
+	m_pMapReleasesRequest = nullptr;
+	m_MapReleasesFailed = m_vMapReleases.empty();
+}
+
+const CUnfinishedMapVote::SMapRelease *CUnfinishedMapVote::FindMapRelease(const char *pMapName)
+{
+	if(!pMapName || !pMapName[0])
+		return nullptr;
+	const auto It = m_MapReleaseIndices.find(pMapName);
+	if(It != m_MapReleaseIndices.end())
+		return &m_vMapReleases[It->second];
+	for(int Index = 0; Index < (int)m_vMapReleases.size(); Index++)
+	{
+		if(str_comp_nocase(m_vMapReleases[Index].m_Name.c_str(), pMapName) == 0)
+			return &m_vMapReleases[Index];
+	}
+	return nullptr;
+}
+
+const CUnfinishedMapVote::SMapRelease *CUnfinishedMapVote::FindMapReleaseForVote(const char *pDescription)
+{
+	if(m_vMapReleases.empty())
+		return nullptr;
+	const auto Cached = m_VoteDescriptionReleaseCache.find(pDescription);
+	if(Cached != m_VoteDescriptionReleaseCache.end())
+		return Cached->second >= 0 ? &m_vMapReleases[Cached->second] : nullptr;
+
+	int BestIndex = -1;
+	for(int Index = 0; Index < (int)m_vMapReleases.size(); Index++)
+	{
+		if((DescriptionMatchesMap(pDescription, m_vMapReleases[Index].m_Name.c_str()) || NormalizedDescriptionMatchesMap(pDescription, m_vMapReleases[Index].m_Name.c_str())) &&
+			(BestIndex < 0 || m_vMapReleases[Index].m_Name.length() > m_vMapReleases[BestIndex].m_Name.length()))
+			BestIndex = Index;
+	}
+	m_VoteDescriptionReleaseCache[pDescription] = BestIndex;
+	return BestIndex >= 0 ? &m_vMapReleases[BestIndex] : nullptr;
+}
+
+IGraphics::CTextureHandle CUnfinishedMapVote::RequestMapPreview(const SMapRelease *pRelease)
+{
+	if(!pRelease || pRelease->m_ThumbnailUrl.empty())
+		return {};
+	SMapPreview &Preview = m_MapPreviews[pRelease->m_Name];
+	if(Preview.m_Texture.IsValid() || Preview.m_pRequest || Preview.m_Failed)
+		return Preview.m_Texture;
+
+	int ActiveRequests = 0;
+	for(const auto &[Name, OtherPreview] : m_MapPreviews)
+		ActiveRequests += OtherPreview.m_pRequest != nullptr;
+	if(ActiveRequests >= 2)
+		return {};
+
+	Preview.m_pRequest = RunRequest(pRelease->m_ThumbnailUrl.c_str(), 4 * 1024 * 1024);
+	return {};
+}
+
+void CUnfinishedMapVote::PollMapPreviews()
+{
+	// Decode at most one image per frame to avoid a visible hitch when several downloads finish together.
+	for(auto &[Name, Preview] : m_MapPreviews)
+	{
+		if(!Preview.m_pRequest || !Preview.m_pRequest->Done())
+			continue;
+		if(Preview.m_pRequest->State() == EHttpState::DONE && Preview.m_pRequest->StatusCode() < 400)
+		{
+			unsigned char *pData;
+			size_t DataSize;
+			Preview.m_pRequest->Result(&pData, &DataSize);
+			CImageInfo ImageInfo;
+			if(Graphics()->LoadPng(ImageInfo, pData, DataSize, Name.c_str()))
+				Preview.m_Texture = Graphics()->LoadTextureRawMove(ImageInfo, 0, Name.c_str());
+		}
+		Preview.m_Failed = !Preview.m_Texture.IsValid();
+		Preview.m_pRequest = nullptr;
+		break;
+	}
 }
 
 void CUnfinishedMapVote::RequestPlayer(const char *pName)
@@ -397,6 +592,8 @@ void CUnfinishedMapVote::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE)
 		return;
 
+	PollMapReleases();
+	PollMapPreviews();
 	PollPlayerRequests();
 	if(m_VotePending)
 		UpdateVote();
@@ -656,7 +853,24 @@ void CUnfinishedMapVote::RecomputeRemainingMaps(const std::vector<std::string> &
 			}
 		}
 		if(Unfinished)
-			m_vRemainingMaps.push_back({OptionIndex, pOption->m_aDescription, VoteDescriptionInfo(pOption->m_pNext)});
+			m_vRemainingMaps.push_back({OptionIndex, *pBestMap, pOption->m_aDescription, VoteDescriptionInfo(pOption->m_pNext)});
+	}
+}
+
+void CUnfinishedMapVote::OnShutdown()
+{
+	if(m_pMapInfoRequest)
+		m_pMapInfoRequest->Abort();
+	if(m_pMapReleasesRequest)
+		m_pMapReleasesRequest->Abort();
+	for(auto &[Name, pRequest] : m_PlayerRequests)
+		pRequest->Abort();
+	for(auto &[Name, Preview] : m_MapPreviews)
+	{
+		if(Preview.m_pRequest)
+			Preview.m_pRequest->Abort();
+		if(Preview.m_Texture.IsValid())
+			Graphics()->UnloadTexture(&Preview.m_Texture);
 	}
 }
 
