@@ -33,6 +33,7 @@ namespace
 	const float ANNOUNCE_TIMEOUT = 10.0f;
 	const float ANNOUNCE_COOLDOWN = 30.0f;
 	const float ANNOUNCE_LISTEN = 12.0f;
+	const float COLOR_BEACON_CLEAR_TIME = 1.0f;
 	const float BEACON_ROUND = 10.0f;
 	const float REPLY_DELAY = 0.3f;
 	const float REPLY_JITTER = 1.5f;
@@ -184,6 +185,12 @@ void CMClientDetect::OnReset()
 	m_AnnounceDeadline = 0.0f;
 	m_AnnounceCooldown = 0.0f;
 	m_AnnounceListenTime = 0.0f;
+	m_ColorBeaconClearPending = false;
+	m_ColorBeaconClearTime = 0.0f;
+	m_RefreshPending = false;
+	m_RefreshColorDetected = false;
+	m_RefreshLegacySent = false;
+	m_RefreshFallbackTime = 0.0f;
 	m_ColorBeaconActive = false;
 	m_ColorBeaconObserved = false;
 	m_ColorBeaconConn = IClient::CONN_MAIN;
@@ -196,6 +203,7 @@ void CMClientDetect::OnReset()
 	m_MarkerColorFeet = 0;
 
 	m_ReplyPending = false;
+	m_ReplyWithEmotes = false;
 	m_ReplyTime = 0.0f;
 
 	m_PetOnSent = false;
@@ -218,10 +226,7 @@ void CMClientDetect::OnStateChange(int NewState, int OldState)
 	}
 
 	if(OldState != IClient::STATE_ONLINE && Enabled())
-	{
-		m_AnnouncePending = true;
-		m_AnnounceDeadline = LocalTime() + ANNOUNCE_TIMEOUT;
-	}
+		QueueColorAnnounce();
 }
 
 void CMClientDetect::ForgetLeftPeers()
@@ -256,6 +261,19 @@ bool CMClientDetect::AnswerOwed() const
 
 void CMClientDetect::OnBeaconSent()
 {
+	if(m_QueuedKind != KIND_PET)
+	{
+		m_BeaconHeardUntil = LocalTime() + BEACON_ROUND;
+		for(CPeer &Peer : m_aPeers)
+		{
+			if(!Peer.m_Detected)
+				continue;
+			Peer.m_WantsAnswer = false;
+			Peer.m_Answered = true;
+		}
+		return;
+	}
+
 	m_PetOnSent = m_QueuedPetOn;
 	str_copy(m_aPetSkinSent, m_aQueuedPetSkin);
 	MarkPetTold();
@@ -266,15 +284,73 @@ void CMClientDetect::Announce()
 {
 	if(!Enabled() || Client()->State() != IClient::STATE_ONLINE)
 		return;
-	if(m_AnnouncePending || LocalTime() < m_AnnounceCooldown)
+	if(m_AnnouncePending || m_ColorBeaconClearPending || LocalTime() < m_AnnounceCooldown)
 		return;
 
-	m_AnnouncePending = true;
+	QueueColorAnnounce();
+}
+
+void CMClientDetect::QueueColorAnnounce()
+{
+	m_AnnouncePending = false;
+	m_ColorBeaconClearPending = true;
+	m_ColorBeaconClearTime = 0.0f;
 	m_AnnounceDeadline = LocalTime() + ANNOUNCE_TIMEOUT;
+}
+
+void CMClientDetect::Refresh()
+{
+	if(!Enabled() || Client()->State() != IClient::STATE_ONLINE)
+		return;
+
+	m_RefreshPending = true;
+	m_RefreshColorDetected = false;
+	m_RefreshLegacySent = false;
+	if(Client()->IsSixup())
+	{
+		m_ColorBeaconClearPending = false;
+		m_AnnouncePending = true;
+		m_AnnounceDeadline = LocalTime() + ANNOUNCE_TIMEOUT;
+		m_RefreshFallbackTime = LocalTime();
+		return;
+	}
+
+	QueueColorAnnounce();
+	m_RefreshFallbackTime = m_AnnounceDeadline;
 }
 
 void CMClientDetect::UpdateAnnounce()
 {
+	if(m_ColorBeaconClearPending)
+	{
+		if(LocalTime() > m_AnnounceDeadline || Client()->IsSixup())
+		{
+			m_ColorBeaconClearPending = false;
+			m_ColorBeaconClearTime = 0.0f;
+			return;
+		}
+		if(m_ColorBeaconActive)
+			return;
+
+		const int Conn = g_Config.m_ClDummy ? IClient::CONN_DUMMY : IClient::CONN_MAIN;
+		if(GameClient()->m_aLocalIds[Conn] < 0)
+			return;
+		if(m_ColorBeaconClearTime == 0.0f)
+		{
+			m_ColorBeaconClearTime = LocalTime() + COLOR_BEACON_CLEAR_TIME;
+			return;
+		}
+		if(LocalTime() < m_ColorBeaconClearTime)
+			return;
+
+		m_ColorBeaconClearPending = false;
+		m_ColorBeaconClearTime = 0.0f;
+		m_AnnouncePending = true;
+		m_AnnounceDeadline = LocalTime() + ANNOUNCE_TIMEOUT;
+		if(m_RefreshPending)
+			m_RefreshFallbackTime = m_AnnounceDeadline;
+	}
+
 	if(!m_AnnouncePending)
 		return;
 
@@ -294,11 +370,48 @@ void CMClientDetect::UpdateAnnounce()
 	m_AnnouncePending = false;
 	m_AnnounceCooldown = LocalTime() + ANNOUNCE_COOLDOWN;
 	m_AnnounceListenTime = LocalTime() + ANNOUNCE_LISTEN;
+	if(m_RefreshPending)
+		m_RefreshFallbackTime = m_AnnounceListenTime;
 }
 
-bool CMClientDetect::Announcing() const
+bool CMClientDetect::Refreshing() const
 {
-	return m_AnnouncePending || m_ColorBeaconActive || LocalTime() < m_AnnounceListenTime;
+	return m_RefreshPending;
+}
+
+void CMClientDetect::UpdateRefresh()
+{
+	if(!m_RefreshPending)
+		return;
+
+	if(m_RefreshColorDetected)
+	{
+		m_RefreshPending = false;
+		m_RefreshLegacySent = false;
+		return;
+	}
+	if(m_RefreshLegacySent)
+	{
+		if(LocalTime() >= m_RefreshFallbackTime)
+		{
+			m_RefreshPending = false;
+			m_RefreshLegacySent = false;
+		}
+		return;
+	}
+
+	if(LocalTime() < m_RefreshFallbackTime || m_ColorBeaconActive)
+		return;
+
+	m_AnnouncePending = false;
+	if(!CanEmote() || !ChannelFree())
+		return;
+
+	SendBeacon(KIND_ANNOUNCE);
+	m_RefreshLegacySent = true;
+	m_RefreshFallbackTime = LocalTime() + ANNOUNCE_LISTEN;
+	m_AnnounceCooldown = LocalTime() + ANNOUNCE_COOLDOWN;
+	m_AnnounceListenTime = LocalTime() + ANNOUNCE_LISTEN;
 }
 
 void CMClientDetect::UpdateReply()
@@ -309,11 +422,21 @@ void CMClientDetect::UpdateReply()
 	if(!AnswerOwed())
 	{
 		m_ReplyPending = false;
+		m_ReplyWithEmotes = false;
 		return;
 	}
 
 	if(LocalTime() < m_ReplyTime || m_ColorBeaconActive)
 		return;
+	if(m_ReplyWithEmotes)
+	{
+		if(!CanEmote() || !ChannelFree())
+			return;
+		SendBeacon(KIND_REPLY);
+		m_ReplyPending = false;
+		m_ReplyWithEmotes = false;
+		return;
+	}
 
 	m_AnnouncePending = true;
 	m_AnnounceDeadline = LocalTime() + ANNOUNCE_TIMEOUT;
@@ -328,22 +451,29 @@ void CMClientDetect::DetectColorBeacons()
 		if(!Client.m_Active || IsLocal(ClientId))
 			continue;
 
+		CPeer &Peer = m_aPeers[ClientId];
 		const unsigned ColorBody = static_cast<unsigned>(Client.m_ColorBody);
 		const unsigned ColorFeet = static_cast<unsigned>(Client.m_ColorFeet);
-		if((ColorBody >> 24) != COLOR_BEACON_BODY || (ColorFeet >> 24) != COLOR_BEACON_FEET)
+		const bool MarkerVisible = (ColorBody >> 24) == COLOR_BEACON_BODY && (ColorFeet >> 24) == COLOR_BEACON_FEET;
+		const bool NewColorBeacon = MarkerVisible && (!Peer.m_ColorBeaconVisible || LocalTime() >= Peer.m_LastColorBeaconReplyTime + BEACON_ROUND);
+		Peer.m_ColorBeaconVisible = MarkerVisible;
+		if(NewColorBeacon)
+			Peer.m_LastColorBeaconReplyTime = LocalTime();
+		if(!MarkerVisible)
 			continue;
 
-		CPeer &Peer = m_aPeers[ClientId];
-		const bool WasDetected = Peer.m_Detected;
 		Peer.m_Detected = true;
 		str_copy(Peer.m_aName, Client.m_aRealName);
-		if(WasDetected || LocalTime() < m_AnnounceListenTime || Peer.m_Answered)
+		if(m_RefreshPending)
+			m_RefreshColorDetected = true;
+		if(!NewColorBeacon || LocalTime() < m_AnnounceListenTime)
 			continue;
 
 		Peer.m_WantsAnswer = true;
 		if(!m_ReplyPending)
 		{
 			m_ReplyPending = true;
+			m_ReplyWithEmotes = false;
 			m_ReplyTime = LocalTime() + REPLY_DELAY + Jitter(REPLY_JITTER);
 		}
 	}
@@ -386,7 +516,6 @@ void CMClientDetect::SendColorBeacon()
 		Peer.m_WantsAnswer = false;
 		Peer.m_Answered = true;
 	}
-	m_BeaconHeardUntil = LocalTime() + BEACON_ROUND;
 }
 
 void CMClientDetect::RestoreColorBeacon()
@@ -560,6 +689,16 @@ void CMClientDetect::SendPetBeacon(bool On, const char *pSkin)
 	m_QueuedKind = KIND_PET;
 	m_QueuedPetOn = On;
 	str_copy(m_aQueuedPetSkin, pSkin);
+}
+
+void CMClientDetect::SendBeacon(int Kind)
+{
+	m_vEmoteQueue.push_back(BEACON_OP);
+	m_vEmoteQueue.push_back(BEACON_MAGIC);
+	m_vEmoteQueue.push_back(Kind);
+	m_vEmoteQueue.push_back(FrameCheck(Kind, nullptr, 0));
+	m_ProtocolLeft = (int)m_vEmoteQueue.size();
+	m_QueuedKind = Kind;
 }
 
 void CMClientDetect::AbortBeacon()
@@ -742,6 +881,8 @@ void CMClientDetect::OnBeacon(int ClientId, int Kind)
 	CPeer &Peer = m_aPeers[ClientId];
 	Peer.m_Detected = true;
 	str_copy(Peer.m_aName, GameClient()->m_aClients[ClientId].m_aRealName);
+	m_RefreshPending = false;
+	m_RefreshLegacySent = false;
 
 	if(LocalTime() < m_BeaconHeardUntil)
 	{
@@ -755,10 +896,8 @@ void CMClientDetect::OnBeacon(int ClientId, int Kind)
 	if(!g_Config.m_ClMClientMiniGames)
 		return;
 
-	if(Peer.m_Answered)
-		return;
-
 	Peer.m_WantsAnswer = true;
+	m_ReplyWithEmotes = true;
 
 	if(m_ReplyPending)
 		return;
@@ -772,6 +911,8 @@ void CMClientDetect::OnPetBeacon(int ClientId)
 	CPeer &Peer = m_aPeers[ClientId];
 	Peer.m_Detected = true;
 	str_copy(Peer.m_aName, GameClient()->m_aClients[ClientId].m_aRealName);
+	m_RefreshPending = false;
+	m_RefreshLegacySent = false;
 
 	if(LocalTime() < m_BeaconHeardUntil)
 	{
@@ -870,7 +1011,7 @@ void CMClientDetect::OnUpdate()
 			if(m_ColorBeaconActive)
 				return;
 		}
-		if(m_AnnouncePending || m_ReplyPending || !m_vEmoteQueue.empty() || NumDetected() > 0)
+		if(m_AnnouncePending || m_ColorBeaconClearPending || m_RefreshPending || m_ReplyPending || !m_vEmoteQueue.empty() || NumDetected() > 0)
 			OnReset();
 		return;
 	}
@@ -882,6 +1023,7 @@ void CMClientDetect::OnUpdate()
 	ForgetOnRename();
 	DetectColorBeacons();
 	UpdateAnnounce();
+	UpdateRefresh();
 	UpdateReply();
 	RestoreColorBeacon();
 	UpdatePet();

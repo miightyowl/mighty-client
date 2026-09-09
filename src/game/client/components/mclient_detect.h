@@ -20,7 +20,8 @@ public:
 	bool OnWhisper(int ClientId, int Team, const char *pMessage);
 
 	void Announce();
-	bool Announcing() const;
+	void Refresh();
+	bool Refreshing() const;
 
 	bool Enabled() const;
 	bool IsMClient(int ClientId) const;
@@ -67,6 +68,8 @@ private:
 		float m_SymbolTime;
 		bool m_WantsAnswer;
 		bool m_Answered;
+		bool m_ColorBeaconVisible;
+		float m_LastColorBeaconReplyTime;
 		bool m_PetTold;
 		bool m_PetOn;
 		char m_aPetSkin[MAX_SKIN_LENGTH];
@@ -87,6 +90,12 @@ private:
 	float m_AnnounceDeadline = 0.0f;
 	float m_AnnounceCooldown = 0.0f;
 	float m_AnnounceListenTime = 0.0f;
+	bool m_ColorBeaconClearPending = false;
+	float m_ColorBeaconClearTime = 0.0f;
+	bool m_RefreshPending = false;
+	bool m_RefreshColorDetected = false;
+	bool m_RefreshLegacySent = false;
+	float m_RefreshFallbackTime = 0.0f;
 	bool m_ColorBeaconActive = false;
 	bool m_ColorBeaconObserved = false;
 	int m_ColorBeaconConn = 0;
@@ -99,6 +108,7 @@ private:
 	int m_MarkerColorFeet = 0;
 
 	bool m_ReplyPending = false;
+	bool m_ReplyWithEmotes = false;
 	float m_ReplyTime = 0.0f;
 
 	// the pet state the other M-Client players around us know about
@@ -121,7 +131,9 @@ private:
 	void ForgetOnRename();
 	bool AnswerOwed() const;
 	void OnBeaconSent();
+	void QueueColorAnnounce();
 	void UpdateAnnounce();
+	void UpdateRefresh();
 	void UpdateReply();
 	void DetectColorBeacons();
 	void SendColorBeacon();
@@ -133,6 +145,7 @@ private:
 	void ForgetPetTold();
 	void LocalPet(bool *pOn, char *pSkin, int SkinSize) const;
 	void SendPetWhisper(int ClientId, bool On, const char *pSkin);
+	void SendBeacon(int Kind);
 	void SendPetBeacon(bool On, const char *pSkin);
 	void AbortBeacon();
 	void FlushEmoteQueue();
