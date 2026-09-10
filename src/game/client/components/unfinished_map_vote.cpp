@@ -51,7 +51,9 @@ void CUnfinishedMapVote::SetAllPlayersSelected(bool Selected)
 		}
 	}
 	else
+	{
 		m_SelectedPlayers.clear();
+	}
 	m_RemainingDirty = true;
 }
 
@@ -251,10 +253,10 @@ const CUnfinishedMapVote::SMapRelease *CUnfinishedMapVote::FindMapRelease(const 
 	const auto It = m_MapReleaseIndices.find(pMapName);
 	if(It != m_MapReleaseIndices.end())
 		return &m_vMapReleases[It->second];
-	for(int Index = 0; Index < (int)m_vMapReleases.size(); Index++)
+	for(const SMapRelease &Release : m_vMapReleases)
 	{
-		if(str_comp_nocase(m_vMapReleases[Index].m_Name.c_str(), pMapName) == 0)
-			return &m_vMapReleases[Index];
+		if(str_comp_nocase(Release.m_Name.c_str(), pMapName) == 0)
+			return &Release;
 	}
 	return nullptr;
 }

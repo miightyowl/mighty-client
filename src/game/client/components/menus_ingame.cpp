@@ -844,7 +844,9 @@ void CMenus::RenderServerInfo(CUIRect MainView)
 				str_format(aBuf, sizeof(aBuf), "%s: %s (%s %d)", Localize("Teams"), pTeamMode, Localize("maximum", "Team size"), Config()->m_SvMaxTeamSize);
 		}
 		else
+		{
 			str_format(aBuf, sizeof(aBuf), "%s: %s", Localize("Teams"), pTeamMode);
+		}
 		GameInfo.HSplitTop(FontSizeBody, &Label, &GameInfo);
 		Ui()->DoLabel(&Label, aBuf, FontSizeBody, TEXTALIGN_ML);
 	}
@@ -1277,7 +1279,9 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 			Graphics()->WrapNormal();
 		}
 		else if(Card.m_Random)
+		{
 			Ui()->DoLabel(&Preview, "?", 18.0f, TEXTALIGN_MC);
+		}
 		Text.Margin(4.0f, &Text);
 		SLabelProperties Props;
 		Props.m_MaxWidth = Text.w;
@@ -2189,7 +2193,9 @@ void CMenus::RenderServerControl(CUIRect MainView)
 		Ui()->DoLabel(&Reason, Localize("Not available"), 12.0f, TEXTALIGN_MC, DisabledProps);
 	}
 	else
+	{
 		Ui()->DoEditBox(&m_CallvoteReasonInput, &Reason, 14.0f);
+	}
 
 	// map catalog loading indicator
 	if(s_ControlPage == EServerControlTab::SETTINGS && GameClient()->m_UnfinishedMapVote.MapReleasesLoading())
