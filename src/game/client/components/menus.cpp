@@ -2788,6 +2788,13 @@ void CMenus::OnStateChange(int NewState, int OldState)
 
 	if(OldState == IClient::STATE_ONLINE || OldState == IClient::STATE_OFFLINE)
 		TextRender()->DeleteTextContainer(m_MotdTextContainerIndex);
+	if(OldState == IClient::STATE_ONLINE)
+	{
+		m_CallvoteSelectedMapType = -1;
+		m_CallvoteSelectedOption = CALLVOTE_OPTION_NONE;
+		m_CallvoteSelectedMapName.clear();
+		m_vCallvoteFilteredMapNames.clear();
+	}
 
 	if(NewState == IClient::STATE_OFFLINE)
 	{
