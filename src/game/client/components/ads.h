@@ -23,7 +23,7 @@ class CAds : public CComponent
 
 	bool m_Active = false;
 	int m_CurrentAd = -1;
-	int m_RotationIndex = 0;
+	int m_LastAd = -1;
 	vec2 m_MousePos = vec2(0.0f, 0.0f);
 	float m_NextAdTime = 0.0f;
 
