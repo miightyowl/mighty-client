@@ -57,7 +57,8 @@ CCharacter::CCharacter(CGameWorld *pWorld, CNetObj_PlayerInput LastInput) :
 CCharacter::~CCharacter()
 {
 	for(auto Id : m_aUntranslatedId)
-		Server()->SnapFreeId(Id.value());
+		if(Id)
+			Server()->SnapFreeId(*Id);
 }
 
 void CCharacter::Reset()
@@ -908,23 +909,28 @@ void CCharacter::TickDeferred()
 		int Events = m_Core.m_TriggeredEvents;
 		int CID = m_pPlayer->GetCid();
 
-		// Some sounds are triggered client-side for the acting player (or for all players on Sixup)
-		// so we need to avoid duplicating them
-		CClientMask TeamMaskExceptSelfAndSixup = Teams()->TeamMask(Team(), CID, CID, CGameContext::FLAG_SIX);
-		// Some are triggered client-side but only on Sixup
-		CClientMask TeamMaskExceptSixup = Teams()->TeamMask(Team(), -1, CID, CGameContext::FLAG_SIX);
+		const int SoundEvents = COREEVENT_GROUND_JUMP | COREEVENT_HOOK_ATTACH_PLAYER |
+					COREEVENT_HOOK_ATTACH_GROUND | COREEVENT_HOOK_HIT_NOHOOK;
+		if(Events & SoundEvents)
+		{
+			// Some sounds are triggered client-side for the acting player (or for all players on Sixup)
+			// so we need to avoid duplicating them
+			CClientMask TeamMaskExceptSelfAndSixup = Teams()->TeamMask(Team(), CID, CID, CGameContext::FLAG_SIX);
+			// Some are triggered client-side but only on Sixup
+			CClientMask TeamMaskExceptSixup = Teams()->TeamMask(Team(), -1, CID, CGameContext::FLAG_SIX);
 
-		if(Events & COREEVENT_GROUND_JUMP)
-			GameServer()->CreateSound(m_Pos, SOUND_PLAYER_JUMP, TeamMaskExceptSelfAndSixup);
+			if(Events & COREEVENT_GROUND_JUMP)
+				GameServer()->CreateSound(m_Pos, SOUND_PLAYER_JUMP, TeamMaskExceptSelfAndSixup);
 
-		if(Events & COREEVENT_HOOK_ATTACH_PLAYER)
-			GameServer()->CreateSound(m_Pos, SOUND_HOOK_ATTACH_PLAYER, TeamMaskExceptSixup);
+			if(Events & COREEVENT_HOOK_ATTACH_PLAYER)
+				GameServer()->CreateSound(m_Pos, SOUND_HOOK_ATTACH_PLAYER, TeamMaskExceptSixup);
 
-		if(Events & COREEVENT_HOOK_ATTACH_GROUND)
-			GameServer()->CreateSound(m_Pos, SOUND_HOOK_ATTACH_GROUND, TeamMaskExceptSelfAndSixup);
+			if(Events & COREEVENT_HOOK_ATTACH_GROUND)
+				GameServer()->CreateSound(m_Pos, SOUND_HOOK_ATTACH_GROUND, TeamMaskExceptSelfAndSixup);
 
-		if(Events & COREEVENT_HOOK_HIT_NOHOOK)
-			GameServer()->CreateSound(m_Pos, SOUND_HOOK_NOATTACH, TeamMaskExceptSelfAndSixup);
+			if(Events & COREEVENT_HOOK_HIT_NOHOOK)
+				GameServer()->CreateSound(m_Pos, SOUND_HOOK_NOATTACH, TeamMaskExceptSelfAndSixup);
+		}
 
 		if(Events & COREEVENT_GROUND_JUMP)
 			m_TriggeredEvents7 |= protocol7::COREEVENTFLAG_GROUND_JUMP;
@@ -1011,8 +1017,8 @@ void CCharacter::StopRecording()
 
 void CCharacter::Die(int Killer, int Weapon, bool SendKillMsg)
 {
-	if(Killer != WEAPON_GAME && m_SetSavePos[RESCUEMODE_AUTO])
-		GetPlayer()->m_LastDeath = m_RescueTee[RESCUEMODE_AUTO];
+	if(Killer != WEAPON_GAME && m_aSetSavePos[RESCUEMODE_AUTO])
+		GetPlayer()->m_LastDeath = m_aRescueTee[RESCUEMODE_AUTO];
 	StopRecording();
 	int ModeSpecial = GameServer()->m_pController->OnCharacterDeath(this, GameServer()->m_apPlayers[Killer], Weapon);
 
@@ -1273,12 +1279,13 @@ void CCharacter::Snap(int SnappingClient)
 
 		int Subtype = GetActiveWeapon();
 		int Type = Subtype == WEAPON_NINJA ? POWERUP_NINJA : POWERUP_WEAPON;
-		GameServer()->SnapPickup(SnapContext, m_aUntranslatedId[EUntranslatedMap::ID_WEAPON].value(), m_Pos, Type, Subtype, 0, PICKUPFLAG_NO_PREDICT);
+		if(m_aUntranslatedId[EUntranslatedMap::ID_WEAPON])
+			GameServer()->SnapPickup(SnapContext, *m_aUntranslatedId[EUntranslatedMap::ID_WEAPON], m_Pos, Type, Subtype, 0, PICKUPFLAG_NO_PREDICT);
 
-		if(m_Core.m_HookState != HOOK_IDLE && m_Core.m_HookState != HOOK_RETRACTED)
+		if(m_Core.m_HookState != HOOK_IDLE && m_Core.m_HookState != HOOK_RETRACTED && m_aUntranslatedId[EUntranslatedMap::ID_HOOK])
 		{
 			int StartTick = Server()->Tick() - 3;
-			GameServer()->SnapLaserObject(SnapContext, m_aUntranslatedId[EUntranslatedMap::ID_HOOK].value(), m_Core.m_HookPos, m_Pos, StartTick, -1, LASERTYPE_RIFLE);
+			GameServer()->SnapLaserObject(SnapContext, *m_aUntranslatedId[EUntranslatedMap::ID_HOOK], m_Core.m_HookPos, m_Pos, StartTick, -1, LASERTYPE_RIFLE);
 		}
 		return;
 	}
@@ -1338,7 +1345,7 @@ void CCharacter::Snap(int SnappingClient)
 	DDNetCharacter.m_TeleCheckpoint = m_TeleCheckpoint;
 
 	int StrongWeakId = m_StrongWeakId;
-	if(SnappingClientVersion < VERSION_DDNET_128_PLAYERS && SnappingClient >= 0 && GameServer()->m_apPlayers[SnappingClient])
+	if(!Server()->ClientSupportsServerMaxClients(SnappingClient) && SnappingClient >= 0 && GameServer()->m_apPlayers[SnappingClient])
 		StrongWeakId = GameServer()->m_apPlayers[SnappingClient]->m_aStrongWeakId[TranslatedId];
 	DDNetCharacter.m_StrongWeakId = StrongWeakId;
 
@@ -2181,8 +2188,8 @@ bool CCharacter::TrySetRescue(int RescueMode)
 	bool Set = false;
 	if(g_Config.m_SvRescue || ((g_Config.m_SvTeam == SV_TEAM_FORCED_SOLO || Team() > TEAM_FLOCK) && Teams()->IsValidTeamNumber(Team())))
 	{
-		// check for nearby health pickups (also freeze)
-		bool InHealthPickup = false;
+		// check for nearby freeze pickups
+		bool InFreezePickup = false;
 		if(!m_Core.m_IsInFreeze)
 		{
 			CEntity *apEnts[9];
@@ -2190,19 +2197,19 @@ bool CCharacter::TrySetRescue(int RescueMode)
 			for(int i = 0; i < Num; ++i)
 			{
 				CPickup *pPickup = static_cast<CPickup *>(apEnts[i]);
-				if(pPickup->Type() == POWERUP_HEALTH)
+				if(pPickup->Type() == POWERUP_FREEZE)
 				{
-					// This uses a separate variable InHealthPickup instead of setting m_Core.m_IsInFreeze
+					// This uses a separate variable InFreezePickup instead of setting m_Core.m_IsInFreeze
 					// as the latter causes freezebars to flicker when standing in the freeze range of a
-					// health pickup. When the same code for client prediction is added, the freezebars
-					// still flicker, but only when standing at the edge of the health pickup's freeze range.
-					InHealthPickup = true;
+					// freeze pickup. When the same code for client prediction is added, the freezebars
+					// still flicker, but only when standing at the edge of the freeze pickup's freeze range.
+					InFreezePickup = true;
 					break;
 				}
 			}
 		}
 
-		if(!m_Core.m_IsInFreeze && IsGrounded() && !m_Core.m_DeepFrozen && !InHealthPickup)
+		if(!m_Core.m_IsInFreeze && IsGrounded() && !m_Core.m_DeepFrozen && !InFreezePickup)
 		{
 			ForceSetRescue(RescueMode);
 			Set = true;
@@ -2214,8 +2221,8 @@ bool CCharacter::TrySetRescue(int RescueMode)
 
 void CCharacter::ForceSetRescue(int RescueMode)
 {
-	m_RescueTee[RescueMode].Save(this);
-	m_SetSavePos[RescueMode] = true;
+	m_aRescueTee[RescueMode].Save(this);
+	m_aSetSavePos[RescueMode] = true;
 }
 
 void CCharacter::DDRaceTick()
@@ -2482,8 +2489,7 @@ void CCharacter::DDRaceInit()
 	m_Paused = false;
 	m_DDRaceState = ERaceState::NONE;
 	m_PrevPos = m_Pos;
-	for(bool &Set : m_SetSavePos)
-		Set = false;
+	std::fill(std::begin(m_aSetSavePos), std::end(m_aSetSavePos), false);
 	m_LastBroadcast = 0;
 	m_TeamBeforeSuper = 0;
 	m_Core.m_Id = GetPlayer()->GetCid();
@@ -2532,7 +2538,7 @@ void CCharacter::DDRaceInit()
 
 bool CCharacter::Rescue()
 {
-	if(m_SetSavePos[GetPlayer()->m_RescueMode] && !m_Core.m_Super && !m_Core.m_Invincible)
+	if(m_aSetSavePos[GetPlayer()->m_RescueMode] && !m_Core.m_Super && !m_Core.m_Invincible)
 	{
 		if(m_LastRescue + (int64_t)g_Config.m_SvRescueDelay * Server()->TickSpeed() > Server()->Tick() && !Teams()->IsPractice(Team()))
 		{
@@ -2545,7 +2551,7 @@ bool CCharacter::Rescue()
 		m_LastRescue = Server()->Tick();
 		int StartTime = m_StartTime;
 		ERaceState DDRaceState = m_DDRaceState;
-		m_RescueTee[GetPlayer()->m_RescueMode].Load(this);
+		m_aRescueTee[GetPlayer()->m_RescueMode].Load(this);
 		// Don't load these from saved tee:
 		m_Core.m_Vel = vec2(0, 0);
 		m_Core.m_HookState = HOOK_IDLE;

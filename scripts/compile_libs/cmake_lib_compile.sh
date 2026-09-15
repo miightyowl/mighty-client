@@ -85,7 +85,8 @@ function make_cmake() {
 			# Use Apple's native TLS stack on iOS for now. This is removed in curl 8.15 due to its inability to support TLS 1.3
 			# SecTrust is available in curl 8.17
 			cmake_arguments+=("-DCURL_ENABLE_SSL=ON")
-			cmake_arguments+=("-DCURL_USE_SECTRANSPORT=ON")
+			# The option is spelled CURL_USE_SECTRANSP up to and including the pinned curl 8.8.0.
+			cmake_arguments+=("-DCURL_USE_SECTRANSP=ON")
 			cmake_arguments+=("-DCURL_USE_OPENSSL=OFF")
 		elif [[ "${TARGET_PLATFORM}" == "webasm" ]]; then
 			log_error "ERROR: Compiling ${TARGET_LIBRARY} for ${TARGET_PLATFORM} is unnecessary."
@@ -121,6 +122,14 @@ function make_cmake() {
 			cmake_arguments+=("-DSDL_PTHREADS=ON")
 			cmake_arguments+=("-DSDL_THREADS=ON")
 		fi
+	elif [[ "${TARGET_LIBRARY}" == "wavpack" ]]; then
+		cmake_targets="--target wavpack"
+		cmake_arguments+=("-DWAVPACK_BUILD_PROGRAMS=OFF")
+		cmake_arguments+=("-DWAVPACK_ENABLE_THREADS=OFF")
+		cmake_arguments+=("-DWAVPACK_INSTALL_CMAKE_MODULE=OFF")
+		cmake_arguments+=("-DWAVPACK_INSTALL_DOCS=OFF")
+		cmake_arguments+=("-DWAVPACK_INSTALL_PKGCONFIG_MODULE=OFF")
+		cmake_arguments+=("-DCMAKE_POLICY_VERSION_MINIMUM=3.5")
 	elif [[ "${TARGET_LIBRARY}" == "zlib" ]]; then
 		cmake_targets="--target zlibstatic"
 		cmake_arguments+=("-DZLIB_BUILD_SHARED=OFF")

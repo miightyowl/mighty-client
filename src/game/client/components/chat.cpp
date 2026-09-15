@@ -31,7 +31,7 @@
 
 #include <algorithm>
 
-char CChat::ms_aDisplayText[MAX_LINE_LENGTH] = "";
+char CChat::ms_aDisplayText[MAX_CHAT_LENGTH] = "";
 
 CChat::CLine::CLine()
 {
@@ -163,9 +163,7 @@ void CChat::Reset()
 	m_aCurrentInputText[0] = '\0';
 	DisableMode();
 	m_vServerCommands.clear();
-
-	for(int64_t &LastSoundPlayed : m_aLastSoundPlayed)
-		LastSoundPlayed = 0;
+	std::fill(std::begin(m_aLastSoundPlayed), std::end(m_aLastSoundPlayed), 0);
 }
 
 void CChat::OnRelease()
@@ -278,6 +276,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 		{
 			m_Input.Clear();
 			m_pHistoryEntry = nullptr;
+			m_EditingNewLine = true;
 		}
 	}
 	else if(Event.m_Flags & IInput::FLAG_PRESS && (Event.m_Key == KEY_RETURN || Event.m_Key == KEY_KP_ENTER))
@@ -294,6 +293,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 		else
 			SendChatQueued(m_Input.GetString());
 		m_pHistoryEntry = nullptr;
+		m_EditingNewLine = true;
 		DisableMode();
 		GameClient()->OnRelease();
 		m_Input.Clear();
@@ -386,7 +386,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 			// insert the command
 			if(pCompletionCommand)
 			{
-				char aBuf[MAX_LINE_LENGTH];
+				char aBuf[MAX_CHAT_LENGTH];
 				// add part before the name
 				str_truncate(aBuf, sizeof(aBuf), m_Input.GetString(), m_PlaceholderOffset);
 
@@ -445,7 +445,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 			// insert the name
 			if(pCompletionString)
 			{
-				char aBuf[MAX_LINE_LENGTH];
+				char aBuf[MAX_CHAT_LENGTH];
 				// add part before the name
 				str_truncate(aBuf, sizeof(aBuf), m_Input.GetString(), m_PlaceholderOffset);
 
@@ -578,7 +578,7 @@ void CChat::OnMessage(int MsgType, void *pRawMsg)
 		/*
 		if(g_Config.m_ClCensorChat)
 		{
-			char aMessage[MAX_LINE_LENGTH];
+			char aMessage[MAX_CHAT_LENGTH];
 			str_copy(aMessage, pMsg->m_pMessage);
 			GameClient()->m_Censor.CensorMessage(aMessage);
 			AddLine(pMsg->m_ClientId, pMsg->m_Team, aMessage);
@@ -756,7 +756,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 			pEnd = pStrOld;
 		}
 
-		if(++Length >= MAX_LINE_LENGTH)
+		if(++Length >= MAX_CHAT_LENGTH)
 		{
 			*(const_cast<char *>(pStr)) = '\0';
 			break;
@@ -1134,7 +1134,7 @@ bool CChat::IsTranslatableText(const char *pText)
 			pCur++;
 		if(pCur != pStart)
 		{
-			char aToken[MAX_LINE_LENGTH];
+			char aToken[MAX_CHAT_LENGTH];
 			str_copy(aToken, pStart, std::min((int)sizeof(aToken), (int)(pCur - pStart) + 1));
 			if(IsTranslatableWord(aToken))
 				return true;
@@ -1331,7 +1331,7 @@ void CChat::MaybeTranslateLine(CLine &Line)
 	const int PrefixLen = NameTagPrefixLength(Line.m_aText);
 	const char *pBody = Line.m_aText + PrefixLen;
 
-	char aProtected[MAX_LINE_LENGTH];
+	char aProtected[MAX_CHAT_LENGTH];
 	std::vector<std::string> vProtectedNames;
 	ProtectPlayerNames(pBody, aProtected, sizeof(aProtected), vProtectedNames);
 
@@ -1343,7 +1343,7 @@ void CChat::MaybeTranslateLine(CLine &Line)
 	{
 		if(!CacheHit->second.m_Text.empty())
 		{
-			char aFull[MAX_LINE_LENGTH];
+			char aFull[MAX_CHAT_LENGTH];
 			ComposeWithPrefix(aFull, sizeof(aFull), Line.m_aText, PrefixLen, CacheHit->second.m_Text.c_str());
 			ApplyTranslation(Line, aFull, CacheHit->second.m_Lang.c_str());
 		}
@@ -1485,7 +1485,7 @@ void CChat::ApplyTranslationToLine(int LineId, const char *pOriginal, int Prefix
 		if(!Line.m_Initialized || Line.m_Id != LineId)
 			continue;
 
-		char aFull[MAX_LINE_LENGTH];
+		char aFull[MAX_CHAT_LENGTH];
 		ComposeWithPrefix(aFull, sizeof(aFull), pOriginal, PrefixLen, pTranslated);
 		ApplyTranslation(Line, aFull, pLangName);
 		break;
@@ -1506,7 +1506,7 @@ void CChat::SendChatTranslated(const char *pLine)
 	const char *pBody = pLine + PrefixLen;
 
 	// protect player names in the body with placeholders
-	char aProtected[MAX_LINE_LENGTH];
+	char aProtected[MAX_CHAT_LENGTH];
 	std::vector<std::string> vProtectedNames;
 	ProtectPlayerNames(pBody, aProtected, sizeof(aProtected), vProtectedNames);
 
@@ -1583,7 +1583,7 @@ void CChat::PollTranslations()
 			// googles endpoint returns
 			json_value *pJson = Pending.m_pRequest->ResultJson();
 
-			char aTranslated[MAX_LINE_LENGTH];
+			char aTranslated[MAX_CHAT_LENGTH];
 			aTranslated[0] = '\0';
 			const char *pDetectedLang = "";
 
@@ -1617,7 +1617,7 @@ void CChat::PollTranslations()
 				// send translated message
 				if(aTranslated[0] != '\0')
 				{
-					char aFull[MAX_LINE_LENGTH];
+					char aFull[MAX_CHAT_LENGTH];
 					ComposeWithPrefix(aFull, sizeof(aFull), Pending.m_aOriginal, Pending.m_PrefixLen, aTranslated);
 					SendChat(0, aFull);
 				}

@@ -24,18 +24,21 @@ jobs:
         - name: ubuntu-latest-fancy
           os: ubuntu-latest
           cmake-args: -G Ninja
+          cmake-args-release: -DIPO=ON
           cmake-init-env: CXXFLAGS=-Werror
           package-file: "*-linux_x86_64.tar.xz"
         - name: ubuntu-22.04
           os: ubuntu-22.04
           cmake-path: /usr/bin/
-          cmake-args: -G "Unix Makefiles" -DTEST_MYSQL=ON
+          cmake-args: -G "Unix Makefiles" -DTEST_MYSQL=ON -DPRECOMPILE_HEADERS=OFF
+          cmake-args-release: -DIPO=ON
           cmake-init-env: CXXFLAGS=-Werror
           gtest-env: GTEST_FILTER=-*SQLite*
           package-file: "*-linux_x86_64.tar.xz"
         - name: macOS-latest
           os: macOS-latest
           cmake-args: -G Ninja
+          cmake-args-release: -DIPO=ON
           cmake-init-env: CXXFLAGS=-Werror
           package-file: "*-macos.dmg"
         - name: windows-latest
@@ -55,7 +58,7 @@ jobs:
           workaround-issue10203-run-after-configure: rm libwinpthread-1.dll
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         submodules: recursive
 
@@ -148,7 +151,7 @@ jobs:
         cache: true
 
     - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@v2.9.2
       with:
           cache-bin: false # WORKAROUND(https://github.com/Swatinem/rust-cache/issues/341)
           workspaces: |
@@ -180,7 +183,7 @@ jobs:
     - name: Test debug
       run: |
         cd debug
-        ${{ matrix.cmake-path }}cmake -E env ${{ matrix.gtest-env }} ${{ matrix.cmake-path }}cmake --build . --config Debug --target run_tests
+        ${{ matrix.cmake-path }}cmake -E env ${{ matrix.gtest-env }} ${{ matrix.cmake-path }}cmake --build . --config Debug --target run_tests_verbose
 
     - name: Run debug server
       run: |
@@ -191,14 +194,14 @@ jobs:
       run: |
         mkdir release
         cd release
-        ${{ matrix.cmake-path }}cmake -E env ${{ matrix.cmake-init-env }} ${{ matrix.cmake-path }}cmake ${{ matrix.cmake-args }} -DCMAKE_BUILD_TYPE=Release -Werror=dev -DDOWNLOAD_GTEST=ON -DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=. ..
+        ${{ matrix.cmake-path }}cmake -E env ${{ matrix.cmake-init-env }} ${{ matrix.cmake-path }}cmake ${{ matrix.cmake-args }} ${{ matrix.cmake-args-release }} -DCMAKE_BUILD_TYPE=Release -Werror=dev -DDOWNLOAD_GTEST=ON -DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=. ..
         ${{ matrix.workaround-issue10203-run-after-configure }}
         ${{ matrix.cmake-path }}cmake --build . --config Release --target everything
 
     - name: Test release
       run: |
         cd release
-        ${{ matrix.cmake-path }}cmake -E env ${{ matrix.gtest-env }} ${{ matrix.cmake-path }}cmake --build . --config Release --target run_tests
+        ${{ matrix.cmake-path }}cmake -E env ${{ matrix.gtest-env }} ${{ matrix.cmake-path }}cmake --build . --config Release --target run_tests_verbose
 
     - name: Run release server
       run: |
@@ -227,17 +230,17 @@ jobs:
       if: ${{ !contains(matrix.os, 'ubuntu') }}
       run: |
         cd headless
-        ${{ matrix.cmake-path }}cmake --build . --config Debug --target run_tests
+        ${{ matrix.cmake-path }}cmake --build . --config Debug --target run_tests_verbose
 
     - name: Test headless client (unit tests) with code coverage
       if: contains(matrix.os, 'ubuntu-latest')
       run: |
         cd headless
-        ${{ matrix.cmake-path }}cmake -E env RUSTFLAGS="-Clink-arg=--coverage" RUSTDOCFLAGS="-Clink-arg=--coverage" ${{ matrix.cmake-path }}cmake --build . --config Debug --target run_tests
+        ${{ matrix.cmake-path }}cmake -E env RUSTFLAGS="-Clink-arg=--coverage" RUSTDOCFLAGS="-Clink-arg=--coverage" ${{ matrix.cmake-path }}cmake --build . --config Debug --target run_tests_verbose
 
     - name: Upload Codecov report (unit tests)
       if: contains(matrix.os, 'ubuntu-latest')
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v7
       with:
         flags: unittests
 
@@ -254,7 +257,7 @@ jobs:
       if: contains(matrix.name, 'fancy')
       run: |
         cd fancy
-        ${{ matrix.cmake-path }}cmake -E env ${{ matrix.gtest-env }} ${{ matrix.cmake-path }}cmake --build . --config RelWithDebInfo --target run_tests
+        ${{ matrix.cmake-path }}cmake -E env ${{ matrix.gtest-env }} ${{ matrix.cmake-path }}cmake --build . --config RelWithDebInfo --target run_tests_verbose
 
     - name: Run fancy server
       if: contains(matrix.name, 'fancy')
@@ -283,7 +286,7 @@ jobs:
     - name: Upload integration test results
       id: integration_test_artifact_upload
       if: steps.integration_test.outcome == 'failure' || steps.integration_test_valgrind.outcome == 'failure'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ddnet-${{ matrix.name }}-integration-test-results
         path: headless/integration_*
@@ -313,7 +316,7 @@ jobs:
 
     - name: Upload Codecov report (integration tests)
       if: contains(matrix.os, 'ubuntu-latest')
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v7
       with:
         flags: integrationtests
 
@@ -325,7 +328,7 @@ jobs:
         mv ${{ matrix.package-file }} artifacts
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ddnet-${{ matrix.name }}
         path: release/artifacts
@@ -335,12 +338,12 @@ jobs:
     env:
       CARGO_HTTP_MULTIPLEXING: false
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         submodules: recursive
 
     - name: Validate Gradle Wrapper
-      uses: gradle/actions/wrapper-validation@v4
+      uses: gradle/actions/wrapper-validation@v5
 
     - name: Prepare Linux
       run: |
@@ -364,7 +367,7 @@ jobs:
         cache: true
 
     - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@v2.9.2
       with:
           cache-bin: false # WORKAROUND(https://github.com/Swatinem/rust-cache/issues/341)
           workspaces: |
@@ -387,7 +390,7 @@ jobs:
         mv build-android/DDNet.apk artifacts
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ddnet-android
         path: artifacts
@@ -397,7 +400,7 @@ jobs:
     env:
       CARGO_HTTP_MULTIPLEXING: false
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         submodules: recursive
 
@@ -414,7 +417,7 @@ jobs:
         ./emsdk activate 4.0.22
 
     - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@v2.9.2
       with:
           cache-bin: false # WORKAROUND(https://github.com/Swatinem/rust-cache/issues/341)
           workspaces: |
@@ -454,7 +457,63 @@ jobs:
         mv build-emscripten-release/*-Emscripten.tar.xz artifacts
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ddnet-emscripten
+        path: artifacts
+
+  build-ios:
+    runs-on: macos-26
+    env:
+      CARGO_HTTP_MULTIPLEXING: false
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        submodules: recursive
+
+    - name: Prepare macOS
+      run: |
+        sudo xcode-select -s "/Applications/Xcode_26.2.app/Contents/Developer"
+        xcodebuild -version
+        rustup target add aarch64-apple-ios
+        rustup target add aarch64-apple-ios-sim
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2.9.2
+      with:
+          cache-bin: false # WORKAROUND(https://github.com/Swatinem/rust-cache/issues/341)
+          workspaces: ./
+
+    - name: Build iOS simulator app in debug mode
+      run: scripts/ios/cmake_ios.sh sim-arm64 DDNet org.ddnet.client Debug build-ios-sim
+
+    - name: Smoke test iOS simulator app in debug mode
+      timeout-minutes: 15
+      run: |
+        UDID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(device["udid"] for devices in json.load(sys.stdin)["devices"].values() for device in devices if "iPhone" in device["name"]))')
+        xcrun simctl bootstatus "$UDID" -b
+        xcrun simctl install "$UDID" build-ios-sim/Debug-iphonesimulator/DDNet.app
+        xcrun simctl launch --console-pty "$UDID" org.ddnet.client quit > simulator-console.log 2>&1
+        cat simulator-console.log
+        grep -q "config: saved to settings_ddnet.cfg" simulator-console.log
+
+    - name: Build iOS device app in release mode
+      run: scripts/ios/cmake_ios.sh device DDNet org.ddnet.client Release build-ios-device
+
+    - name: Package
+      run: |
+        mkdir artifacts
+        # Zip the app bundles, as the artifact upload does not keep the executable bit.
+        cd build-ios-sim/Debug-iphonesimulator
+        zip -qry ../../artifacts/DDNet-simulator.zip DDNet.app
+        cd ../..
+        # The app is unsigned, so it has to be signed before it can be installed.
+        mkdir Payload
+        mv build-ios-device/Release-iphoneos/DDNet.app Payload
+        zip -qry artifacts/DDNet.ipa Payload
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v6
+      with:
+        name: ddnet-ios
         path: artifacts

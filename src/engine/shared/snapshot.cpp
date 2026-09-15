@@ -14,6 +14,7 @@
 #include <generated/protocol7.h>
 #include <generated/protocolglue.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <limits>
 
@@ -298,9 +299,9 @@ const CSnapshotDelta::CData *CSnapshotDelta::EmptyDelta() const
 }
 
 // TODO: OPT: this should be made much faster
-int CSnapshotDelta::CreateDelta(const CSnapshot *pFrom, const CSnapshot *pTo, void *pDstData)
+int CSnapshotDelta::CreateDelta(const CSnapshot *pFrom, const CSnapshot *pTo, CSnapshotDeltaBuffer *pDstData)
 {
-	CData *pDelta = (CData *)pDstData;
+	CData *pDelta = (CData *)pDstData->m_aData;
 	int *pData = (int *)pDelta->m_aData;
 
 	pDelta->m_NumDeletedItems = 0;
@@ -378,7 +379,7 @@ int CSnapshotDelta::CreateDelta(const CSnapshot *pFrom, const CSnapshot *pTo, vo
 	if(!pDelta->m_NumDeletedItems && !pDelta->m_NumUpdateItems && !pDelta->m_NumTempItems)
 		return 0;
 
-	return (int)((char *)pData - (char *)pDstData);
+	return (int)((char *)pData - (char *)pDelta);
 }
 
 int CSnapshotDelta::DebugDumpDelta(const void *pSrcData, int DataSize)
@@ -418,12 +419,12 @@ int CSnapshotDelta::DebugDumpDelta(const void *pSrcData, int DataSize)
 		dbg_msg("delta_dump", "|  Invalid delta. Number of deleted items %d is negative.", pDelta->m_NumDeletedItems);
 		return -201;
 	}
-	pData += pDelta->m_NumDeletedItems;
-	if(pData > pEnd)
+	if(pDelta->m_NumDeletedItems > pEnd - pData)
 	{
 		dbg_msg("delta_dump", "|  Invalid delta. Read past the end.");
 		return -101;
 	}
+	pData += pDelta->m_NumDeletedItems;
 
 	// list deleted items
 	// (all other items should be copied from the last full snap)
@@ -526,9 +527,9 @@ int CSnapshotDelta::UnpackDelta(const CSnapshot *pFrom, CSnapshotBuffer *pTo, co
 	int *pDeleted = pData;
 	if(pDelta->m_NumDeletedItems < 0)
 		return -201;
-	pData += pDelta->m_NumDeletedItems;
-	if(pData > pEnd)
+	if(pDelta->m_NumDeletedItems > pEnd - pData)
 		return -101;
+	pData += pDelta->m_NumDeletedItems;
 
 	// copy all non deleted stuff
 	for(int i = 0; i < pFrom->NumItems(); i++)
@@ -892,6 +893,17 @@ void *CSnapshotBuilder::NewItemRaw(int Type, int Id, int Size)
 	dbg_assert(Id >= 0 && Id <= CSnapshot::MAX_ID, "Invalid snap item Id: %d", Id);
 	dbg_assert(Size >= 0 && (size_t)Size <= CSnapshot::MAX_SIZE - sizeof(CSnapshot) - sizeof(CSnapshotItem) - sizeof(int) && Size % sizeof(int32_t) == 0, "Invalid snap item Size: %d", Size);
 
+	// resolve extended types first for capacity checks below
+	if(Extended)
+	{
+		const int ExtendedItemTypeIndex = GetExtendedItemTypeIndex(Type);
+		if(ExtendedItemTypeIndex == -1)
+		{
+			return nullptr;
+		}
+		Type = GetTypeFromIndex(ExtendedItemTypeIndex);
+	}
+
 	if(m_NumItems >= CSnapshot::MAX_ITEMS)
 	{
 		return nullptr;
@@ -902,16 +914,6 @@ void *CSnapshotBuilder::NewItemRaw(int Type, int Id, int Size)
 	if(sizeof(CSnapshot) + OffsetSize + m_DataSize + ItemSize > CSnapshot::MAX_SIZE)
 	{
 		return nullptr;
-	}
-
-	if(Extended)
-	{
-		const int ExtendedItemTypeIndex = GetExtendedItemTypeIndex(Type);
-		if(ExtendedItemTypeIndex == -1)
-		{
-			return nullptr;
-		}
-		Type = GetTypeFromIndex(ExtendedItemTypeIndex);
 	}
 
 	CSnapshotItem *pObj = (CSnapshotItem *)(m_aData + m_DataSize);
