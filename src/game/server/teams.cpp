@@ -527,6 +527,7 @@ void CGameTeams::ChangeTeamState(int Team, ETeamState State)
 
 void CGameTeams::KillTeam(int Team, int NewStrongId, int ExceptId)
 {
+	CClientMask KilledMask;
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
 		if(m_Core.Team(i) == Team && GameServer()->m_apPlayers[i])
@@ -534,6 +535,8 @@ void CGameTeams::KillTeam(int Team, int NewStrongId, int ExceptId)
 			GameServer()->m_apPlayers[i]->m_VotedForPractice = false;
 			if(i != ExceptId)
 			{
+				if(GameServer()->m_apPlayers[i]->GetCharacter())
+					KilledMask.set(i);
 				GameServer()->m_apPlayers[i]->KillCharacter(WEAPON_SELF, false);
 				if(NewStrongId != -1 && i != NewStrongId)
 				{
@@ -558,6 +561,22 @@ void CGameTeams::KillTeam(int Team, int NewStrongId, int ExceptId)
 		if(!Server()->ClientIngame(i))
 			continue;
 		Msg.m_Team = TeamForClient(Team, i);
+		if(Msg.m_Team == TEAM_FLOCK && Team != TEAM_FLOCK)
+		{
+			// The client resets prediction for every tee it thinks is in the killed team.
+			for(int Killed = 0; Killed < MAX_CLIENTS; Killed++)
+			{
+				if(!KilledMask.test(Killed))
+					continue;
+				CNetMsg_Sv_KillMsg KillMsg;
+				KillMsg.m_Killer = Killed;
+				KillMsg.m_Victim = Killed;
+				KillMsg.m_Weapon = WEAPON_SELF;
+				KillMsg.m_ModeSpecial = 0;
+				Server()->SendPackMsg(&KillMsg, MSGFLAG_VITAL | MSGFLAG_NORECORD, i);
+			}
+			continue;
+		}
 		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL | MSGFLAG_NORECORD, i);
 	}
 }
@@ -622,14 +641,13 @@ void CGameTeams::SendTeamsState(int ClientId)
 	CMsgPacker Msg(NETMSGTYPE_SV_TEAMSSTATE);
 	CMsgPacker MsgLegacy(NETMSGTYPE_SV_TEAMSSTATELEGACY);
 
-	int ClientVersion = GameServer()->GetClientVersion(ClientId);
-	bool PlayerMappingRequired = ClientVersion < VERSION_DDNET_128_PLAYERS;
+	bool PlayerMappingRequired = !Server()->ClientSupportsServerMaxClients(ClientId);
 
 	for(unsigned i = 0; i < MAX_CLIENTS; i++)
 	{
 		if(PlayerMappingRequired)
 		{
-			if(i >= LEGACY_MAX_CLIENTS)
+			if(i >= (unsigned)Server()->GetMaxClients(ClientId))
 				break;
 
 			// see others selector
@@ -663,6 +681,7 @@ void CGameTeams::SendTeamsState(int ClientId)
 		MsgLegacy.AddInt(Team);
 	}
 
+	int ClientVersion = GameServer()->GetClientVersion(ClientId);
 	Server()->SendMsg(&Msg, MSGFLAG_VITAL, ClientId);
 	if(!Server()->IsSixup(ClientId) && VERSION_DDRACE < ClientVersion && ClientVersion < VERSION_DDNET_MSG_LEGACY)
 	{
@@ -706,13 +725,18 @@ void CGameTeams::UpdateLegacyTeamMap()
 
 int CGameTeams::TeamForClient(int Team, int ClientId) const
 {
-	int ClientVersion = GameServer()->GetClientVersion(ClientId);
-	if(ClientVersion >= VERSION_DDNET_128_TEAMS)
+	if(ClientSupportsServerNumTeams(ClientId))
 		return Team;
 	// If the team's slots are not reserved, dont highlight it. Causes mismatch between dummy and main when playermapping is active.
-	if(ClientVersion < VERSION_DDNET_128_PLAYERS && !GameServer()->m_PlayerMapping.ReserveTeamSlots(Team))
+	if(!Server()->ClientSupportsServerMaxClients(ClientId) && !GameServer()->m_PlayerMapping.ReserveTeamSlots(Team, ClientId))
 		return TEAM_FLOCK;
 	return m_aLegacyTeamMap[Team];
+}
+
+bool CGameTeams::ClientSupportsServerNumTeams(int ClientId) const
+{
+	const int ClientVersion = GameServer()->GetClientVersion(ClientId);
+	return ClientVersion >= VERSION_DDNET_128_TEAMS;
 }
 
 ERaceState CGameTeams::GetDDRaceState(const CPlayer *Player) const
@@ -954,7 +978,12 @@ const CGameContext *CGameTeams::GameServer() const
 	return m_pGameContext;
 }
 
-class IServer *CGameTeams::Server()
+IServer *CGameTeams::Server()
+{
+	return m_pGameContext->Server();
+}
+
+const IServer *CGameTeams::Server() const
 {
 	return m_pGameContext->Server();
 }
@@ -1169,10 +1198,14 @@ void CGameTeams::ProcessSaveTeam()
 		{
 			if(GameServer()->TeeHistorianActive())
 			{
-				GameServer()->TeeHistorian()->RecordTeamSaveSuccess(
-					Team,
-					m_apSaveTeamResult[Team]->m_SaveId,
-					m_apSaveTeamResult[Team]->m_SavedTeam.GetString());
+				const char *pSaveState = m_apSaveTeamResult[Team]->m_SavedTeam.GetString();
+				if(pSaveState)
+				{
+					GameServer()->TeeHistorian()->RecordTeamSaveSuccess(
+						Team,
+						m_apSaveTeamResult[Team]->m_SaveId,
+						pSaveState);
+				}
 			}
 			for(int i = 0; i < Size; i++)
 			{
@@ -1202,10 +1235,14 @@ void CGameTeams::ProcessSaveTeam()
 		{
 			if(GameServer()->TeeHistorianActive())
 			{
-				GameServer()->TeeHistorian()->RecordTeamLoadSuccess(
-					Team,
-					m_apSaveTeamResult[Team]->m_SaveId,
-					m_apSaveTeamResult[Team]->m_SavedTeam.GetString());
+				const char *pSaveState = m_apSaveTeamResult[Team]->m_SavedTeam.GetString();
+				if(pSaveState)
+				{
+					GameServer()->TeeHistorian()->RecordTeamLoadSuccess(
+						Team,
+						m_apSaveTeamResult[Team]->m_SaveId,
+						pSaveState);
+				}
 			}
 
 			bool TeamValid = false;

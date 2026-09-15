@@ -2,14 +2,13 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "input.h"
 
-#include "keynames.h"
-
 #include <base/dbg.h>
 #include <base/log.h>
 #include <base/str.h>
 #include <base/time.h>
 #include <base/windows.h>
 
+#include <engine/client/keyboard.h>
 #include <engine/console.h>
 #include <engine/graphics.h>
 #include <engine/input.h>
@@ -17,6 +16,8 @@
 #include <engine/shared/config.h>
 
 #include <SDL.h>
+
+#include <algorithm>
 
 // support older SDL version (pre 2.0.6)
 #ifndef SDL_JOYSTICK_AXIS_MIN
@@ -413,12 +414,6 @@ bool CInput::KeyPress(int Key) const
 	return m_aFrameKeyStates[Key];
 }
 
-const char *CInput::KeyName(int Key) const
-{
-	dbg_assert(Key >= KEY_FIRST && Key < KEY_LAST, "Key invalid: %d", Key);
-	return g_aaKeyStrings[Key];
-}
-
 int CInput::FindKeyByName(const char *pKeyName) const
 {
 	// check for numeric
@@ -549,13 +544,29 @@ void CInput::HandleJoystickRemovedEvent(const SDL_JoyDeviceEvent &Event)
 	}
 }
 
+vec2 CInput::TouchPositionToViewport(vec2 Position) const
+{
+	// Touch positions are normalized to the drawable area, whereas the rendered image can
+	// be smaller than it and offset horizontally within it. Positions on the area that is
+	// not rendered to are clamped to the image.
+	const vec2 Scaled = (Position * Graphics()->DrawableSize() - vec2(Graphics()->ViewportX(), 0.0f)) / Graphics()->ScreenSize();
+	return vec2(std::clamp(Scaled.x, 0.0f, 1.0f), std::clamp(Scaled.y, 0.0f, 1.0f));
+}
+
+vec2 CInput::TouchDeltaToViewport(vec2 Delta) const
+{
+	// The scale between the drawable area and the rendered image applies to deltas as well.
+	const vec2 Scaled = Delta * Graphics()->DrawableSize() / Graphics()->ScreenSize();
+	return vec2(std::clamp(Scaled.x, -1.0f, 1.0f), std::clamp(Scaled.y, -1.0f, 1.0f));
+}
+
 void CInput::HandleTouchDownEvent(const SDL_TouchFingerEvent &Event)
 {
 	CTouchFingerState TouchFingerState;
 	TouchFingerState.m_Finger.m_DeviceId = Event.touchId;
 	TouchFingerState.m_Finger.m_FingerId = Event.fingerId;
-	TouchFingerState.m_Position = vec2(Event.x, Event.y);
-	TouchFingerState.m_Delta = vec2(Event.dx, Event.dy);
+	TouchFingerState.m_Position = TouchPositionToViewport(vec2(Event.x, Event.y));
+	TouchFingerState.m_Delta = TouchDeltaToViewport(vec2(Event.dx, Event.dy));
 	TouchFingerState.m_PressTime = time_get_nanoseconds();
 	m_vTouchFingerStates.emplace_back(TouchFingerState);
 }
@@ -578,8 +589,8 @@ void CInput::HandleTouchMotionEvent(const SDL_TouchFingerEvent &Event)
 	});
 	if(FoundState != m_vTouchFingerStates.end())
 	{
-		FoundState->m_Position = vec2(Event.x, Event.y);
-		FoundState->m_Delta += vec2(Event.dx, Event.dy);
+		FoundState->m_Position = TouchPositionToViewport(vec2(Event.x, Event.y));
+		FoundState->m_Delta += TouchDeltaToViewport(vec2(Event.dx, Event.dy));
 	}
 }
 
@@ -841,6 +852,9 @@ int CInput::Update()
 			case SDL_WINDOWEVENT_FOCUS_GAINED:
 				if(m_InputGrabbed)
 				{
+#if defined(CONF_PLATFORM_MACOS) // Todo: remove this when fixed in SDL: https://github.com/libsdl-org/SDL/issues/13920
+					MouseModeAbsolute();
+#endif
 					MouseModeRelative();
 					// Clear pending relative mouse motion
 					SDL_GetRelativeMouseState(nullptr, nullptr);
@@ -867,7 +881,7 @@ int CInput::Update()
 				break;
 
 			case SDL_WINDOWEVENT_MAXIMIZED:
-#if defined(CONF_PLATFORM_MACOS) // Todo: remove this when fixed in SDL
+#if defined(CONF_PLATFORM_MACOS) // Todo: remove this when fixed in SDL: https://github.com/libsdl-org/SDL/issues/13920
 				MouseModeAbsolute();
 				MouseModeRelative();
 #endif
@@ -877,6 +891,14 @@ int CInput::Update()
 				break;
 			}
 			break;
+
+#if defined(CONF_PLATFORM_IOS)
+		// Save the config before the app is suspended on iOS, it can be killed
+		// without any further notice afterwards.
+		case SDL_APP_WILLENTERBACKGROUND:
+			m_pConfigManager->Save();
+			break;
+#endif
 
 		// other messages
 		case SDL_QUIT:

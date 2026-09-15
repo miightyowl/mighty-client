@@ -6,7 +6,10 @@
 #include <base/time.h>
 
 #include <engine/antibot.h>
+#include <engine/server/authmanager.h>
 #include <engine/shared/config.h>
+
+#include <generated/protocol.h>
 
 #include <game/mapitems.h>
 #include <game/server/entities/character.h>
@@ -90,7 +93,7 @@ void CGameContext::ConKillPlayer(IConsole::IResult *pResult, void *pUserData)
 	CGameContext *pSelf = (CGameContext *)pUserData;
 	if(!CheckClientId(pResult->m_ClientId))
 		return;
-	int Victim = pResult->GetVictim();
+	int Victim = pResult->GetVictim(0);
 
 	if(pSelf->m_apPlayers[Victim])
 	{
@@ -462,11 +465,32 @@ void CGameContext::ConTeleport(IConsole::IResult *pResult, void *pUserData)
 	CGameContext *pSelf = (CGameContext *)pUserData;
 	if(!CheckClientId(pResult->m_ClientId))
 		return;
-	int Tele = pResult->NumArguments() == 2 ? pResult->GetInteger(0) : pResult->m_ClientId;
-	int TeleTo = pResult->NumArguments() ? pResult->GetInteger(pResult->NumArguments() - 1) : pResult->m_ClientId;
+	const bool HasSource = pResult->NumArguments() == 2;
+	int Tele = HasSource ? pResult->GetVictim(0) : pResult->m_ClientId;
+	int TeleTo = pResult->NumArguments() ? pResult->GetVictim(HasSource ? 1 : 0) : pResult->m_ClientId;
 	int AuthLevel = pSelf->Server()->GetAuthedState(pResult->m_ClientId);
 
-	if(Tele != pResult->m_ClientId && AuthLevel < g_Config.m_SvTeleOthersAuthLevel)
+	auto MinTeleLevel = CAuthManager::RoleNameToAuthLevel(g_Config.m_SvTeleOthersAuthLevel);
+	if(!MinTeleLevel.has_value())
+	{
+		// if it is not a valid role name like "helper"
+		// we fallback to backcompat numeric values
+		if(str_comp(g_Config.m_SvTeleOthersAuthLevel, "1") == 0)
+		{
+			MinTeleLevel = AUTHED_HELPER;
+		}
+		else if(str_comp(g_Config.m_SvTeleOthersAuthLevel, "2") == 0)
+		{
+			MinTeleLevel = AUTHED_MOD;
+		}
+		else if(str_comp(g_Config.m_SvTeleOthersAuthLevel, "3") == 0)
+		{
+			MinTeleLevel = AUTHED_ADMIN;
+		}
+	}
+	dbg_assert(MinTeleLevel.has_value(), "sv_tele_others_auth_level got unexpected value '%s'", g_Config.m_SvTeleOthersAuthLevel);
+
+	if(Tele != pResult->m_ClientId && AuthLevel < MinTeleLevel.value())
 	{
 		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "tele", "you aren't allowed to tele others");
 		return;
@@ -478,7 +502,7 @@ void CGameContext::ConTeleport(IConsole::IResult *pResult, void *pUserData)
 	if(pChr && pPlayer && pSelf->GetPlayerChar(TeleTo))
 	{
 		// default to view pos when character is not available
-		vec2 Pos = pPlayer->m_ViewPos;
+		vec2 Pos = pSelf->m_apPlayers[TeleTo]->m_ViewPos;
 		if(pResult->NumArguments() == 0 && !pPlayer->IsPaused() && pChr->IsAlive())
 		{
 			vec2 Target = vec2(pChr->Core()->m_Input.m_TargetX, pChr->Core()->m_Input.m_TargetY);
@@ -508,7 +532,7 @@ void CGameContext::ConKill(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConForcePause(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	int Victim = pResult->GetVictim();
+	int Victim = pResult->GetVictim(0);
 	int Seconds = 0;
 	if(pResult->NumArguments() > 1)
 		Seconds = std::clamp(pResult->GetInteger(1), 0, 360);
@@ -555,7 +579,7 @@ void CGameContext::ConSetDDRTeam(IConsole::IResult *pResult, void *pUserData)
 		return;
 	}
 
-	const int Target = pResult->GetVictim();
+	const int Target = pResult->GetVictim(0);
 	CPlayer *pPlayer = pSelf->m_apPlayers[Target];
 	if(!pPlayer)
 		return;
@@ -578,7 +602,7 @@ void CGameContext::ConUninvite(IConsole::IResult *pResult, void *pUserData)
 	CGameContext *pSelf = (CGameContext *)pUserData;
 	auto *pController = pSelf->m_pController;
 
-	const int Target = pResult->GetVictim();
+	const int Target = pResult->GetVictim(0);
 	if(!pSelf->m_apPlayers[Target])
 		return;
 
@@ -609,14 +633,20 @@ void CGameContext::ConDrySave(IConsole::IResult *pResult, void *pUserData)
 
 	char aTimestamp[32];
 	str_timestamp(aTimestamp, sizeof(aTimestamp));
+	const char *pSaveState = SavedTeam.GetString();
+	if(!pSaveState)
+	{
+		pSelf->SendChatTarget(pResult->m_ClientId, "Your team is too large to save");
+		return;
+	}
+
 	char aBuf[64];
 	str_format(aBuf, sizeof(aBuf), "%s_%s_%s.save", pSelf->Map()->BaseName(), aTimestamp, pSelf->Server()->GetAuthName(pResult->m_ClientId));
 	IOHANDLE File = pSelf->Storage()->OpenFile(aBuf, IOFLAG_WRITE, IStorage::TYPE_SAVE);
 	if(!File)
 		return;
 
-	int Len = str_length(SavedTeam.GetString());
-	io_write(File, SavedTeam.GetString(), Len);
+	io_write(File, pSaveState, str_length(pSaveState));
 	io_close(File);
 }
 

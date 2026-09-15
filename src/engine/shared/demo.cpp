@@ -278,13 +278,16 @@ void CDemoRecorder::WriteTickMarker(int Tick, bool Keyframe)
 		m_FirstTick = Tick;
 }
 
-void CDemoRecorder::Write(int Type, const void *pData, int Size)
+bool CDemoRecorder::Write(int Type, const void *pData, int Size)
 {
 	if(!m_File)
-		return;
+		return false;
 
 	if(Size > 64 * 1024)
-		return;
+	{
+		log_error("demo_recorder", "Dropped chunk of type %d, size %d is too large", Type, Size);
+		return false;
+	}
 
 	/* pad the data with 0 so we get an alignment of 4,
 	else the compression won't work and miss some bytes */
@@ -295,11 +298,11 @@ void CDemoRecorder::Write(int Type, const void *pData, int Size)
 		aBuffer2[Size++] = 0;
 	Size = CVariableInt::Compress(aBuffer2, Size, aBuffer, sizeof(aBuffer)); // buffer2 -> buffer
 	if(Size < 0)
-		return;
+		return false;
 
 	Size = CNetBase::Compress(aBuffer, Size, aBuffer2, sizeof(aBuffer2)); // buffer -> buffer2
 	if(Size < 0)
-		return;
+		return false;
 
 	unsigned char aChunk[3];
 	aChunk[0] = ((Type & 0x3) << 5);
@@ -326,17 +329,21 @@ void CDemoRecorder::Write(int Type, const void *pData, int Size)
 	}
 
 	io_write(m_File, aBuffer2, Size);
+	return true;
 }
 
 void CDemoRecorder::RecordSnapshot(int Tick, const void *pData, int Size)
 {
+	// only advance the delta base when the chunk ended up in the file,
+	// else playback decodes all following deltas against a snapshot it never saw
 	if(m_LastKeyFrame == -1 || (Tick - m_LastKeyFrame) > SERVER_TICK_SPEED * 5)
 	{
 		// write full tickmarker
 		WriteTickMarker(Tick, true);
 
 		// write snapshot
-		Write(CHUNKTYPE_SNAPSHOT, pData, Size);
+		if(!Write(CHUNKTYPE_SNAPSHOT, pData, Size))
+			return;
 
 		m_LastKeyFrame = Tick;
 		mem_copy(&m_LastSnapshotData, pData, Size);
@@ -347,13 +354,13 @@ void CDemoRecorder::RecordSnapshot(int Tick, const void *pData, int Size)
 		WriteTickMarker(Tick, false);
 
 		// create delta
-		char aDeltaData[CSnapshot::MAX_SIZE];
-		const int DeltaSize = m_pSnapshotDelta->CreateDelta(m_LastSnapshotData.AsSnapshot(), (CSnapshot *)pData, &aDeltaData);
+		CSnapshotDeltaBuffer DeltaData;
+		const int DeltaSize = m_pSnapshotDelta->CreateDelta(m_LastSnapshotData.AsSnapshot(), (CSnapshot *)pData, &DeltaData);
 		if(DeltaSize)
 		{
 			// record delta
-			Write(CHUNKTYPE_DELTA, aDeltaData, DeltaSize);
-			mem_copy(&m_LastSnapshotData, pData, Size);
+			if(Write(CHUNKTYPE_DELTA, DeltaData.m_aData, DeltaSize))
+				mem_copy(&m_LastSnapshotData, pData, Size);
 		}
 	}
 }
@@ -445,7 +452,8 @@ void CDemoRecorder::AddDemoMarker()
 
 void CDemoRecorder::AddDemoMarker(int Tick)
 {
-	dbg_assert(Tick >= 0, "invalid marker tick");
+	dbg_assert(Tick >= m_FirstTick && Tick <= m_LastTickMarker, "Invalid marker tick: %d", Tick);
+
 	if(m_NumTimelineMarkers >= MAX_TIMELINE_MARKERS)
 	{
 		if(m_pConsole)
@@ -597,7 +605,8 @@ CDemoPlayer::EScanFileResult CDemoPlayer::ScanFile()
 	}
 
 	const auto &ResetToStartPosition = [&](EScanFileResult Result) -> EScanFileResult {
-		if(io_seek(m_File, StartPos, EIoSeekOrigin::START) != 0)
+		// Cannot play or seek without at least one keyframe, also when the scan stopped early
+		if(io_seek(m_File, StartPos, EIoSeekOrigin::START) != 0 || m_vKeyFrames.empty())
 		{
 			m_vKeyFrames.clear();
 			return EScanFileResult::ERROR_UNRECOVERABLE;
@@ -661,8 +670,7 @@ CDemoPlayer::EScanFileResult CDemoPlayer::ScanFile()
 		}
 	}
 
-	// Cannot start playback without at least one keyframe
-	return ResetToStartPosition(m_vKeyFrames.empty() ? EScanFileResult::ERROR_UNRECOVERABLE : EScanFileResult::SUCCESS);
+	return ResetToStartPosition(EScanFileResult::SUCCESS);
 }
 
 void CDemoPlayer::DoTick()
@@ -872,6 +880,14 @@ int CDemoPlayer::Load(IStorage *pStorage, IConsole *pConsole, const char *pFilen
 		return -1;
 	}
 
+	// Scan the file for interesting points
+	if(ScanFile() == EScanFileResult::ERROR_UNRECOVERABLE)
+	{
+		Stop("Error scanning demo file");
+		return -1;
+	}
+	m_Info.m_LiveStateUpdating = true;
+
 	if(m_Info.m_Header.m_Version > gs_OldVersion)
 	{
 		// get timeline markers
@@ -880,16 +896,13 @@ int CDemoPlayer::Load(IStorage *pStorage, IConsole *pConsole, const char *pFilen
 		for(int i = 0; i < m_Info.m_Info.m_NumTimelineMarkers; i++)
 		{
 			m_Info.m_Info.m_aTimelineMarkers[i] = bytes_be_to_uint(m_Info.m_TimelineMarkers.m_aTimelineMarkers[i]);
+			if(!in_range(m_Info.m_Info.m_aTimelineMarkers[i], m_Info.m_Info.m_FirstTick, m_Info.m_Info.m_LastTick))
+			{
+				Stop("Invalid demo timeline marker");
+				return -1;
+			}
 		}
 	}
-
-	// Scan the file for interesting points
-	if(ScanFile() == EScanFileResult::ERROR_UNRECOVERABLE)
-	{
-		Stop("Error scanning demo file");
-		return -1;
-	}
-	m_Info.m_LiveStateUpdating = true;
 
 	// reset slice markers
 	g_Config.m_ClDemoSliceBegin = -1;

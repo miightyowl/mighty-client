@@ -25,6 +25,7 @@
 
 // Horizontal spacing of the scoreboard contents, both to its edges and between columns
 static constexpr float MARGIN = 10.0f;
+static constexpr const char *SCOREBOARD_CURSOR_BIND_NAME = "toggle_scoreboard_cursor";
 
 CScoreboard::CScoreboard()
 {
@@ -101,7 +102,7 @@ void CScoreboard::ConToggleScoreboardCursor(IConsole::IResult *pResult, void *pU
 void CScoreboard::OnConsoleInit()
 {
 	Console()->Register("+scoreboard", "", CFGFLAG_CLIENT, ConKeyScoreboard, this, "Show scoreboard");
-	Console()->Register("toggle_scoreboard_cursor", "", CFGFLAG_CLIENT, ConToggleScoreboardCursor, this, "Toggle scoreboard cursor");
+	Console()->Register(SCOREBOARD_CURSOR_BIND_NAME, "", CFGFLAG_CLIENT, ConToggleScoreboardCursor, this, "Toggle scoreboard cursor");
 }
 
 void CScoreboard::OnInit()
@@ -348,7 +349,8 @@ void CScoreboard::RenderGoals(CUIRect Goals)
 
 void CScoreboard::RenderSpectators(CUIRect Spectators)
 {
-	Spectators.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f), IGraphics::CORNER_ALL, 7.5f);
+	int Corners = m_MouseUnlocked ? IGraphics::CORNER_ALL : IGraphics::CORNER_T;
+	Spectators.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f), Corners, 7.5f);
 	constexpr float SpectatorCut = 5.0f;
 	Spectators.Margin(SpectatorCut, &Spectators);
 
@@ -495,7 +497,7 @@ void CScoreboard::RenderSpectators(CUIRect Spectators)
 	}
 }
 
-void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart, int CountEnd, CScoreboardRenderState &State)
+void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart, int CountEnd, CScoreboardRenderState &State, int NumPlayersForSize)
 {
 	dbg_assert(Team == TEAM_RED || Team == TEAM_BLUE, "Team invalid");
 
@@ -504,7 +506,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 	const bool TimeScore = GameClient()->m_GameInfo.m_TimeScore;
 	const bool MillisecondScore = GameClient()->m_ReceivedDDNetPlayerFinishTimes;
 	const bool TrueMilliseconds = GameClient()->m_ReceivedDDNetPlayerFinishTimesMillis;
-	const int NumPlayers = CountEnd - CountStart;
+	const int NumPlayers = NumPlayersForSize >= 0 ? NumPlayersForSize : (CountEnd - CountStart);
 	const bool LowScoreboardWidth = Scoreboard.w < 350.0f;
 
 	bool Race7 = Client()->IsSixup() && pGameInfoObj && pGameInfoObj->m_GameFlags & protocol7::GAMEFLAG_RACE;
@@ -557,7 +559,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 		RoundRadius = 2.5f;
 		FontSize = 8.0f;
 	}
-	else if(LowScoreboardWidth)
+	else if(LowScoreboardWidth && NumPlayers <= 48)
 	{
 		LineHeight = 7.5f;
 		TeeSizeMod = 0.125f;
@@ -579,13 +581,22 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 	const float TeeOffset = ScoreOffset + ScoreLength + MARGIN;
 	const float TeeLength = 60.0f * TeeSizeMod;
 	const float NameOffset = TeeOffset + TeeLength;
-	const float NameLength = (LowScoreboardWidth ? 90.0f : 150.0f) - TeeLength;
 	const float CountryLength = (LineHeight - Spacing - TeeSizeMod * 5.0f) * 2.0f;
 	const float PingLength = 27.5f;
 	const float PingOffset = Scoreboard.x + Scoreboard.w - PingLength - MARGIN;
 	const float CountryOffset = PingOffset - CountryLength;
+
+	float NameLength = (LowScoreboardWidth ? 90.0f : 150.0f) - TeeLength;
+	const float MinMiddleGap = 5.0f; // 2.5 before and after clan
+	const float AvailableMiddle = CountryOffset - NameOffset;
+	if(NameLength + MinMiddleGap > AvailableMiddle)
+	{
+		const float Shrinkable = AvailableMiddle - MinMiddleGap;
+		NameLength = std::max(0.0f, Shrinkable * 0.7f);
+	}
+
 	const float ClanOffset = NameOffset + NameLength + 2.5f;
-	const float ClanLength = CountryOffset - ClanOffset - 2.5f;
+	const float ClanLength = std::max(0.0f, CountryOffset - ClanOffset - 2.5f);
 
 	// render headlines
 	const float HeadlineFontsize = 11.0f;
@@ -608,7 +619,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 	int &CurrentDDTeamSize = State.m_CurrentDDTeamSize;
 
 	char aBuf[64];
-	int MaxTeamSize = Config()->m_SvMaxTeamSize;
+	int MaxTeamSize = GameClient()->MaxTeamSize();
 
 	for(int RenderDead = 0; RenderDead < 2; RenderDead++)
 	{
@@ -878,6 +889,22 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 	}
 }
 
+void CScoreboard::RenderMouseHint(CUIRect MouseHint)
+{
+	char aKey[64];
+	GameClient()->m_Binds.GetKey(SCOREBOARD_CURSOR_BIND_NAME, aKey, sizeof(aKey));
+	MouseHint.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f), IGraphics::CORNER_B, 7.5f);
+	constexpr float HintCut = 5.0f;
+	constexpr float FontSize = 11.0f;
+	MouseHint.VMargin(HintCut, &MouseHint);
+	char aHint[128];
+	if(!aKey[0])
+		str_format(aHint, sizeof(aHint), Localize("'%s' not bound."), SCOREBOARD_CURSOR_BIND_NAME);
+	else
+		str_format(aHint, sizeof(aHint), Localize("Press '%s' to show cursor."), aKey);
+	Ui()->DoLabel(&MouseHint, aHint, FontSize, TEXTALIGN_ML);
+}
+
 void CScoreboard::RenderRecordingNotification(float x)
 {
 	char aBuf[512] = "";
@@ -1016,8 +1043,25 @@ void CScoreboard::OnRender()
 
 		RenderTitleBar(RedTitle, TEAM_RED, pRedTeamName == nullptr ? Localize("Red team") : pRedTeamName);
 		RenderTitleBar(BlueTitle, TEAM_BLUE, pBlueTeamName == nullptr ? Localize("Blue team") : pBlueTeamName);
-		RenderScoreboard(RedScoreboard, TEAM_RED, 0, NumPlayers, RenderState);
-		RenderScoreboard(BlueScoreboard, TEAM_BLUE, 0, NumPlayers, RenderState);
+
+		auto RenderTeamScoreboard = [&](CUIRect TeamScoreboard, int Team, int TeamSize) {
+			if(TeamSize <= 64)
+			{
+				RenderScoreboard(TeamScoreboard, Team, 0, TeamSize, RenderState);
+			}
+			else
+			{
+				const int FirstColumnSize = 64;
+				CUIRect LeftColumn, RightColumn;
+				TeamScoreboard.VSplitMid(&LeftColumn, &RightColumn, 2.5f);
+
+				RenderScoreboard(LeftColumn, Team, 0, FirstColumnSize, RenderState, FirstColumnSize);
+				RenderScoreboard(RightColumn, Team, FirstColumnSize, TeamSize, RenderState, FirstColumnSize);
+			}
+		};
+
+		RenderTeamScoreboard(RedScoreboard, TEAM_RED, aTeamSize[TEAM_RED]);
+		RenderTeamScoreboard(BlueScoreboard, TEAM_BLUE, aTeamSize[TEAM_BLUE]);
 	}
 	else
 	{
@@ -1081,6 +1125,13 @@ void CScoreboard::OnRender()
 		RenderGoals(Goals);
 	}
 	RenderSpectators(Spectators);
+
+	if(!m_MouseUnlocked)
+	{
+		constexpr float MouseHintSize = 15.0f;
+		CUIRect MouseHint = {Spectators.x, Spectators.y + Spectators.h, ScoreboardSmallWidth, std::min(Screen.h - Scoreboard.y - Scoreboard.h, MouseHintSize)};
+		RenderMouseHint(MouseHint);
+	}
 
 	RenderRecordingNotification((Screen.w / 7) * 4 + 10);
 

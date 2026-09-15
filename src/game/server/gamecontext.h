@@ -54,6 +54,7 @@ class CHeap;
 class CPlayer;
 class CScore;
 class CUnpacker;
+class CRconRole;
 class IAntibot;
 class IGameController;
 class IMap;
@@ -161,7 +162,6 @@ class CGameContext : public IGameServer
 	static void ConBroadcast(IConsole::IResult *pResult, void *pUserData);
 	static void ConSay(IConsole::IResult *pResult, void *pUserData);
 	static void ConSetTeam(IConsole::IResult *pResult, void *pUserData);
-	static void ConSetTeamAll(IConsole::IResult *pResult, void *pUserData);
 	static void ConHotReload(IConsole::IResult *pResult, void *pUserData);
 	static void ConAddVote(IConsole::IResult *pResult, void *pUserData);
 	static void ConRemoveVote(IConsole::IResult *pResult, void *pUserData);
@@ -177,6 +177,7 @@ class CGameContext : public IGameServer
 	static void ConchainSpecialMotdupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainSettingUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainPracticeByDefaultUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainTeleOthersAuthLevel(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConDumpLog(IConsole::IResult *pResult, void *pUserData);
 
 	void AddVote(const char *pDescription, const char *pCommand);
@@ -339,7 +340,6 @@ public:
 
 	void SendTuningParams(int ClientId, int Zone = 0);
 
-	const CVoteOptionServer *GetVoteOption(int Index) const;
 	void ProgressVoteOptions(int ClientId);
 
 	//
@@ -380,6 +380,7 @@ public:
 	void OnClientConnected(int ClientId, void *pData) override;
 	void OnClientEnter(int ClientId) override;
 	void OnClientDrop(int ClientId, const char *pReason) override;
+	void OnClientInfoChange(int ClientId) override;
 	void OnClientPrepareInput(int ClientId, void *pInput) override;
 	void OnClientDirectInput(int ClientId, const void *pInput) override;
 	void OnClientPredictedInput(int ClientId, const void *pInput) override;
@@ -394,7 +395,7 @@ public:
 	void TeehistorianRecordPlayerName(int ClientId, const char *pName) override;
 	void TeehistorianRecordPlayerFinish(int ClientId, int TimeTicks) override;
 	void TeehistorianRecordTeamFinish(int TeamId, int TimeTicks) override;
-	void TeehistorianRecordAuthLogin(int ClientId, int Level, const char *pAuthName) override;
+	void TeehistorianRecordAuthLogin(int ClientId, const char *pRoleName, const char *pAuthName) override;
 
 	bool IsClientReady(int ClientId) const override;
 	bool IsClientPlayer(int ClientId) const override;
@@ -669,8 +670,12 @@ public:
 	void SendRecord(int ClientId);
 	void SendFinish(int ClientId, float Time, std::optional<float> PreviousBestTime);
 	void SendSaveCode(int Team, int TeamSize, int State, const char *pError, const char *pSaveRequester, const char *pServerName, const char *pGeneratedCode, const char *pCode);
-	void OnSetAuthed(int ClientId, int Level) override;
-	void OnSetTimedOut(int ClientId) override;
+	// `pRole` being `nullptr` signifies logout.
+	void OnSetAuthed(int ClientId, CRconRole *pRole) override;
+	void ReinitPlayerMap(int ClientId, bool Timeout) override;
+	void OnClientRejoin(int ClientId) override;
+
+	void SendStartMessages(int ClientId);
 
 	void ResetTuning();
 };
