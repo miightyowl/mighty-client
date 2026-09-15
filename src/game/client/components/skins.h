@@ -300,7 +300,7 @@ private:
 	 */
 	constexpr static const char *BLOCKED_SKINS[] = {"skunky", "penis_tee", "penis",
 		"penistee", "penis_2", "penis_1", "justin-penev2-2", "justinbieberw",
-		"geiletitten", "geilerpimmel", "geilerarsch", "doll", "93", "trovador"};
+		"geiletitten", "geilerpimmel", "geilerarsch", "doll", "93", "trovador", "Shit"};
 
 	constexpr static const char *VANILLA_SKINS[] = {"bluekitty", "bluestripe", "brownbear",
 		"cammo", "cammostripes", "coala", "default", "limekitty",
