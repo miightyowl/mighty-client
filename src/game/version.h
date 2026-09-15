@@ -4,7 +4,7 @@
 #define GAME_VERSION_H
 
 // mighty-client
-#define MCLIENT_VERSION "1.5.0"
+#define MCLIENT_VERSION "1.5.1"
 
 // ddnet
 #define GAME_NAME "DDNet"
