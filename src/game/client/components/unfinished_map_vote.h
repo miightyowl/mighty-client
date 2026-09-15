@@ -113,6 +113,7 @@ public:
 	void UpdateMapReleases();
 	const std::vector<SMapRelease> &MapReleases() const { return m_vMapReleases; }
 	bool MapReleasesLoading() const { return m_pMapReleasesRequest != nullptr; }
+	bool MapReleasesFailed() const { return m_MapReleasesFailed; }
 	const SMapRelease *FindMapRelease(const char *pMapName);
 	IGraphics::CTextureHandle RequestMapPreview(const SMapRelease *pRelease);
 	const SMapDetails *RequestMapDetails(const SMapRelease *pRelease);

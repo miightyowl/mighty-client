@@ -2808,6 +2808,7 @@ if(CLIENT)
     components/touch_controls.h
     components/unfinished_map_vote.cpp
     components/unfinished_map_vote.h
+    components/vote_menu_mode.h
     components/voting.cpp
     components/voting.h
     components/widgetbar.cpp

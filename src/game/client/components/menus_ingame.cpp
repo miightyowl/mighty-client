@@ -3,6 +3,7 @@
 #include "ghost.h"
 #include "menus.h"
 #include "motd.h"
+#include "vote_menu_mode.h"
 #include "voting.h"
 
 #include <base/color.h>
@@ -48,6 +49,96 @@ using namespace std::chrono_literals;
 
 namespace
 {
+	bool IsCardWhitespace(char Character)
+	{
+		return Character == ' ' || Character == '\t' || Character == '\r' || Character == '\n';
+	}
+
+	void TrimCardText(std::string &Text)
+	{
+		while(!Text.empty() && IsCardWhitespace(Text.front()))
+			Text.erase(Text.begin());
+		while(!Text.empty() && IsCardWhitespace(Text.back()))
+			Text.pop_back();
+	}
+
+	char SmallCapToAscii(int Codepoint)
+	{
+		switch(Codepoint)
+		{
+		case 0x1D00: return 'a';
+		case 0x0299: return 'b';
+		case 0x1D04: return 'c';
+		case 0x1D05: return 'd';
+		case 0x1D07: return 'e';
+		case 0xA730: return 'f';
+		case 0x0262: return 'g';
+		case 0x029C: return 'h';
+		case 0x026A: return 'i';
+		case 0x1D0A: return 'j';
+		case 0x1D0B: return 'k';
+		case 0x029F: return 'l';
+		case 0x1D0D: return 'm';
+		case 0x0274: return 'n';
+		case 0x1D0F: return 'o';
+		case 0x1D18: return 'p';
+		case 0x0280: return 'r';
+		case 0xA731: return 's';
+		case 0x1D1B: return 't';
+		case 0x1D1C: return 'u';
+		case 0x1D20: return 'v';
+		case 0x1D21: return 'w';
+		case 0x028F: return 'y';
+		case 0x1D22: return 'z';
+		default: return '\0';
+		}
+	}
+
+	void NormalizeVoteText(char *pDst, int DstSize, const char *pSrc)
+	{
+		int Length = 0;
+		while(*pSrc && Length < DstSize - 1)
+		{
+			const int Codepoint = str_utf8_decode(&pSrc);
+			char Character;
+			if(Codepoint >= 'A' && Codepoint <= 'Z')
+				Character = Codepoint - 'A' + 'a';
+			else if(Codepoint >= 0x20 && Codepoint < 0x7F)
+				Character = Codepoint;
+			else
+			{
+				Character = SmallCapToAscii(Codepoint);
+				if(!Character)
+					continue;
+			}
+			pDst[Length++] = Character;
+		}
+		pDst[Length] = '\0';
+	}
+
+	bool VoteDescriptionContains(const char *pDescription, const char *pNeedle)
+	{
+		char aDescription[VOTE_DESC_LENGTH];
+		char aNeedle[VOTE_DESC_LENGTH];
+		NormalizeVoteText(aDescription, sizeof(aDescription), pDescription);
+		NormalizeVoteText(aNeedle, sizeof(aNeedle), pNeedle);
+		return str_find(aDescription, aNeedle) != nullptr;
+	}
+
+	std::string ServerVoteInfo(const char *pDescription)
+	{
+		if(pDescription == nullptr)
+			return {};
+		std::string Info = pDescription;
+		TrimCardText(Info);
+		if(str_startswith(Info.c_str(), "⚑"))
+		{
+			Info.erase(0, std::string("⚑").length());
+			TrimCardText(Info);
+		}
+		return Info;
+	}
+
 	void AppendMapCardInfo(std::string &Info, const char *pText)
 	{
 		if(!Info.empty())
@@ -1439,7 +1530,233 @@ bool CMenus::RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll)
 
 bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 {
-	return RenderServerControlServerCards(MainView, UpdateScroll);
+	const bool IsDDNetCommunity = str_comp(Client()->ServerInfo().m_aCommunityId, IServerBrowser::COMMUNITY_DDNET) == 0;
+	CUnfinishedMapVote &UnfinishedVote = GameClient()->m_UnfinishedMapVote;
+	if(IsDDNetCommunity)
+		UnfinishedVote.UpdateMapReleases();
+
+	const EVoteMenuMode Mode = SelectVoteMenuMode(IsDDNetCommunity, !UnfinishedVote.MapReleases().empty(), UnfinishedVote.MapReleasesFailed());
+	switch(Mode)
+	{
+	case EVoteMenuMode::DDNET_CATALOG:
+		return RenderServerControlServerCards(MainView, UpdateScroll);
+	case EVoteMenuMode::DDNET_SERVER_VOTES:
+		return RenderServerControlServerFallbackCards(MainView, UpdateScroll);
+	case EVoteMenuMode::LEGACY:
+		return RenderServerControlServerLegacy(MainView, UpdateScroll);
+	}
+	dbg_assert_failed("invalid vote menu mode");
+}
+
+bool CMenus::RenderServerControlServerFallbackCards(CUIRect MainView, bool UpdateScroll)
+{
+	(void)UpdateScroll;
+	std::vector<const CVoteOptionClient *> vpOptions;
+	std::vector<int> vMapTypes;
+	int ActiveMapType = -1;
+	for(const CVoteOptionClient *pOption = GameClient()->m_Voting.FirstOption(); pOption; pOption = pOption->m_pNext)
+	{
+		const int OptionIndex = vpOptions.size();
+		vpOptions.push_back(pOption);
+		const char *pDescription = str_skip_whitespaces_const(pOption->m_aDescription);
+		const bool ActiveMapTypeOption = str_startswith(pDescription, "☒") || str_startswith(pDescription, "☑");
+		const bool MapTypeOption = ActiveMapTypeOption || str_startswith(pDescription, "☐");
+		if(MapTypeOption && VoteDescriptionContains(pDescription, "maps"))
+		{
+			vMapTypes.push_back(OptionIndex);
+			if(ActiveMapTypeOption)
+				ActiveMapType = OptionIndex;
+		}
+	}
+
+	if(ActiveMapType >= 0)
+		m_CallvoteSelectedMapType = ActiveMapType;
+	else if(std::find(vMapTypes.begin(), vMapTypes.end(), m_CallvoteSelectedMapType) == vMapTypes.end())
+		m_CallvoteSelectedMapType = vMapTypes.empty() ? -1 : vMapTypes.front();
+
+	CUIRect Header, MapTypeButton, StatusLabel;
+	MainView.HSplitTop(40.0f, &Header, &MainView);
+	Header.HMargin(7.0f, &Header);
+	Header.VSplitLeft(std::min(205.0f, Header.w * 0.4f), &MapTypeButton, &StatusLabel);
+	StatusLabel.VSplitLeft(12.0f, nullptr, &StatusLabel);
+
+	static CButtonContainer s_MapTypeButton;
+	const char *pCurrentType = m_CallvoteSelectedMapType >= 0 && m_CallvoteSelectedMapType < (int)vpOptions.size() ? vpOptions[m_CallvoteSelectedMapType]->m_aDescription : Localize("Map type");
+	if(DoButton_Menu(&s_MapTypeButton, pCurrentType, 0, &MapTypeButton) && !vMapTypes.empty())
+		m_CallvoteMapTypeMenuOpen = !m_CallvoteMapTypeMenuOpen;
+
+	SLabelProperties StatusProps;
+	StatusProps.SetColor(ColorRGBA(1.0f, 0.8f, 0.35f, 0.9f));
+	Ui()->DoLabel(&StatusLabel, Localize("Online map catalog unavailable — using server votes"), 10.0f, TEXTALIGN_ML, StatusProps);
+
+	const bool ShowMapTypeMenu = m_CallvoteMapTypeMenuOpen && !vMapTypes.empty();
+	CUIRect MapTypeDropDown;
+	if(ShowMapTypeMenu)
+	{
+		MapTypeDropDown.x = MapTypeButton.x;
+		MapTypeDropDown.y = Header.y + Header.h + 2.0f;
+		MapTypeDropDown.w = MapTypeButton.w;
+		MapTypeDropDown.h = std::min(22.0f * vMapTypes.size(), MainView.y + MainView.h - MapTypeDropDown.y);
+	}
+
+	MainView.HSplitTop(12.0f, nullptr, &MainView);
+	struct SServerVoteCard
+	{
+		int m_Option;
+		const CVoteOptionClient *m_pOption;
+		std::string m_Info;
+		bool m_Random;
+	};
+	std::vector<SServerVoteCard> vCards;
+	for(int OptionIndex = 0; OptionIndex < (int)vpOptions.size(); OptionIndex++)
+	{
+		const CVoteOptionClient *pOption = vpOptions[OptionIndex];
+		const char *pDescription = str_skip_whitespaces_const(pOption->m_aDescription);
+		if(!pDescription[0] || str_find(pDescription, "⚑") || std::find(vMapTypes.begin(), vMapTypes.end(), OptionIndex) != vMapTypes.end())
+			continue;
+
+		const char *pInfoDescription = pOption->m_pNext && str_find(pOption->m_pNext->m_aDescription, "⚑") ? pOption->m_pNext->m_aDescription : nullptr;
+		if(!m_FilterInput.IsEmpty() && !str_utf8_find_nocase(pDescription, m_FilterInput.GetString()) &&
+			(pInfoDescription == nullptr || !str_utf8_find_nocase(pInfoDescription, m_FilterInput.GetString())))
+			continue;
+		const bool Random = VoteDescriptionContains(pDescription, "random") && VoteDescriptionContains(pDescription, "map");
+		vCards.push_back({OptionIndex, pOption, ServerVoteInfo(pInfoDescription), Random});
+	}
+
+	const float Gap = 8.0f;
+	const int CardsPerRow = std::clamp((int)((MainView.w + Gap) / 190.0f), 1, 6);
+	CScrollRegionParams ScrollParams;
+	const float CardWidth = (MainView.w - (CardsPerRow - 1) * Gap - ScrollParams.m_ScrollbarThickness) / CardsPerRow;
+	const float PreviewHeight = std::clamp((CardWidth - 8.0f) / 1.6f, 105.0f, 150.0f);
+	const float CardHeight = PreviewHeight + 54.0f;
+	ScrollParams.m_ScrollUnit = (CardHeight + Gap) * 0.5f;
+	static CScrollRegion s_ScrollRegion;
+	s_ScrollRegion.Begin(&MainView, &ScrollParams);
+	CUIRect Grid = MainView;
+	static char s_aCardIds[MAX_VOTE_OPTIONS];
+	bool Activated = false;
+	CUIRect Row = {};
+	bool RowVisible = false;
+	for(int CardIndex = 0; CardIndex < (int)vCards.size(); CardIndex++)
+	{
+		if(CardIndex % CardsPerRow == 0)
+		{
+			if(CardIndex > 0)
+				Grid.HSplitTop(Gap, nullptr, &Grid);
+			Grid.HSplitTop(CardHeight, &Row, &Grid);
+			RowVisible = s_ScrollRegion.AddRect(Row);
+		}
+		if(!RowVisible)
+			continue;
+
+		const SServerVoteCard &Card = vCards[CardIndex];
+		CUIRect Cell = Row;
+		Cell.x += CardIndex % CardsPerRow * (CardWidth + Gap);
+		Cell.w = CardWidth;
+		Cell.Draw(m_CallvoteSelectedOption == Card.m_Option ? AccentColor().WithAlpha(0.35f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_ALL, 5.0f);
+		const int CardClicked = !ShowMapTypeMenu ? Ui()->DoButtonLogic(&s_aCardIds[Card.m_Option], 0, &Cell, BUTTONFLAG_LEFT) : 0;
+		if(CardClicked)
+		{
+			m_CallvoteSelectedOption = Card.m_Option;
+			m_CallvoteSelectedMapName.clear();
+			Activated = CardClicked == 1 && Ui()->DoDoubleClickLogic(&s_aCardIds[Card.m_Option]);
+		}
+
+		CUIRect Preview, Text;
+		Cell.HSplitTop(PreviewHeight, &Preview, &Text);
+		Preview.Margin(4.0f, &Preview);
+		Preview.Draw(ColorRGBA(0.12f, 0.18f, 0.24f, 1.0f), IGraphics::CORNER_ALL, 3.0f);
+		SLabelProperties PreviewProps;
+		PreviewProps.SetColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.35f));
+		Ui()->DoLabel(&Preview, Card.m_Random ? "?" : "VOTE", Card.m_Random ? 18.0f : 11.0f, TEXTALIGN_MC, PreviewProps);
+
+		Text.Margin(4.0f, &Text);
+		SLabelProperties TextProps;
+		TextProps.m_MaxWidth = Text.w;
+		TextProps.m_EllipsisAtEnd = true;
+		CUIRect Name, Info;
+		Text.HSplitTop(14.0f, &Name, &Text);
+		Ui()->DoLabel(&Name, Card.m_pOption->m_aDescription, 10.0f, TEXTALIGN_ML, TextProps);
+		if(!Card.m_Info.empty())
+		{
+			Text.HSplitTop(11.0f, &Info, &Text);
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.55f);
+			Ui()->DoLabel(&Info, Card.m_Info.c_str(), 7.0f, TEXTALIGN_ML, TextProps);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
+	}
+	s_ScrollRegion.End();
+
+	if(ShowMapTypeMenu)
+	{
+		MapTypeDropDown.Draw(ColorRGBA(0.08f, 0.08f, 0.08f, 0.98f), IGraphics::CORNER_ALL, 5.0f);
+		CScrollRegionParams DropDownScrollParams;
+		DropDownScrollParams.m_ScrollbarThickness = 8.0f;
+		DropDownScrollParams.m_ScrollbarMargin = 1.0f;
+		DropDownScrollParams.m_ScrollUnit = 22.0f;
+		static CScrollRegion s_DropDownScrollRegion;
+		CUIRect DropDownContent = MapTypeDropDown;
+		s_DropDownScrollRegion.Begin(&DropDownContent, &DropDownScrollParams);
+		static CButtonContainer s_aMapTypeButtonIds[MAX_VOTE_OPTIONS];
+		for(const int OptionIndex : vMapTypes)
+		{
+			CUIRect DropDownRow;
+			DropDownContent.HSplitTop(22.0f, &DropDownRow, &DropDownContent);
+			if(!s_DropDownScrollRegion.AddRect(DropDownRow))
+				continue;
+			if(DoButton_Menu(&s_aMapTypeButtonIds[OptionIndex], vpOptions[OptionIndex]->m_aDescription, OptionIndex == m_CallvoteSelectedMapType, &DropDownRow))
+			{
+				m_CallvoteMapTypeMenuOpen = false;
+				m_CallvoteSelectedOption = CALLVOTE_OPTION_NONE;
+				GameClient()->m_Voting.CallvoteOption(OptionIndex, m_CallvoteReasonInput.GetString());
+			}
+		}
+		s_DropDownScrollRegion.End();
+	}
+	return Activated;
+}
+
+bool CMenus::RenderServerControlServerLegacy(CUIRect MainView, bool UpdateScroll)
+{
+	CUIRect List = MainView;
+	int NumVoteOptions = 0;
+	int aIndices[MAX_VOTE_OPTIONS];
+	int Selected = -1;
+	int TotalShown = 0;
+
+	int OptionIndex = 0;
+	for(const CVoteOptionClient *pOption = GameClient()->m_Voting.FirstOption(); pOption; pOption = pOption->m_pNext, OptionIndex++)
+	{
+		if(!m_FilterInput.IsEmpty() && !str_utf8_find_nocase(pOption->m_aDescription, m_FilterInput.GetString()))
+			continue;
+		if(OptionIndex == m_CallvoteSelectedOption)
+			Selected = TotalShown;
+		TotalShown++;
+	}
+
+	static CListBox s_ListBox;
+	s_ListBox.DoStart(19.0f, TotalShown, 1, 3, Selected, &List);
+
+	OptionIndex = 0;
+	for(const CVoteOptionClient *pOption = GameClient()->m_Voting.FirstOption(); pOption; pOption = pOption->m_pNext, OptionIndex++)
+	{
+		if(!m_FilterInput.IsEmpty() && !str_utf8_find_nocase(pOption->m_aDescription, m_FilterInput.GetString()))
+			continue;
+		aIndices[NumVoteOptions++] = OptionIndex;
+
+		const CListboxItem Item = s_ListBox.DoNextItem(pOption);
+		if(!Item.m_Visible)
+			continue;
+		CUIRect Label;
+		Item.m_Rect.VMargin(2.0f, &Label);
+		Ui()->DoLabel(&Label, pOption->m_aDescription, 13.0f, TEXTALIGN_ML);
+	}
+
+	Selected = s_ListBox.DoEnd();
+	if(UpdateScroll)
+		s_ListBox.ScrollToSelected();
+	m_CallvoteSelectedOption = Selected != -1 ? aIndices[Selected] : CALLVOTE_OPTION_NONE;
+	return s_ListBox.WasItemActivated();
 }
 
 bool CMenus::RenderServerControlKick(CUIRect MainView, bool FilterSpectators, bool UpdateScroll)
@@ -2126,7 +2443,10 @@ void CMenus::RenderServerControl(CUIRect MainView)
 		Call = RenderServerControlKick(MainView, false, Searching);
 	else if(s_ControlPage == EServerControlTab::SPECVOTE)
 		Call = RenderServerControlKick(MainView, true, Searching);
-	const bool RandomUnfinishedSelected = s_ControlPage == EServerControlTab::SETTINGS &&
+	const bool IsDDNetCommunity = str_comp(Client()->ServerInfo().m_aCommunityId, IServerBrowser::COMMUNITY_DDNET) == 0;
+	const CUnfinishedMapVote &UnfinishedVote = GameClient()->m_UnfinishedMapVote;
+	const EVoteMenuMode VoteMenuMode = SelectVoteMenuMode(IsDDNetCommunity, !UnfinishedVote.MapReleases().empty(), UnfinishedVote.MapReleasesFailed());
+	const bool RandomUnfinishedSelected = s_ControlPage == EServerControlTab::SETTINGS && VoteMenuMode == EVoteMenuMode::DDNET_CATALOG &&
 					      (m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL || m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_SELECTED);
 
 	// call vote
@@ -2138,17 +2458,26 @@ void CMenus::RenderServerControl(CUIRect MainView)
 	{
 		if(s_ControlPage == EServerControlTab::SETTINGS)
 		{
-			const bool RandomMapSelected = RandomUnfinishedSelected || m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_MAP;
-			const char *pMapName = nullptr;
-			if(RandomMapSelected && !m_vCallvoteFilteredMapNames.empty())
-				pMapName = m_vCallvoteFilteredMapNames[secure_rand_below((int)m_vCallvoteFilteredMapNames.size())].c_str();
-			else if(m_CallvoteSelectedOption == CALLVOTE_OPTION_MAP && !m_CallvoteSelectedMapName.empty())
-				pMapName = m_CallvoteSelectedMapName.c_str();
-			if(pMapName != nullptr)
+			if(VoteMenuMode == EVoteMenuMode::DDNET_CATALOG)
 			{
-				char aCommand[MAX_MAP_LENGTH + 8];
-				str_format(aCommand, sizeof(aCommand), "/map %s", pMapName);
-				GameClient()->m_Chat.SendChat(0, aCommand);
+				const bool RandomMapSelected = RandomUnfinishedSelected || m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_MAP;
+				const char *pMapName = nullptr;
+				if(RandomMapSelected && !m_vCallvoteFilteredMapNames.empty())
+					pMapName = m_vCallvoteFilteredMapNames[secure_rand_below((int)m_vCallvoteFilteredMapNames.size())].c_str();
+				else if(m_CallvoteSelectedOption == CALLVOTE_OPTION_MAP && !m_CallvoteSelectedMapName.empty())
+					pMapName = m_CallvoteSelectedMapName.c_str();
+				if(pMapName != nullptr)
+				{
+					char aCommand[MAX_MAP_LENGTH + 8];
+					str_format(aCommand, sizeof(aCommand), "/map %s", pMapName);
+					GameClient()->m_Chat.SendChat(0, aCommand);
+					if(g_Config.m_UiCloseWindowAfterChangingSetting)
+						SetActive(false);
+				}
+			}
+			else if(m_CallvoteSelectedOption >= 0)
+			{
+				GameClient()->m_Voting.CallvoteOption(m_CallvoteSelectedOption, m_CallvoteReasonInput.GetString());
 				if(g_Config.m_UiCloseWindowAfterChangingSetting)
 					SetActive(false);
 			}
@@ -2200,7 +2529,7 @@ void CMenus::RenderServerControl(CUIRect MainView)
 	}
 
 	// map catalog loading indicator
-	if(s_ControlPage == EServerControlTab::SETTINGS && GameClient()->m_UnfinishedMapVote.MapReleasesLoading())
+	if(s_ControlPage == EServerControlTab::SETTINGS && VoteMenuMode == EVoteMenuMode::DDNET_CATALOG && GameClient()->m_UnfinishedMapVote.MapReleasesLoading())
 	{
 		CUIRect Spinner, LoadingLabel;
 		Bottom.VSplitLeft(20.0f, nullptr, &Bottom);

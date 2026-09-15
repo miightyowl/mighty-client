@@ -558,6 +558,8 @@ protected:
 	bool RenderServerControlKick(CUIRect MainView, bool FilterSpectators, bool UpdateScroll);
 	bool RenderServerControlServer(CUIRect MainView, bool UpdateScroll);
 	bool RenderServerControlServerCards(CUIRect MainView, bool UpdateScroll);
+	bool RenderServerControlServerFallbackCards(CUIRect MainView, bool UpdateScroll);
+	bool RenderServerControlServerLegacy(CUIRect MainView, bool UpdateScroll);
 	void RenderServerControlSaveMaps(CUIRect MainView);
 	void RenderServerControlSavedTeams(CUIRect MainView);
 
