@@ -349,8 +349,7 @@ void CScoreboard::RenderGoals(CUIRect Goals)
 
 void CScoreboard::RenderSpectators(CUIRect Spectators)
 {
-	int Corners = m_MouseUnlocked ? IGraphics::CORNER_ALL : IGraphics::CORNER_T;
-	Spectators.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f), Corners, 7.5f);
+	Spectators.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f), IGraphics::CORNER_ALL, 7.5f);
 	constexpr float SpectatorCut = 5.0f;
 	Spectators.Margin(SpectatorCut, &Spectators);
 
@@ -889,22 +888,6 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 	}
 }
 
-void CScoreboard::RenderMouseHint(CUIRect MouseHint)
-{
-	char aKey[64];
-	GameClient()->m_Binds.GetKey(SCOREBOARD_CURSOR_BIND_NAME, aKey, sizeof(aKey));
-	MouseHint.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f), IGraphics::CORNER_B, 7.5f);
-	constexpr float HintCut = 5.0f;
-	constexpr float FontSize = 11.0f;
-	MouseHint.VMargin(HintCut, &MouseHint);
-	char aHint[128];
-	if(!aKey[0])
-		str_format(aHint, sizeof(aHint), Localize("'%s' not bound."), SCOREBOARD_CURSOR_BIND_NAME);
-	else
-		str_format(aHint, sizeof(aHint), Localize("Press '%s' to show cursor."), aKey);
-	Ui()->DoLabel(&MouseHint, aHint, FontSize, TEXTALIGN_ML);
-}
-
 void CScoreboard::RenderRecordingNotification(float x)
 {
 	char aBuf[512] = "";
@@ -1125,13 +1108,6 @@ void CScoreboard::OnRender()
 		RenderGoals(Goals);
 	}
 	RenderSpectators(Spectators);
-
-	if(!m_MouseUnlocked)
-	{
-		constexpr float MouseHintSize = 15.0f;
-		CUIRect MouseHint = {Spectators.x, Spectators.y + Spectators.h, ScoreboardSmallWidth, std::min(Screen.h - Scoreboard.y - Scoreboard.h, MouseHintSize)};
-		RenderMouseHint(MouseHint);
-	}
 
 	RenderRecordingNotification((Screen.w / 7) * 4 + 10);
 
