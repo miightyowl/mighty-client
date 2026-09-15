@@ -2,6 +2,7 @@
 
 #include <base/log.h>
 #include <base/math.h>
+#include <base/secure.h>
 #include <base/str.h>
 #include <base/types.h>
 
@@ -75,6 +76,7 @@ void CAds::OnReset()
 {
 	m_Active = false;
 	m_CurrentAd = -1;
+	m_LastAd = -1;
 	m_NextAdTime = 0.0f;
 }
 
@@ -89,10 +91,12 @@ void CAds::Show()
 {
 	if(m_vAds.empty())
 		return;
-	// rotate through ads
-	m_RotationIndex %= (int)m_vAds.size();
-	m_CurrentAd = m_RotationIndex;
-	m_RotationIndex = (m_RotationIndex + 1) % (int)m_vAds.size();
+
+	const int NumAds = (int)m_vAds.size();
+	m_CurrentAd = secure_rand_below(NumAds);
+	if(NumAds > 1 && m_CurrentAd == m_LastAd)
+		m_CurrentAd = (m_CurrentAd + 1 + secure_rand_below(NumAds - 1)) % NumAds;
+	m_LastAd = m_CurrentAd;
 	m_Active = true;
 	// put cursor in the middle of the screen
 	const CUIRect Screen = *Ui()->Screen();
