@@ -149,6 +149,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Players,
 					      &m_Petting,
 					      &m_PetTee,
+					      &m_GirlfriendTee,
 					      &m_FastPractice,
 					      &m_MapLayersForeground,
 					      &m_Particles.m_RenderExplosions,

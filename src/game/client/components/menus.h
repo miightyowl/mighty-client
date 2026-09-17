@@ -682,8 +682,10 @@ protected:
 	void RenderSettingsProfiles(CUIRect MainView);
 	void RenderSettingsBindWheel(CUIRect MainView);
 	void RenderSettingsWidgetBar(CUIRect MainView);
-	void RenderSettingsTeeCompanion(CUIRect MainView);
+	void RenderSettingsTeeCompanion(CUIRect MainView, bool Girlfriend = false);
 	bool m_CompanionTeeTab = false;
+	bool m_GirlfriendTeeTab = false;
+	bool m_GirlfriendPlayerTab = false;
 
 	// found in menus_settings_player.cpp
 	void RenderSettingsPlayer(CUIRect MainView);

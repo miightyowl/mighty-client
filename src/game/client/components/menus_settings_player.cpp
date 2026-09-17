@@ -18,22 +18,60 @@
 
 void CMenus::RenderSettingsPlayer(CUIRect MainView)
 {
-	CUIRect TabBar, PlayerTab, DummyTab, ChangeInfo, QuickSearch;
+	CUIRect TabBar, PlayerTab, DummyTab, GirlfriendTab, ChangeInfo, QuickSearch;
 	MainView.HSplitTop(20.0f, &TabBar, &MainView);
 	TabBar.VSplitMid(&TabBar, &ChangeInfo, 20.f);
-	TabBar.VSplitMid(&PlayerTab, &DummyTab);
+	TabBar.VSplitLeft(TabBar.w / 3.0f, &PlayerTab, &TabBar);
+	TabBar.VSplitMid(&DummyTab, &GirlfriendTab);
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
 	static CButtonContainer s_PlayerTabButton;
-	if(DoButton_MenuTab(&s_PlayerTabButton, Localize("Player"), !m_Dummy, &PlayerTab, IGraphics::CORNER_L, nullptr, nullptr, nullptr, nullptr, 4.0f))
+	if(DoButton_MenuTab(&s_PlayerTabButton, Localize("Player"), !m_Dummy && !m_GirlfriendPlayerTab, &PlayerTab, IGraphics::CORNER_L, nullptr, nullptr, nullptr, nullptr, 4.0f))
 	{
 		m_Dummy = false;
+		m_GirlfriendPlayerTab = false;
 	}
 
 	static CButtonContainer s_DummyTabButton;
-	if(DoButton_MenuTab(&s_DummyTabButton, Localize("Dummy"), m_Dummy, &DummyTab, IGraphics::CORNER_R, nullptr, nullptr, nullptr, nullptr, 4.0f))
+	if(DoButton_MenuTab(&s_DummyTabButton, Localize("Dummy"), m_Dummy && !m_GirlfriendPlayerTab, &DummyTab, IGraphics::CORNER_NONE, nullptr, nullptr, nullptr, nullptr, 4.0f))
 	{
 		m_Dummy = true;
+		m_GirlfriendPlayerTab = false;
+	}
+
+	static CButtonContainer s_GirlfriendTabButton;
+	if(DoButton_MenuTab(&s_GirlfriendTabButton, Localize("Girlfriend"), m_GirlfriendPlayerTab, &GirlfriendTab, IGraphics::CORNER_R, nullptr, nullptr, nullptr, nullptr, 4.0f))
+	{
+		m_Dummy = false;
+		m_GirlfriendPlayerTab = true;
+	}
+
+	if(m_GirlfriendPlayerTab)
+	{
+		CUIRect Button, Label;
+		MainView.HSplitTop(20.0f, &Button, &MainView);
+		if(DoButton_CheckBox(&g_Config.m_ClMClientGirlfriend, Localize("Show girlfriend tee (only visible to you)"), g_Config.m_ClMClientGirlfriend, &Button))
+			g_Config.m_ClMClientGirlfriend ^= 1;
+
+		MainView.HSplitTop(10.0f, nullptr, &MainView);
+		MainView.HSplitTop(20.0f, &Button, &MainView);
+		Button.VSplitLeft(80.0f, &Label, &Button);
+		Button.VSplitLeft(150.0f, &Button, nullptr);
+		char aBuf[128];
+		str_format(aBuf, sizeof(aBuf), "%s:", Localize("Name"));
+		Ui()->DoLabel(&Label, aBuf, 14.0f, TEXTALIGN_ML);
+
+		static CLineInput s_GirlfriendNameInput;
+		s_GirlfriendNameInput.SetBuffer(g_Config.m_ClMClientGirlfriendName, sizeof(g_Config.m_ClMClientGirlfriendName));
+		s_GirlfriendNameInput.SetEmptyText("Girlfriend");
+		Ui()->DoEditBox(&s_GirlfriendNameInput, &Button, 14.0f);
+
+		MainView.HSplitTop(10.0f, nullptr, &MainView);
+		MainView.HSplitTop(20.0f, &Label, &MainView);
+		TextRender()->TextColor(0.6f, 0.6f, 0.6f, 1.0f);
+		Ui()->DoLabel(&Label, Localize("Pick the girlfriend skin in the Tee settings tab."), 11.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+		return;
 	}
 
 	if(Client()->State() == IClient::STATE_ONLINE &&

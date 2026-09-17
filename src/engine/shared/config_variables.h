@@ -257,6 +257,9 @@ MACRO_CONFIG_INT(ClMClientExtraSkinProvider, cl_mclient_extra_skin_provider, 0, 
 MACRO_CONFIG_INT(ClMClientFinishFireworks, cl_mclient_finish_fireworks, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: play fireworks when you finish a map")
 MACRO_CONFIG_INT(ClMClientFatChat, cl_mclient_fat_chat, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: briefly enable fat skins (DDFat) when someone writes \"fat\" in chat")
 MACRO_CONFIG_INT(ClMClientMaodieWalk, cl_mclient_maodie_walk, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: every few minutes a giant maodie tee walks across the bottom of the screen")
+MACRO_CONFIG_INT(ClMClientGirlfriend, cl_mclient_girlfriend, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show a girlfriend tee that follows you (only visible to you)")
+MACRO_CONFIG_STR(ClMClientGirlfriendSkin, cl_mclient_girlfriend_skin, 24, "pinky", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_INSENSITIVE, "M-Client: skin used for the girlfriend tee")
+MACRO_CONFIG_STR(ClMClientGirlfriendName, cl_mclient_girlfriend_name, 16, "Girlfriend", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_INSENSITIVE, "M-Client: name shown above the girlfriend tee")
 
 MACRO_CONFIG_COL(ClPlayer7ColorBody, player7_color_body, 0x1B6F74, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player body color")
 MACRO_CONFIG_COL(ClPlayer7ColorFeet, player7_color_feet, 0x1C873E, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLLIGHT7 | CFGFLAG_INSENSITIVE, "Player feet color")

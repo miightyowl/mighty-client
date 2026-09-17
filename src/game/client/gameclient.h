@@ -67,6 +67,7 @@
 #include "components/motd.h"
 #include "components/nameplates.h"
 #include "components/particles.h"
+#include "components/girlfriend_tee.h"
 #include "components/pet_tee.h"
 #include "components/petting.h"
 #include "components/players.h"
@@ -204,6 +205,7 @@ public:
 	CSaveNotice m_SaveNotice;
 	CPetting m_Petting;
 	CPetTee m_PetTee;
+	CGirlfriendTee m_GirlfriendTee;
 	CFastPractice m_FastPractice;
 	CAds m_Ads;
 	CMaodieWalk m_MaodieWalk;

@@ -2780,6 +2780,8 @@ if(CLIENT)
     components/nameplates.h
     components/particles.cpp
     components/particles.h
+    components/girlfriend_tee.cpp
+    components/girlfriend_tee.h
     components/pet_tee.cpp
     components/pet_tee.h
     components/petting.cpp

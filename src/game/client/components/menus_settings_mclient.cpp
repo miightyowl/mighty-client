@@ -113,6 +113,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientAds, Localize("Random advertisement/quote pop-ups"), &g_Config.m_ClMClientAds, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFatChat, Localize("Fat skins when someone writes \"fat\""), &g_Config.m_ClMClientFatChat, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMaodieWalk, Localize("Giant maodie walks across the screen"), &g_Config.m_ClMClientMaodieWalk, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientGirlfriend, Localize("Show girlfriend tee (only visible to you)"), &g_Config.m_ClMClientGirlfriend, &LeftView, LineSize);
 
 		// companion pet
 		Ui()->DoLabel_AutoLineSize(Localize("Companion pet"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
@@ -128,7 +129,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		}
 		RightView.HSplitTop(LineSize, &Label, &RightView);
 		TextRender()->TextColor(0.6f, 0.6f, 0.6f, 1.0f);
-		Ui()->DoLabel(&Label, Localize("Pick the companion skin in the Tee settings tab."), 11.0f, TEXTALIGN_ML);
+		Ui()->DoLabel(&Label, Localize("Pick skins in Tee settings; girlfriend name in Player settings."), 11.0f, TEXTALIGN_ML);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 
 		// chat translation
@@ -292,20 +293,21 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		}
 	}
 }
-void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
+void CMenus::RenderSettingsTeeCompanion(CUIRect MainView, bool Girlfriend)
 {
 	CUIRect Label, Button;
+	int *pEnabled = Girlfriend ? &g_Config.m_ClMClientGirlfriend : &g_Config.m_ClMClientPetTee;
 
 	// Enable toggle
 	MainView.HSplitTop(20.0f, &Button, &MainView);
-	if(DoButton_CheckBox(&g_Config.m_ClMClientPetTee, Localize("Show companion tee (pet)"), g_Config.m_ClMClientPetTee, &Button))
+	if(DoButton_CheckBox(pEnabled, Girlfriend ? Localize("Show girlfriend tee (only visible to you)") : Localize("Show companion tee (pet)"), *pEnabled, &Button))
 	{
-		g_Config.m_ClMClientPetTee ^= 1;
+		*pEnabled ^= 1;
 	}
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
-	char *pSkinName = g_Config.m_ClMClientPetTeeSkin;
-	const size_t SkinNameSize = sizeof(g_Config.m_ClMClientPetTeeSkin);
+	char *pSkinName = Girlfriend ? g_Config.m_ClMClientGirlfriendSkin : g_Config.m_ClMClientPetTeeSkin;
+	const size_t SkinNameSize = Girlfriend ? sizeof(g_Config.m_ClMClientGirlfriendSkin) : sizeof(g_Config.m_ClMClientPetTeeSkin);
 
 	CSkins::CSkinList &SkinList = GameClient()->m_Skins.SkinList();
 	const CSkin *pDefaultSkin = GameClient()->m_Skins.Find("default");
@@ -325,7 +327,7 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 	SkinArea.VSplitLeft(65.0f, &TeeRect, &EditArea);
 	EditArea.VSplitRight(20.0f, &EditArea, nullptr);
 	EditArea.HSplitTop(15.0f, &Label, &EditArea);
-	Ui()->DoLabel(&Label, Localize("Companion skin"), 14.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&Label, Girlfriend ? Localize("Girlfriend skin") : Localize("Companion skin"), 14.0f, TEXTALIGN_ML);
 	EditArea.HSplitTop(20.0f, &EditArea, nullptr);
 
 	{
