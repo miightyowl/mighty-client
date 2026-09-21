@@ -995,8 +995,6 @@ bool CMClientDetect::OnWhisper(int ClientId, int Team, const char *pMessage)
 		return true;
 
 	CPeer &Peer = m_aPeers[ClientId];
-	if(!Peer.m_Detected)
-		return true;
 
 	char aEncodedSkin[2 * MAX_SKIN_LENGTH] = "";
 	int UseCustomColor = 0;
@@ -1012,6 +1010,11 @@ bool CMClientDetect::OnWhisper(int ClientId, int Team, const char *pMessage)
 		aSkin[0] = '\0';
 	else if(!HexDecode(aEncodedSkin, aSkin, sizeof(aSkin)))
 		return true;
+
+	Peer.m_Detected = true;
+	str_copy(Peer.m_aName, GameClient()->m_aClients[ClientId].m_aRealName);
+	m_RefreshPending = false;
+	m_RefreshLegacySent = false;
 
 	Peer.m_PetOn = On;
 	str_copy(Peer.m_aPetSkin, aSkin);
