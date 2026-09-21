@@ -585,6 +585,7 @@ protected:
 	struct CProfile
 	{
 		bool m_IsPet = false;
+		int m_Number = 0;
 		char m_aName[MAX_NAME_LENGTH] = "";
 		char m_aClan[MAX_CLAN_LENGTH] = "";
 		int m_Country = -1;
@@ -601,6 +602,7 @@ protected:
 	void SaveProfile(bool Dummy);
 	void SavePetProfile();
 	void SortProfiles();
+	int NextFreeProfileNumber() const;
 	void ApplyProfile(const CProfile &Profile, bool Dummy);
 	static void ConLoadProfile(IConsole::IResult *pResult, void *pUserData);
 	void RenderUnfinishedVoteTeeSelection(CUIRect *pMainView);

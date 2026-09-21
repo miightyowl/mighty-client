@@ -1089,7 +1089,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		Row.VSplitLeft(ClanW + 8.0f, &ClanCol, &Row);
 		Row.VSplitLeft(24.0f, &FlagRect, &Row);
 		char aLoadCmd[64];
-		str_format(aLoadCmd, sizeof(aLoadCmd), "load_profile %d", ProfileIdx + 1);
+		str_format(aLoadCmd, sizeof(aLoadCmd), "load_profile %d", Profile.m_Number);
 		Row.VSplitLeft(10.0f, nullptr, &Row);
 		Row.VSplitLeft(TextRender()->TextWidth(10.0f, aLoadCmd) + 18.0f, &CmdBox, &Row);
 
@@ -1185,6 +1185,7 @@ void CMenus::LoadProfiles()
 				continue;
 			CProfile Profile;
 			const json_value &IsPet = Entry["is_pet"];
+			const json_value &Number = Entry["number"];
 			const json_value &Name = Entry["name"];
 			const json_value &Clan = Entry["clan"];
 			const json_value &Country = Entry["country"];
@@ -1194,6 +1195,8 @@ void CMenus::LoadProfiles()
 			const json_value &ColorFeet = Entry["color_feet"];
 			if(IsPet.type == json_integer)
 				Profile.m_IsPet = IsPet.u.integer != 0;
+			if(Number.type == json_integer)
+				Profile.m_Number = (int)Number.u.integer;
 			if(Name.type == json_string)
 				str_copy(Profile.m_aName, Name);
 			if(Clan.type == json_string)
@@ -1210,6 +1213,14 @@ void CMenus::LoadProfiles()
 				Profile.m_ColorFeet = (int)ColorFeet.u.integer;
 			m_vProfiles.push_back(Profile);
 		}
+	}
+	for(size_t i = 0; i < m_vProfiles.size(); ++i)
+	{
+		bool Duplicate = false;
+		for(size_t j = 0; j < i && !Duplicate; ++j)
+			Duplicate = m_vProfiles[i].m_Number > 0 && m_vProfiles[j].m_Number == m_vProfiles[i].m_Number;
+		if(m_vProfiles[i].m_Number <= 0 || Duplicate)
+			m_vProfiles[i].m_Number = NextFreeProfileNumber();
 	}
 	SortProfiles();
 	json_value_free(pData);
@@ -1234,6 +1245,8 @@ void CMenus::SaveMClient()
 		Writer.BeginObject();
 		Writer.WriteAttribute("is_pet");
 		Writer.WriteIntValue(Profile.m_IsPet ? 1 : 0);
+		Writer.WriteAttribute("number");
+		Writer.WriteIntValue(Profile.m_Number);
 		Writer.WriteAttribute("name");
 		Writer.WriteStrValue(Profile.m_aName);
 		Writer.WriteAttribute("clan");
@@ -1317,9 +1330,28 @@ void CMenus::SortProfiles()
 	std::stable_partition(m_vProfiles.begin(), m_vProfiles.end(), [](const CProfile &Profile) { return !Profile.m_IsPet; });
 }
 
+int CMenus::NextFreeProfileNumber() const
+{
+	for(int Number = 1;; ++Number)
+	{
+		bool Used = false;
+		for(const CProfile &Profile : m_vProfiles)
+		{
+			if(Profile.m_Number == Number)
+			{
+				Used = true;
+				break;
+			}
+		}
+		if(!Used)
+			return Number;
+	}
+}
+
 void CMenus::SaveProfile(bool Dummy)
 {
 	CProfile Profile;
+	Profile.m_Number = NextFreeProfileNumber();
 	str_copy(Profile.m_aName, Dummy ? g_Config.m_ClDummyName : g_Config.m_PlayerName);
 	str_copy(Profile.m_aClan, Dummy ? g_Config.m_ClDummyClan : g_Config.m_PlayerClan);
 	Profile.m_Country = Dummy ? g_Config.m_ClDummyCountry : g_Config.m_PlayerCountry;
@@ -1336,6 +1368,7 @@ void CMenus::SavePetProfile()
 {
 	CProfile Profile;
 	Profile.m_IsPet = true;
+	Profile.m_Number = NextFreeProfileNumber();
 	str_copy(Profile.m_aSkin, g_Config.m_ClMClientPetTeeSkin);
 	Profile.m_UseCustomColor = g_Config.m_ClMClientPetTeeUseCustomColor;
 	Profile.m_ColorBody = g_Config.m_ClMClientPetTeeColorBody;
@@ -1399,13 +1432,22 @@ void CMenus::ConLoadProfile(IConsole::IResult *pResult, void *pUserData)
 	CMenus *pSelf = static_cast<CMenus *>(pUserData);
 	if(!pSelf->m_ProfilesLoaded)
 		pSelf->LoadProfiles();
-	const int Index = pResult->GetInteger(0) - 1;
-	if(Index < 0 || Index >= (int)pSelf->m_vProfiles.size())
+	const int Number = pResult->GetInteger(0);
+	const CProfile *pProfile = nullptr;
+	for(const CProfile &Profile : pSelf->m_vProfiles)
+	{
+		if(Profile.m_Number == Number)
+		{
+			pProfile = &Profile;
+			break;
+		}
+	}
+	if(pProfile == nullptr)
 	{
 		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "mclient", "no saved profile with that number");
 		return;
 	}
-	pSelf->ApplyProfile(pSelf->m_vProfiles[Index], g_Config.m_ClDummy != 0);
+	pSelf->ApplyProfile(*pProfile, g_Config.m_ClDummy != 0);
 }
 void CMenus::OnConsoleInit()
 {
