@@ -969,12 +969,16 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 	Ui()->DoLabel(&Headline, Localize("Profiles"), 20.0f, TEXTALIGN_ML);
 	MainView.HSplitTop(5.0f, nullptr, &MainView);
 
-	// current player + player/dummy save buttons
+	// current player + player/dummy/pet save buttons
 	MainView.HSplitTop(34.0f, &TopBar, &MainView);
 	MainView.HSplitTop(6.0f, nullptr, &MainView);
-	CUIRect CurTee, CurInfo, CurLabel, SavePlayerButton, SaveDummyButton, CurFlag;
-	TopBar.VSplitRight(250.0f, &TopBar, &SavePlayerButton);
-	SavePlayerButton.VSplitMid(&SavePlayerButton, &SaveDummyButton, 5.0f);
+	CUIRect CurTee, CurInfo, CurLabel, SavePlayerButton, SaveDummyButton, SavePetButton, SaveButtons, CurFlag;
+	TopBar.VSplitRight(345.0f, &TopBar, &SaveButtons);
+	SaveButtons.VSplitLeft(110.0f, &SavePlayerButton, &SaveButtons);
+	SaveButtons.VSplitLeft(5.0f, nullptr, &SaveButtons);
+	SaveButtons.VSplitLeft(110.0f, &SaveDummyButton, &SaveButtons);
+	SaveButtons.VSplitLeft(5.0f, nullptr, &SaveButtons);
+	SaveButtons.VSplitLeft(110.0f, &SavePetButton, &SaveButtons);
 	TopBar.VSplitRight(10.0f, &TopBar, nullptr);
 	TopBar.VSplitLeft(TopBar.h, &CurTee, &CurInfo);
 	CurInfo.VSplitLeft(8.0f, nullptr, &CurInfo);
@@ -997,14 +1001,19 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 
 	SavePlayerButton.HMargin((SavePlayerButton.h - 24.0f) / 2.0f, &SavePlayerButton);
 	SaveDummyButton.HMargin((SaveDummyButton.h - 24.0f) / 2.0f, &SaveDummyButton);
+	SavePetButton.HMargin((SavePetButton.h - 24.0f) / 2.0f, &SavePetButton);
 	static CButtonContainer s_SavePlayerButton;
 	static CButtonContainer s_SaveDummyButton;
+	static CButtonContainer s_SavePetButton;
 	MenuButton(SavePlayerButton, Localize("Save player"), 13.0f, Ui()->HotItem() == &s_SavePlayerButton);
 	MenuButton(SaveDummyButton, Localize("Save dummy"), 13.0f, Ui()->HotItem() == &s_SaveDummyButton);
+	MenuButton(SavePetButton, Localize("Save pet"), 13.0f, Ui()->HotItem() == &s_SavePetButton);
 	if(Ui()->DoButtonLogic(&s_SavePlayerButton, 0, &SavePlayerButton, BUTTONFLAG_LEFT))
 		SaveProfile(false);
 	if(Ui()->DoButtonLogic(&s_SaveDummyButton, 0, &SaveDummyButton, BUTTONFLAG_LEFT))
 		SaveProfile(true);
+	if(Ui()->DoButtonLogic(&s_SavePetButton, 0, &SavePetButton, BUTTONFLAG_LEFT))
+		SavePetProfile();
 
 	MainView.HSplitTop(1.0f, &Divider, &MainView);
 	Divider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_NONE, 0.0f);
@@ -1016,7 +1025,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		Props.SetColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
 		CUIRect Hint;
 		MainView.HSplitTop(24.0f, &Hint, nullptr);
-		Ui()->DoLabel(&Hint, Localize("No profiles saved yet. Save your player or dummy to add one."), 12.0f, TEXTALIGN_ML, Props);
+		Ui()->DoLabel(&Hint, Localize("No profiles saved yet. Save your player, dummy or pet to add one."), 12.0f, TEXTALIGN_ML, Props);
 		return;
 	}
 
@@ -1049,7 +1058,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		Row.VSplitRight(56.0f, &Row, &LoadButton);
 		Row.VSplitRight(10.0f, &Row, nullptr);
 
-		const float NameW = std::min(TextRender()->TextWidth(12.0f, Profile.m_aName[0] != '\0' ? Profile.m_aName : "(unnamed)"), Row.w * 0.5f);
+		const float NameW = std::min(TextRender()->TextWidth(12.0f, Profile.m_IsPet ? Localize("Companion pet") : (Profile.m_aName[0] != '\0' ? Profile.m_aName : "(unnamed)")), Row.w * 0.5f);
 		Row.VSplitLeft(NameW + 12.0f, &NameCol, &Row);
 		const float ClanW = Profile.m_aClan[0] != '\0' ? std::min(TextRender()->TextWidth(12.0f, Profile.m_aClan), Row.w - 40.0f) : -8.0f;
 		Row.VSplitLeft(ClanW + 8.0f, &ClanCol, &Row);
@@ -1066,7 +1075,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		SLabelProperties NameProps;
 		NameProps.m_MaxWidth = NameCol.w;
 		NameProps.m_EllipsisAtEnd = true;
-		Ui()->DoLabel(&NameCol, Profile.m_aName[0] != '\0' ? Profile.m_aName : "(unnamed)", 12.0f, TEXTALIGN_ML, NameProps);
+		Ui()->DoLabel(&NameCol, Profile.m_IsPet ? Localize("Companion pet") : (Profile.m_aName[0] != '\0' ? Profile.m_aName : "(unnamed)"), 12.0f, TEXTALIGN_ML, NameProps);
 		if(Profile.m_aClan[0] != '\0')
 		{
 			SLabelProperties ClanProps;
@@ -1150,6 +1159,7 @@ void CMenus::LoadProfiles()
 			if(Entry.type != json_object)
 				continue;
 			CProfile Profile;
+			const json_value &IsPet = Entry["is_pet"];
 			const json_value &Name = Entry["name"];
 			const json_value &Clan = Entry["clan"];
 			const json_value &Country = Entry["country"];
@@ -1157,6 +1167,8 @@ void CMenus::LoadProfiles()
 			const json_value &UseCustomColor = Entry["use_custom_color"];
 			const json_value &ColorBody = Entry["color_body"];
 			const json_value &ColorFeet = Entry["color_feet"];
+			if(IsPet.type == json_integer)
+				Profile.m_IsPet = IsPet.u.integer != 0;
 			if(Name.type == json_string)
 				str_copy(Profile.m_aName, Name);
 			if(Clan.type == json_string)
@@ -1194,6 +1206,8 @@ void CMenus::SaveMClient()
 	for(const CProfile &Profile : m_vProfiles)
 	{
 		Writer.BeginObject();
+		Writer.WriteAttribute("is_pet");
+		Writer.WriteIntValue(Profile.m_IsPet ? 1 : 0);
 		Writer.WriteAttribute("name");
 		Writer.WriteStrValue(Profile.m_aName);
 		Writer.WriteAttribute("clan");
@@ -1286,8 +1300,29 @@ void CMenus::SaveProfile(bool Dummy)
 	SaveMClient();
 }
 
+void CMenus::SavePetProfile()
+{
+	CProfile Profile;
+	Profile.m_IsPet = true;
+	str_copy(Profile.m_aSkin, g_Config.m_ClMClientPetTeeSkin);
+	Profile.m_UseCustomColor = g_Config.m_ClMClientPetTeeUseCustomColor;
+	Profile.m_ColorBody = g_Config.m_ClMClientPetTeeColorBody;
+	Profile.m_ColorFeet = g_Config.m_ClMClientPetTeeColorFeet;
+	m_vProfiles.push_back(Profile);
+	SaveMClient();
+}
+
 void CMenus::ApplyProfile(const CProfile &Profile, bool Dummy)
 {
+	if(Profile.m_IsPet)
+	{
+		str_copy(g_Config.m_ClMClientPetTeeSkin, Profile.m_aSkin);
+		g_Config.m_ClMClientPetTeeUseCustomColor = Profile.m_UseCustomColor;
+		g_Config.m_ClMClientPetTeeColorBody = Profile.m_ColorBody;
+		g_Config.m_ClMClientPetTeeColorFeet = Profile.m_ColorFeet;
+		return;
+	}
+
 	if(Dummy)
 	{
 		str_copy(g_Config.m_ClDummyName, Profile.m_aName);
