@@ -54,6 +54,9 @@ void CPetTee::OnRender()
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
 	{
 		const char *pSkinName = nullptr;
+		bool UseCustomColor = false;
+		int ColorBody = 0;
+		int ColorFeet = 0;
 		float Scale = OTHERS_SIZE;
 		float Alpha = OTHERS_ALPHA;
 
@@ -62,13 +65,20 @@ void CPetTee::OnRender()
 			if(g_Config.m_ClMClientPetTee)
 			{
 				pSkinName = g_Config.m_ClMClientPetTeeSkin;
+				UseCustomColor = g_Config.m_ClMClientPetTeeUseCustomColor != 0;
+				ColorBody = g_Config.m_ClMClientPetTeeColorBody;
+				ColorFeet = g_Config.m_ClMClientPetTeeColorFeet;
 				Scale = (float)g_Config.m_ClMClientPetTeeSize / 100.0f;
 				Alpha = (float)g_Config.m_ClMClientPetTeeAlpha / 100.0f;
 			}
 		}
 		else if(g_Config.m_ClMClientPetTeeOthers)
 		{
-			pSkinName = GameClient()->m_MClientDetect.PetSkin(ClientId);
+			const CMClientDetect::SPetAppearance Appearance = GameClient()->m_MClientDetect.PetAppearance(ClientId);
+			pSkinName = Appearance.m_pSkin;
+			UseCustomColor = Appearance.m_UseCustomColor;
+			ColorBody = Appearance.m_ColorBody;
+			ColorFeet = Appearance.m_ColorFeet;
 			Scale = (float)g_Config.m_ClMClientPetTeeSize / 100.0f;
 			Alpha = (float)g_Config.m_ClMClientPetTeeAlpha / 100.0f;
 		}
@@ -79,11 +89,11 @@ void CPetTee::OnRender()
 			continue;
 		}
 
-		RenderPet(ClientId, g_Config.m_ClMClientForceSkin ? "maodie" : pSkinName, Scale, Alpha);
+		RenderPet(ClientId, g_Config.m_ClMClientForceSkin ? "maodie" : pSkinName, UseCustomColor, ColorBody, ColorFeet, Scale, Alpha);
 	}
 }
 
-void CPetTee::RenderPet(int ClientId, const char *pSkinName, float Scale, float Alpha)
+void CPetTee::RenderPet(int ClientId, const char *pSkinName, bool UseCustomColor, int ColorBody, int ColorFeet, float Scale, float Alpha)
 {
 	CPet &Pet = m_aPets[ClientId];
 	const auto &Player = GameClient()->m_aClients[ClientId];
@@ -155,6 +165,7 @@ void CPetTee::RenderPet(int ClientId, const char *pSkinName, float Scale, float 
 
 	CTeeRenderInfo TeeRenderInfo;
 	TeeRenderInfo.Apply(GameClient()->m_Skins.Find(pSkinName));
+	TeeRenderInfo.ApplyColors(UseCustomColor, ColorBody, ColorFeet);
 	TeeRenderInfo.m_Size = 64.0f * Scale;
 	TeeRenderInfo.m_GotAirJump = Pet.m_Velocity.y > -10.0f;
 	RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeRenderInfo, EMOTE_NORMAL, Pet.m_Dir, Pet.m_Position, Pet.m_Alpha * Alpha);

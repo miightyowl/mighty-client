@@ -27,8 +27,14 @@ public:
 	bool IsMClient(int ClientId) const;
 	int NumDetected() const;
 
-	// skin of the companion tee that player broadcast, nullptr when they have none
-	const char *PetSkin(int ClientId) const;
+	struct SPetAppearance
+	{
+		const char *m_pSkin = nullptr;
+		bool m_UseCustomColor = false;
+		int m_ColorBody = 0;
+		int m_ColorFeet = 0;
+	};
+	SPetAppearance PetAppearance(int ClientId) const;
 
 	bool EmoteInFlight() const { return m_EmoteWaiting; }
 	bool EmoteChannelBusy() const { return !m_vEmoteQueue.empty(); }
@@ -73,6 +79,9 @@ private:
 		bool m_PetTold;
 		bool m_PetOn;
 		char m_aPetSkin[MAX_SKIN_LENGTH];
+		bool m_PetUseCustomColor;
+		int m_PetColorBody;
+		int m_PetColorFeet;
 	};
 
 	CPeer m_aPeers[MAX_CLIENTS] = {};
@@ -114,6 +123,9 @@ private:
 	// the pet state the other M-Client players around us know about
 	bool m_PetOnSent = false;
 	char m_aPetSkinSent[MAX_SKIN_LENGTH] = "";
+	bool m_PetUseCustomColorSent = false;
+	int m_PetColorBodySent = 0;
+	int m_PetColorFeetSent = 0;
 	int m_PetLocalId = -1;
 	float m_PetCooldown = 0.0f;
 	bool m_QueuedPetOn = false;
@@ -143,8 +155,8 @@ private:
 	bool PetAudience() const;
 	void MarkPetTold();
 	void ForgetPetTold();
-	void LocalPet(bool *pOn, char *pSkin, int SkinSize) const;
-	void SendPetWhisper(int ClientId, bool On, const char *pSkin);
+	void LocalPet(bool *pOn, char *pSkin, int SkinSize, bool *pUseCustomColor, int *pColorBody, int *pColorFeet) const;
+	void SendPetWhisper(int ClientId, bool On, const char *pSkin, bool UseCustomColor, int ColorBody, int ColorFeet);
 	void SendBeacon(int Kind);
 	void SendPetBeacon(bool On, const char *pSkin);
 	void AbortBeacon();
