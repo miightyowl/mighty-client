@@ -19,6 +19,7 @@
 #include <engine/textrender.h>
 
 #include <game/client/animstate.h>
+#include <game/client/components/mighty_language.h>
 #include <game/client/gameclient.h>
 #include <game/client/skin.h>
 #include <game/client/ui.h>
@@ -29,6 +30,7 @@
 #include <algorithm>
 #include <array>
 #include <memory>
+#include <vector>
 
 void CMenus::RenderSettingsMClient(CUIRect MainView)
 {
@@ -142,6 +144,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 			GameClient()->m_Chat.RebuildChat();
 		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslateShortWords, Localize("Also translate short words"), &g_Config.m_ClChatTranslateShortWords, &RightView, LineSize))
 			GameClient()->m_Chat.ClearTranslationCache();
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMightyRead, Localize("Read Mighty-language chat"), &g_Config.m_ClMClientMightyRead, &RightView, LineSize);
 
 		static const char *s_apTranslateLangCodes[] = {
 			"en", "de", "es", "fr", "pt", "it", "nl", "pl", "ru", "uk", "tr", "ar",
@@ -153,6 +156,24 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		const auto FindTranslateLang = [&](const char *pCode) {
 			for(int i = 0; i < s_NumTranslateLang; ++i)
 				if(str_comp(pCode, s_apTranslateLangCodes[i]) == 0)
+					return i;
+			return 0;
+		};
+
+		static std::vector<const char *> s_vSendAsLangCodes = [] {
+			std::vector<const char *> v(s_apTranslateLangCodes, s_apTranslateLangCodes + s_NumTranslateLang);
+			v.push_back(MIGHTY_LANG_CODE);
+			return v;
+		}();
+		static std::vector<const char *> s_vSendAsLangNames = [] {
+			std::vector<const char *> v(s_apTranslateLangNames, s_apTranslateLangNames + s_NumTranslateLang);
+			v.push_back(MIGHTY_LANG_NAME);
+			return v;
+		}();
+		const int NumSendAsLang = (int)s_vSendAsLangCodes.size();
+		const auto FindSendAsLang = [&](const char *pCode) {
+			for(int i = 0; i < NumSendAsLang; ++i)
+				if(str_comp(pCode, s_vSendAsLangCodes[i]) == 0)
 					return i;
 			return 0;
 		};
@@ -204,10 +225,10 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		static CUi::SDropDownState s_TargetLangDropDownState;
 		static CScrollRegion s_TargetLangScrollRegion;
 		s_TargetLangDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_TargetLangScrollRegion;
-		const int OldTargetLang = FindTranslateLang(g_Config.m_ClChatTranslateOutTarget);
-		const int NewTargetLang = Ui()->DoDropDown(&TranslateDropDown, OldTargetLang, s_apTranslateLangNames, s_NumTranslateLang, s_TargetLangDropDownState);
+		const int OldTargetLang = FindSendAsLang(g_Config.m_ClChatTranslateOutTarget);
+		const int NewTargetLang = Ui()->DoDropDown(&TranslateDropDown, OldTargetLang, s_vSendAsLangNames.data(), NumSendAsLang, s_TargetLangDropDownState);
 		if(NewTargetLang != OldTargetLang)
-			str_copy(g_Config.m_ClChatTranslateOutTarget, s_apTranslateLangCodes[NewTargetLang]);
+			str_copy(g_Config.m_ClChatTranslateOutTarget, s_vSendAsLangCodes[NewTargetLang]);
 	}
 	else if(s_CurTab == MCLIENT_TAB_FROZEN)
 	{

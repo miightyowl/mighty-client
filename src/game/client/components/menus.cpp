@@ -33,6 +33,7 @@
 #include <game/client/components/console.h>
 #include <game/client/components/key_binder.h>
 #include <game/client/components/menu_background.h>
+#include <game/client/components/mighty_language.h>
 #include <game/client/components/sounds.h>
 #include <game/client/gameclient.h>
 #include <game/client/ui_listbox.h>
@@ -1455,10 +1456,28 @@ void CMenus::RenderPopupMClientSetup(CUIRect Box)
 	static const char *s_apLangNames[] = {
 		"English", "German", "Spanish", "French", "Portuguese", "Italian", "Dutch", "Polish", "Russian", "Ukrainian", "Turkish", "Arabic",
 		"Chinese", "Japanese", "Korean", "Vietnamese", "Indonesian", "Thai", "Swedish", "Czech", "Greek", "Hungarian", "Romanian", "Finnish", "Danish", "Norwegian", "Slovenian", "Slovak", "Croatian", "Serbian", "Bulgarian"};
-	const int NumLang = std::size(s_apLangCodes);
+	static const int NumLang = std::size(s_apLangCodes);
 	const auto FindLang = [&](const char *pCode) {
 		for(int i = 0; i < NumLang; ++i)
 			if(str_comp(pCode, s_apLangCodes[i]) == 0)
+				return i;
+		return 0;
+	};
+
+	static std::vector<const char *> s_vSendAsCodes = [] {
+		std::vector<const char *> v(s_apLangCodes, s_apLangCodes + NumLang);
+		v.push_back(MIGHTY_LANG_CODE);
+		return v;
+	}();
+	static std::vector<const char *> s_vSendAsNames = [] {
+		std::vector<const char *> v(s_apLangNames, s_apLangNames + NumLang);
+		v.push_back(MIGHTY_LANG_NAME);
+		return v;
+	}();
+	const int NumSendAs = (int)s_vSendAsCodes.size();
+	const auto FindSendAs = [&](const char *pCode) {
+		for(int i = 0; i < NumSendAs; ++i)
+			if(str_comp(pCode, s_vSendAsCodes[i]) == 0)
 				return i;
 		return 0;
 	};
@@ -1490,10 +1509,10 @@ void CMenus::RenderPopupMClientSetup(CUIRect Box)
 	static CUi::SDropDownState s_TargetState;
 	static CScrollRegion s_TargetScroll;
 	s_TargetState.m_SelectionPopupContext.m_pScrollRegion = &s_TargetScroll;
-	const int OldTarget = FindLang(g_Config.m_ClChatTranslateOutTarget);
-	const int NewTarget = Ui()->DoDropDown(&Field, OldTarget, s_apLangNames, NumLang, s_TargetState);
+	const int OldTarget = FindSendAs(g_Config.m_ClChatTranslateOutTarget);
+	const int NewTarget = Ui()->DoDropDown(&Field, OldTarget, s_vSendAsNames.data(), NumSendAs, s_TargetState);
 	if(NewTarget != OldTarget)
-		str_copy(g_Config.m_ClChatTranslateOutTarget, s_apLangCodes[NewTarget]);
+		str_copy(g_Config.m_ClChatTranslateOutTarget, s_vSendAsCodes[NewTarget]);
 	Hint(&RightView, Localize("Your message is sent translated into this language"));
 }
 

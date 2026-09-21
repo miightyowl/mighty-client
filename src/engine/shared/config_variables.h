@@ -718,6 +718,7 @@ MACRO_CONFIG_INT(ClChatTranslateShortWords, cl_chat_translate_short_words, 0, 0,
 MACRO_CONFIG_INT(ClChatTranslateShowLang, cl_chat_translate_show_lang, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: append the detected source language to translated chat messages")
 MACRO_CONFIG_STR(ClChatTranslateOutSource, cl_chat_translate_out_source, 8, "en", CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: language you write in the translate chat")
 MACRO_CONFIG_STR(ClChatTranslateOutTarget, cl_chat_translate_out_target, 8, "de", CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: language the translate chat sends your messages in")
+MACRO_CONFIG_INT(ClMClientMightyRead, cl_mclient_mighty_read, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: auto-decode mighty-language chat messages")
 MACRO_CONFIG_COL(ClLaserRifleInnerColor, cl_laser_rifle_inner_color, 11206591, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Laser inner color for Rifle")
 MACRO_CONFIG_COL(ClLaserRifleOutlineColor, cl_laser_rifle_outline_color, 11176233, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Laser outline color for Rifle")
 MACRO_CONFIG_COL(ClLaserShotgunInnerColor, cl_laser_sg_inner_color, 1467241, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Laser inner color for Shotgun")

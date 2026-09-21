@@ -23,6 +23,7 @@
 
 #include <game/client/animstate.h>
 #include <game/client/components/censor.h>
+#include <game/client/components/mighty_language.h>
 #include <game/client/components/scoreboard.h>
 #include <game/client/components/skins.h>
 #include <game/client/components/sounds.h>
@@ -770,7 +771,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 
 	bool Highlighted = false;
 
-	auto &&FChatMsgCheckAndPrint = [](const CLine &Line) {
+	auto &&FChatMsgCheckAndPrint = [](const CLine &Line, const char *pOriginalText) {
 		ColorRGBA ChatLogColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 		if(Line.m_Highlighted)
 		{
@@ -802,7 +803,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		else
 			pFrom = "chat/all";
 
-		log_info_color(color_cast<LOG_COLOR>(ChatLogColor), pFrom, "%s%s%s", Line.m_aName, Line.m_ClientId >= 0 ? ": " : "", Line.m_aText);
+		log_info_color(color_cast<LOG_COLOR>(ChatLogColor), pFrom, "%s%s%s", Line.m_aName, Line.m_ClientId >= 0 ? ": " : "", pOriginalText);
 	};
 
 	// Custom color for new line
@@ -829,7 +830,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		PreviousLine.m_aYOffset[0] = -1.0f;
 		PreviousLine.m_aYOffset[1] = -1.0f;
 
-		FChatMsgCheckAndPrint(PreviousLine);
+		FChatMsgCheckAndPrint(PreviousLine, pLine);
 		return;
 	}
 
@@ -934,7 +935,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		}
 	}
 
-	FChatMsgCheckAndPrint(CurrentLine);
+	FChatMsgCheckAndPrint(CurrentLine, pLine);
 
 	// play sound
 	int64_t Now = time();
@@ -1317,6 +1318,27 @@ static const char *LanguageName(const char *pCode)
 
 void CChat::MaybeTranslateLine(CLine &Line)
 {
+	int PrefixLen = NameTagPrefixLength(Line.m_aText);
+	const char *pBody = Line.m_aText + PrefixLen;
+
+	const bool OwnMessage = Line.m_ClientId == GameClient()->m_aLocalIds[0] || Line.m_ClientId == GameClient()->m_aLocalIds[1];
+	const bool MightyMessage = IsMightyMessage(pBody);
+
+	if(g_Config.m_ClMClientMightyRead && !OwnMessage && MightyMessage)
+	{
+		char aDecoded[MAX_CHAT_LENGTH];
+		if(DecodeMighty(pBody, aDecoded, sizeof(aDecoded)))
+		{
+			char aFull[MAX_CHAT_LENGTH];
+			ComposeWithPrefix(aFull, sizeof(aFull), Line.m_aText, PrefixLen, aDecoded);
+			str_copy(Line.m_aText, aFull);
+			str_copy(Line.m_aLangTag, MIGHTY_CHAT_LABEL);
+			Line.m_TranslatedTextColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageTranslatedColor));
+			PrefixLen = NameTagPrefixLength(Line.m_aText);
+			pBody = Line.m_aText + PrefixLen;
+		}
+	}
+
 	if(!g_Config.m_ClChatTranslate)
 		return;
 	if(Line.m_ClientId < 0)
@@ -1327,9 +1349,6 @@ void CChat::MaybeTranslateLine(CLine &Line)
 		return;
 	if(Line.m_TeamNumber == TEAM_WHISPER_SEND)
 		return;
-
-	const int PrefixLen = NameTagPrefixLength(Line.m_aText);
-	const char *pBody = Line.m_aText + PrefixLen;
 
 	char aProtected[MAX_CHAT_LENGTH];
 	std::vector<std::string> vProtectedNames;
@@ -1504,6 +1523,27 @@ void CChat::SendChatTranslated(const char *pLine)
 
 	const int PrefixLen = NameTagPrefixLength(pLine);
 	const char *pBody = pLine + PrefixLen;
+
+	if(str_comp(g_Config.m_ClChatTranslateOutTarget, MIGHTY_LANG_CODE) == 0)
+	{
+		if(pBody[0] == '\0')
+		{
+			SendChat(0, pLine);
+			return;
+		}
+
+		char aEncoded[MAX_CHAT_LENGTH];
+		if(EncodeMighty(pBody, aEncoded, sizeof(aEncoded) - PrefixLen) < 0)
+		{
+			Echo(Localize("Message is too long for the Mighty language."));
+			return;
+		}
+
+		char aFull[MAX_CHAT_LENGTH];
+		ComposeWithPrefix(aFull, sizeof(aFull), pLine, PrefixLen, aEncoded);
+		SendChat(0, aFull);
+		return;
+	}
 
 	// protect player names in the body with placeholders
 	char aProtected[MAX_CHAT_LENGTH];
@@ -1973,7 +2013,8 @@ void CChat::OnRender()
 		else if(m_Mode == MODE_TRANSLATE)
 		{
 			char aTranslateLabel[64];
-			str_format(aTranslateLabel, sizeof(aTranslateLabel), "%s \xE2\x86\x92 %s", Localize("Translate"), g_Config.m_ClChatTranslateOutTarget);
+			const char *pTargetLabel = str_comp(g_Config.m_ClChatTranslateOutTarget, MIGHTY_LANG_CODE) == 0 ? MIGHTY_CHAT_LABEL : g_Config.m_ClChatTranslateOutTarget;
+			str_format(aTranslateLabel, sizeof(aTranslateLabel), "%s \xE2\x86\x92 %s", Localize("Translate"), pTargetLabel);
 			TextRender()->TextEx(&InputCursor, aTranslateLabel);
 		}
 		else

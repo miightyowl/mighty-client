@@ -2772,6 +2772,8 @@ if(CLIENT)
     components/menus_settings_tee7.cpp
     components/menus_start.cpp
     components/menus_start.h
+    components/mighty_language.cpp
+    components/mighty_language.h
     components/minigames.cpp
     components/minigames.h
     components/motd.cpp
