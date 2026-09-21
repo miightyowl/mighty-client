@@ -99,7 +99,7 @@ private:
 	void Start();
 	void Stop();
 	void SetCheckpoint();
-	bool Respawn();
+	bool Respawn(const vec2 *pSpectatorSpawnPos = nullptr);
 	void Advance(int Ticks);
 
 	class CScopedPredictEvents
