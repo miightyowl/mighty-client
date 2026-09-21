@@ -600,6 +600,7 @@ protected:
 	void SaveMClient();
 	void SaveProfile(bool Dummy);
 	void SavePetProfile();
+	void SortProfiles();
 	void ApplyProfile(const CProfile &Profile, bool Dummy);
 	static void ConLoadProfile(IConsole::IResult *pResult, void *pUserData);
 	void RenderUnfinishedVoteTeeSelection(CUIRect *pMainView);

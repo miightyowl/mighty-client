@@ -26,6 +26,7 @@
 #include <game/client/ui_scrollregion.h>
 #include <game/localization.h>
 
+#include <algorithm>
 #include <array>
 #include <memory>
 
@@ -1029,8 +1030,14 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		return;
 	}
 
+	// player/dummy entries come first, companion pets are rendered in a separated section at the bottom
+	const auto FirstPet = std::find_if(m_vProfiles.begin(), m_vProfiles.end(), [](const CProfile &Profile) { return Profile.m_IsPet; });
+	const int PetHeaderRow = (int)(FirstPet - m_vProfiles.begin());
+	const bool HasPets = PetHeaderRow < (int)m_vProfiles.size();
+	const int NumRows = (int)m_vProfiles.size() + (HasPets ? 1 : 0);
+
 	static int s_Selected = -1;
-	if(s_Selected >= (int)m_vProfiles.size())
+	if(s_Selected >= NumRows)
 		s_Selected = -1;
 
 	static CListBox s_ListBox;
@@ -1038,14 +1045,32 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		AccentColor().WithAlpha(0.14f),
 		AccentColor().WithAlpha(0.10f),
 		ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f));
-	s_ListBox.DoStart(30.0f, m_vProfiles.size(), 1, 3, s_Selected, &MainView, false);
+	s_ListBox.DoStart(30.0f, NumRows, 1, 3, s_Selected, &MainView, false);
 
 	int LoadIndex = -1;
 	int DeleteIndex = -1;
-	for(size_t i = 0; i < m_vProfiles.size(); ++i)
+	for(int DisplayRow = 0; DisplayRow < NumRows; ++DisplayRow)
 	{
-		const CProfile &Profile = m_vProfiles[i];
-		const CListboxItem Item = s_ListBox.DoNextItem(&m_vProfiles[i], (int)i == s_Selected);
+		if(HasPets && DisplayRow == PetHeaderRow)
+		{
+			s_ListBox.DoSpacing(12.0f);
+			const CListboxItem HeaderItem = s_ListBox.DoSubheader();
+			if(HeaderItem.m_Visible)
+			{
+				CUIRect HeaderLabel = HeaderItem.m_Rect;
+				HeaderLabel.VSplitLeft(10.0f, nullptr, &HeaderLabel);
+				SLabelProperties HeaderProps;
+				HeaderProps.SetColor(ColorRGBA(0.70f, 0.70f, 0.70f, 1.0f));
+				Ui()->DoLabel(&HeaderLabel, Localize("Companion pets"), 12.0f, TEXTALIGN_ML, HeaderProps);
+			}
+			s_ListBox.DoSpacing(12.0f);
+			continue;
+		}
+
+		const bool IsPetRow = HasPets && DisplayRow > PetHeaderRow;
+		const int ProfileIdx = IsPetRow ? DisplayRow - 1 : DisplayRow;
+		const CProfile &Profile = m_vProfiles[ProfileIdx];
+		const CListboxItem Item = s_ListBox.DoNextItem(&Profile, DisplayRow == s_Selected);
 		if(!Item.m_Visible)
 			continue;
 
@@ -1064,7 +1089,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		Row.VSplitLeft(ClanW + 8.0f, &ClanCol, &Row);
 		Row.VSplitLeft(24.0f, &FlagRect, &Row);
 		char aLoadCmd[64];
-		str_format(aLoadCmd, sizeof(aLoadCmd), "load_profile %d", (int)i + 1);
+		str_format(aLoadCmd, sizeof(aLoadCmd), "load_profile %d", ProfileIdx + 1);
 		Row.VSplitLeft(10.0f, nullptr, &Row);
 		Row.VSplitLeft(TextRender()->TextWidth(10.0f, aLoadCmd) + 18.0f, &CmdBox, &Row);
 
@@ -1105,7 +1130,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		LoadButton.HMargin((LoadButton.h - 18.0f) / 2.0f, &LoadButton);
 		MenuButton(LoadButton, Localize("Load"), 11.0f, Ui()->HotItem() == &Profile.m_aSkin);
 		if(Ui()->DoButtonLogic(&Profile.m_aSkin, 0, &LoadButton, BUTTONFLAG_LEFT))
-			LoadIndex = (int)i;
+			LoadIndex = ProfileIdx;
 
 		// delete button
 		const bool DeleteHovered = Ui()->HotItem() == &Profile.m_aClan;
@@ -1117,7 +1142,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		TextRender()->SetRenderFlags(0);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		if(Ui()->DoButtonLogic(&Profile.m_aClan, 0, &DeleteButton, BUTTONFLAG_LEFT))
-			DeleteIndex = (int)i;
+			DeleteIndex = ProfileIdx;
 	}
 	s_Selected = s_ListBox.DoEnd();
 
@@ -1186,6 +1211,7 @@ void CMenus::LoadProfiles()
 			m_vProfiles.push_back(Profile);
 		}
 	}
+	SortProfiles();
 	json_value_free(pData);
 }
 void CMenus::SaveMClient()
@@ -1286,6 +1312,11 @@ void CMenus::SaveMClient()
 
 	Writer.EndObject();
 }
+void CMenus::SortProfiles()
+{
+	std::stable_partition(m_vProfiles.begin(), m_vProfiles.end(), [](const CProfile &Profile) { return !Profile.m_IsPet; });
+}
+
 void CMenus::SaveProfile(bool Dummy)
 {
 	CProfile Profile;
@@ -1297,6 +1328,7 @@ void CMenus::SaveProfile(bool Dummy)
 	Profile.m_ColorBody = Dummy ? g_Config.m_ClDummyColorBody : g_Config.m_ClPlayerColorBody;
 	Profile.m_ColorFeet = Dummy ? g_Config.m_ClDummyColorFeet : g_Config.m_ClPlayerColorFeet;
 	m_vProfiles.push_back(Profile);
+	SortProfiles();
 	SaveMClient();
 }
 
@@ -1309,6 +1341,7 @@ void CMenus::SavePetProfile()
 	Profile.m_ColorBody = g_Config.m_ClMClientPetTeeColorBody;
 	Profile.m_ColorFeet = g_Config.m_ClMClientPetTeeColorFeet;
 	m_vProfiles.push_back(Profile);
+	SortProfiles();
 	SaveMClient();
 }
 
