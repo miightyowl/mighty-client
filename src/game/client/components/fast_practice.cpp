@@ -71,13 +71,15 @@ bool CFastPractice::CanRun() const
 {
 	if(Client()->State() != IClient::STATE_ONLINE)
 		return false;
-	if(!GameClient()->Predict())
-		return false;
-	if(GameClient()->m_Snap.m_SpecInfo.m_Active)
+	if(!g_Config.m_ClPredict || GameClient()->IsWorldPaused())
 		return false;
 
 	const int ClientId = GameClient()->m_Snap.m_LocalClientId;
-	if(ClientId < 0 || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
+	if(ClientId < 0 || !GameClient()->m_aClients[ClientId].m_Active)
+		return false;
+	if(GameClient()->m_Snap.m_SpecInfo.m_Active)
+		return true;
+	if(!GameClient()->Predict() || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
 		return false;
 	return GameClient()->m_PredictedWorld.GetCharacterById(ClientId) != nullptr;
 }
@@ -94,21 +96,33 @@ void CFastPractice::Start()
 {
 	if(!CanRun())
 	{
-		Notify(Localize("Fast practice needs your own tee to be alive and prediction to be on."));
+		Notify(Localize("Fast practice needs prediction to be on and either your own tee or spectator mode."));
 		return;
 	}
 
 	m_ClientId = GameClient()->m_Snap.m_LocalClientId;
 
-	const CCharacter *pChar = GameClient()->m_PredictedWorld.GetCharacterById(m_ClientId);
-	m_CheckpointCore = *pChar->Core();
-	ClearFreeze(&m_CheckpointCore);
-	m_CheckpointTick = GameClient()->m_PredictedWorld.GameTick();
-	m_CheckpointTele = GameClient()->m_Snap.m_aCharacters[m_ClientId].m_HasExtendedData ?
-				   GameClient()->m_Snap.m_aCharacters[m_ClientId].m_ExtendedData.m_TeleCheckpoint :
-				   pChar->m_TeleCheckpoint;
+	const CCharacter *pChar = GameClient()->m_Snap.m_aCharacters[m_ClientId].m_Active ?
+		GameClient()->m_PredictedWorld.GetCharacterById(m_ClientId) :
+		nullptr;
+	vec2 SpectatorSpawnPos;
+	const vec2 *pSpectatorSpawnPos = nullptr;
+	if(pChar != nullptr)
+	{
+		m_CheckpointCore = *pChar->Core();
+		ClearFreeze(&m_CheckpointCore);
+		m_CheckpointTick = GameClient()->m_PredictedWorld.GameTick();
+		m_CheckpointTele = GameClient()->m_Snap.m_aCharacters[m_ClientId].m_HasExtendedData ?
+					   GameClient()->m_Snap.m_aCharacters[m_ClientId].m_ExtendedData.m_TeleCheckpoint :
+					   pChar->m_TeleCheckpoint;
+	}
+	else
+	{
+		SpectatorSpawnPos = GameClient()->m_Camera.m_Center;
+		pSpectatorSpawnPos = &SpectatorSpawnPos;
+	}
 
-	if(!Respawn())
+	if(!Respawn(pSpectatorSpawnPos))
 	{
 		m_ClientId = -1;
 		return;
@@ -173,7 +187,7 @@ void CFastPractice::SetCheckpoint()
 	Notify(Localize("Fast practice checkpoint moved."));
 }
 
-bool CFastPractice::Respawn()
+bool CFastPractice::Respawn(const vec2 *pSpectatorSpawnPos)
 {
 	if(!CanRun())
 	{
@@ -205,6 +219,31 @@ bool CFastPractice::Respawn()
 	}
 
 	CCharacter *pChar = m_World.GetCharacterById(m_ClientId);
+	if(pChar == nullptr && pSpectatorSpawnPos != nullptr)
+	{
+		CNetObj_Character Spawn = {};
+		Spawn.m_X = round_to_int(pSpectatorSpawnPos->x);
+		Spawn.m_Y = round_to_int(pSpectatorSpawnPos->y);
+		Spawn.m_HookedPlayer = -1;
+		Spawn.m_HookState = HOOK_IDLE;
+		Spawn.m_Weapon = WEAPON_HAMMER;
+		Spawn.m_Emote = EMOTE_NORMAL;
+		Spawn.m_Tick = m_World.GameTick();
+
+		pChar = new CCharacter(&m_World, m_ClientId, &Spawn);
+		pChar->m_IsLocal = true;
+		pChar->m_GameTeam = GameClient()->m_Teams.Team(m_ClientId);
+		m_World.InsertEntity(pChar);
+		pChar->GiveWeapon(WEAPON_HAMMER);
+		pChar->GiveWeapon(WEAPON_GUN);
+		pChar->SetWeaponAmmo(WEAPON_HAMMER, -1);
+		pChar->SetWeaponAmmo(WEAPON_GUN, -1);
+
+		m_CheckpointCore = pChar->GetCore();
+		ClearFreeze(&m_CheckpointCore);
+		m_CheckpointTick = m_World.GameTick();
+		m_CheckpointTele = 0;
+	}
 	if(!pChar)
 	{
 		Stop();
@@ -266,6 +305,21 @@ void CFastPractice::TeleportTo(CCharacter *pChar, const std::vector<vec2> &vOuts
 	CGameWorld *pWorld = pChar->GameWorld();
 	CCharacterCore Core = pChar->GetCore();
 	Core.m_Pos = vOuts[pWorld->m_Core.RandomOr0(vOuts.size())];
+
+	const auto &&IsFreezeTile = [](int Tile) {
+		return Tile == TILE_FREEZE || Tile == TILE_DFREEZE || Tile == TILE_LFREEZE;
+	};
+	CCollision *pCollision = pWorld->Collision();
+	const int DestinationIndex = pCollision->GetMapIndex(Core.m_Pos);
+	const int SwitchNumber = pCollision->GetSwitchNumber(DestinationIndex);
+	const bool SwitchActive = SwitchNumber == 0 ||
+		(SwitchNumber < (int)pChar->Switchers().size() && pChar->Switchers()[SwitchNumber].m_aStatus[pChar->Team()]);
+	const bool DestinationIsFreeze = IsFreezeTile(pCollision->GetTileIndex(DestinationIndex)) ||
+		IsFreezeTile(pCollision->GetFrontTileIndex(DestinationIndex)) ||
+		(SwitchActive && IsFreezeTile(pCollision->GetSwitchType(DestinationIndex)));
+	if(!DestinationIsFreeze)
+		ClearFreeze(&Core);
+
 	if(ResetVelocity)
 		Core.m_Vel = vec2(0.0f, 0.0f);
 	pChar->SetCore(Core);
@@ -274,6 +328,11 @@ void CFastPractice::TeleportTo(CCharacter *pChar, const std::vector<vec2> &vOuts
 	pChar->m_Pos = Core.m_Pos;
 	pChar->m_PrevPos = Core.m_Pos;
 	pChar->m_PrevPrevPos = Core.m_Pos;
+	if(!DestinationIsFreeze)
+	{
+		pChar->m_FreezeTime = 0;
+		pChar->m_FrozenLastTick = false;
+	}
 }
 
 void CFastPractice::HandleTeleports(CCharacter *pChar)
@@ -449,17 +508,19 @@ bool CFastPractice::HidesTee(int ClientId) const
 		return false;
 	if(ClientId == m_ClientId)
 	{
-		return Suspended();
+		return GameClient()->m_Snap.m_SpecInfo.m_Active ||
+		       !GameClient()->m_Snap.m_aCharacters[m_ClientId].m_Active;
 	}
 	return true;
 }
 
 bool CFastPractice::Suspended() const
 {
-	return GameClient()->m_Snap.m_SpecInfo.m_Active ||
-	       m_ClientId < 0 ||
-	       !GameClient()->m_Snap.m_aCharacters[m_ClientId].m_Active ||
-	       !GameClient()->Predict();
+	if(m_ClientId < 0 || !g_Config.m_ClPredict || GameClient()->IsWorldPaused())
+		return true;
+	if(GameClient()->m_Snap.m_SpecInfo.m_Active)
+		return false;
+	return !GameClient()->m_Snap.m_aCharacters[m_ClientId].m_Active || !GameClient()->Predict();
 }
 
 void CFastPractice::ApplyAction(CCharacter *pChar, int Action)
@@ -650,7 +711,7 @@ CCharacterCore CFastPractice::ShownCore() const
 
 void CFastPractice::RenderPracticeTee()
 {
-	if(m_ClientId < 0 || !Suspended())
+	if(m_ClientId < 0 || (!GameClient()->m_Snap.m_SpecInfo.m_Active && GameClient()->m_Snap.m_aCharacters[m_ClientId].m_Active))
 		return;
 
 	const CCharacterCore Core = ShownCore();
@@ -902,6 +963,13 @@ void CFastPractice::OnUpdatePositions()
 	GameClient()->m_aClients[m_ClientId].m_RegularPredicted = Shown;
 	GameClient()->m_PredictedChar = Shown;
 	GameClient()->m_PredictedPrevChar = ShownPrev;
+
+	if(GameClient()->m_Snap.m_SpecInfo.m_Active)
+	{
+		GameClient()->m_Snap.m_SpecInfo.m_Position = Shown.m_Pos;
+		GameClient()->m_Snap.m_SpecInfo.m_UsePosition = true;
+		GameClient()->m_LocalCharacterPos = Shown.m_Pos;
+	}
 }
 
 void CFastPractice::OnRender()
