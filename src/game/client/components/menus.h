@@ -584,6 +584,7 @@ protected:
 	// user's saved player profiles
 	struct CProfile
 	{
+		bool m_IsPet = false;
 		char m_aName[MAX_NAME_LENGTH] = "";
 		char m_aClan[MAX_CLAN_LENGTH] = "";
 		int m_Country = -1;
@@ -598,6 +599,7 @@ protected:
 	// writes the combined mclient.json (profiles + bind wheel); loads profiles first if needed
 	void SaveMClient();
 	void SaveProfile(bool Dummy);
+	void SavePetProfile();
 	void ApplyProfile(const CProfile &Profile, bool Dummy);
 	static void ConLoadProfile(IConsole::IResult *pResult, void *pUserData);
 	void RenderUnfinishedVoteTeeSelection(CUIRect *pMainView);
