@@ -208,6 +208,9 @@ void CMClientDetect::OnReset()
 
 	m_PetOnSent = false;
 	m_aPetSkinSent[0] = '\0';
+	m_PetUseCustomColorSent = false;
+	m_PetColorBodySent = 0;
+	m_PetColorFeetSent = 0;
 	m_PetLocalId = -1;
 	m_PetCooldown = 0.0f;
 	m_QueuedPetOn = false;
@@ -560,10 +563,13 @@ void CMClientDetect::RestoreColorBeacon()
 	m_ColorRestoreAttemptTick = CurrentTick;
 }
 
-void CMClientDetect::LocalPet(bool *pOn, char *pSkin, int SkinSize) const
+void CMClientDetect::LocalPet(bool *pOn, char *pSkin, int SkinSize, bool *pUseCustomColor, int *pColorBody, int *pColorFeet) const
 {
 	*pOn = g_Config.m_ClMClientPetTee != 0;
 	str_copy(pSkin, g_Config.m_ClMClientForceSkin ? "maodie" : g_Config.m_ClMClientPetTeeSkin, SkinSize);
+	*pUseCustomColor = g_Config.m_ClMClientPetTeeUseCustomColor != 0;
+	*pColorBody = g_Config.m_ClMClientPetTeeColorBody;
+	*pColorFeet = g_Config.m_ClMClientPetTeeColorFeet;
 }
 
 bool CMClientDetect::PetAudience() const
@@ -594,13 +600,19 @@ void CMClientDetect::UpdatePet()
 
 	bool On;
 	char aSkin[MAX_SKIN_LENGTH];
-	LocalPet(&On, aSkin, sizeof(aSkin));
+	bool UseCustomColor;
+	int ColorBody, ColorFeet;
+	LocalPet(&On, aSkin, sizeof(aSkin), &UseCustomColor, &ColorBody, &ColorFeet);
 
-	if(On != m_PetOnSent || str_comp(aSkin, m_aPetSkinSent) != 0)
+	if(On != m_PetOnSent || str_comp(aSkin, m_aPetSkinSent) != 0 ||
+		UseCustomColor != m_PetUseCustomColorSent || ColorBody != m_PetColorBodySent || ColorFeet != m_PetColorFeetSent)
 	{
 		ForgetPetTold();
 		m_PetOnSent = On;
 		str_copy(m_aPetSkinSent, aSkin);
+		m_PetUseCustomColorSent = UseCustomColor;
+		m_PetColorBodySent = ColorBody;
+		m_PetColorFeetSent = ColorFeet;
 	}
 
 	if(!PetAudience())
@@ -613,12 +625,12 @@ void CMClientDetect::UpdatePet()
 		CPeer &Peer = m_aPeers[ClientId];
 		if(!Peer.m_Detected || Peer.m_PetTold)
 			continue;
-		SendPetWhisper(ClientId, On, aSkin);
+		SendPetWhisper(ClientId, On, aSkin, UseCustomColor, ColorBody, ColorFeet);
 		Peer.m_PetTold = true;
 	}
 }
 
-void CMClientDetect::SendPetWhisper(int ClientId, bool On, const char *pSkin)
+void CMClientDetect::SendPetWhisper(int ClientId, bool On, const char *pSkin, bool UseCustomColor, int ColorBody, int ColorFeet)
 {
 	char aEncodedSkin[2 * MAX_SKIN_LENGTH];
 	if(!On)
@@ -627,8 +639,13 @@ void CMClientDetect::SendPetWhisper(int ClientId, bool On, const char *pSkin)
 		HexEncode(pSkin, aEncodedSkin, sizeof(aEncodedSkin));
 	if(On && aEncodedSkin[0] == '\0')
 		str_copy(aEncodedSkin, "-");
-	char aMessage[128];
-	str_format(aMessage, sizeof(aMessage), "%s%s", PET_WHISPER_PREFIX, aEncodedSkin);
+	char aMessage[192];
+	if(!On)
+		str_format(aMessage, sizeof(aMessage), "%s%s", PET_WHISPER_PREFIX, aEncodedSkin);
+	else if(UseCustomColor)
+		str_format(aMessage, sizeof(aMessage), "%s%s 1 %08x %08x", PET_WHISPER_PREFIX, aEncodedSkin, (unsigned)ColorBody, (unsigned)ColorFeet);
+	else
+		str_format(aMessage, sizeof(aMessage), "%s%s 0", PET_WHISPER_PREFIX, aEncodedSkin);
 	GameClient()->m_MiniGames.QueueWhisper(ClientId, aMessage);
 }
 
@@ -923,6 +940,9 @@ void CMClientDetect::OnPetBeacon(int ClientId)
 	const int Head = Peer.m_aPayload[0] * EMOTE_RADIX + Peer.m_aPayload[1];
 	Peer.m_PetOn = Head != PET_HEAD_NONE;
 	Peer.m_aPetSkin[0] = '\0';
+	Peer.m_PetUseCustomColor = false;
+	Peer.m_PetColorBody = 0;
+	Peer.m_PetColorFeet = 0;
 
 	const bool Wide = Head > PET_HEAD_WIDE;
 	const int NameLen = Wide ? Head - PET_HEAD_WIDE : Head;
@@ -948,15 +968,20 @@ void CMClientDetect::OnPetBeacon(int ClientId)
 	str_copy(Peer.m_aPetSkin, aSkin);
 }
 
-const char *CMClientDetect::PetSkin(int ClientId) const
+CMClientDetect::SPetAppearance CMClientDetect::PetAppearance(int ClientId) const
 {
+	SPetAppearance Appearance;
 	if(!Enabled() || ClientId < 0 || ClientId >= MAX_CLIENTS)
-		return nullptr;
+		return Appearance;
 
 	const CPeer &Peer = m_aPeers[ClientId];
 	if(!Peer.m_Detected || !Peer.m_PetOn)
-		return nullptr;
-	return Peer.m_aPetSkin[0] == '\0' ? "default" : Peer.m_aPetSkin;
+		return Appearance;
+	Appearance.m_pSkin = Peer.m_aPetSkin[0] == '\0' ? "default" : Peer.m_aPetSkin;
+	Appearance.m_UseCustomColor = Peer.m_PetUseCustomColor;
+	Appearance.m_ColorBody = Peer.m_PetColorBody;
+	Appearance.m_ColorFeet = Peer.m_PetColorFeet;
+	return Appearance;
 }
 
 bool CMClientDetect::OnWhisper(int ClientId, int Team, const char *pMessage)
@@ -974,7 +999,11 @@ bool CMClientDetect::OnWhisper(int ClientId, int Team, const char *pMessage)
 		return true;
 
 	char aEncodedSkin[2 * MAX_SKIN_LENGTH] = "";
-	if(sscanf(pArgs, "%46s", aEncodedSkin) != 1)
+	int UseCustomColor = 0;
+	char aColorBody[16] = "";
+	char aColorFeet[16] = "";
+	const int Tokens = sscanf(pArgs, "%46s %d %15s %15s", aEncodedSkin, &UseCustomColor, aColorBody, aColorFeet);
+	if(Tokens < 1)
 		return true;
 
 	char aSkin[MAX_SKIN_LENGTH];
@@ -986,6 +1015,19 @@ bool CMClientDetect::OnWhisper(int ClientId, int Team, const char *pMessage)
 
 	Peer.m_PetOn = On;
 	str_copy(Peer.m_aPetSkin, aSkin);
+	Peer.m_PetUseCustomColor = false;
+	Peer.m_PetColorBody = 0;
+	Peer.m_PetColorFeet = 0;
+	if(On && Tokens >= 4 && UseCustomColor)
+	{
+		unsigned ColorBody = 0, ColorFeet = 0;
+		if(sscanf(aColorBody, "%x", &ColorBody) == 1 && sscanf(aColorFeet, "%x", &ColorFeet) == 1)
+		{
+			Peer.m_PetUseCustomColor = true;
+			Peer.m_PetColorBody = (int)ColorBody;
+			Peer.m_PetColorFeet = (int)ColorFeet;
+		}
+	}
 	return true;
 }
 

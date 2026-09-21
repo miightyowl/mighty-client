@@ -26,7 +26,7 @@ class CPetTee : public CComponent
 
 	static void PickWanderOffset(CPet &Pet, float Time, float Scale);
 	static void PickGazeTarget(CPet &Pet, float Time);
-	void RenderPet(int ClientId, const char *pSkinName, float Scale, float Alpha);
+	void RenderPet(int ClientId, const char *pSkinName, bool UseCustomColor, int ColorBody, int ColorFeet, float Scale, float Alpha);
 
 public:
 	int Sizeof() const override { return sizeof(*this); }

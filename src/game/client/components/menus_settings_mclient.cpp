@@ -317,6 +317,7 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 
 	CTeeRenderInfo OwnSkinInfo;
 	OwnSkinInfo.Apply(pOwnSkinContainer == nullptr || pOwnSkinContainer->Skin() == nullptr ? pDefaultSkin : pOwnSkinContainer->Skin().get());
+	OwnSkinInfo.ApplyColors(g_Config.m_ClMClientPetTeeUseCustomColor, g_Config.m_ClMClientPetTeeColorBody, g_Config.m_ClMClientPetTeeColorFeet);
 	OwnSkinInfo.m_Size = 50.0f;
 
 	// Preview tee + skin name edit box
@@ -349,6 +350,29 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 	}
 
 	MainView.HSplitTop(5.0f, nullptr, &MainView);
+
+	// custom colors
+	MainView.HSplitTop(20.0f, &Button, &MainView);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientPetTeeUseCustomColor, Localize("Custom colors"), g_Config.m_ClMClientPetTeeUseCustomColor, &Button))
+	{
+		g_Config.m_ClMClientPetTeeUseCustomColor ^= 1;
+	}
+	MainView.HSplitTop(5.0f, nullptr, &MainView);
+	if(g_Config.m_ClMClientPetTeeUseCustomColor)
+	{
+		CUIRect CustomColors, aRects[2];
+		MainView.HSplitTop(95.0f, &CustomColors, &MainView);
+		CustomColors.VSplitMid(&aRects[0], &aRects[1], 20.0f);
+		unsigned *apColors[] = {&g_Config.m_ClMClientPetTeeColorBody, &g_Config.m_ClMClientPetTeeColorFeet};
+		const char *apParts[] = {Localize("Body"), Localize("Feet")};
+		for(int i = 0; i < 2; i++)
+		{
+			aRects[i].HSplitTop(20.0f, &Label, &aRects[i]);
+			Ui()->DoLabel(&Label, apParts[i], 14.0f, TEXTALIGN_ML);
+			RenderHslaScrollbars(&aRects[i], apColors[i], false, ColorHSLA::DARKEST_LGT);
+		}
+		MainView.HSplitTop(5.0f, nullptr, &MainView);
+	}
 
 	// Bottom controls
 	CUIRect BottomBar, QuickSearch, SortDropDown, DatabaseButton, DdstatsButton, DirectoryButton, RefreshButton;
