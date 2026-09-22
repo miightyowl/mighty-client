@@ -38,7 +38,7 @@ public:
 	bool IsActive() const { return m_State != STATE_IDLE; }
 
 	bool OnWhisper(int ClientId, int Team, const char *pMessage);
-	void QueueWhisper(int ClientId, const char *pMessage);
+	void QueueWhisper(int ClientId, const char *pMessage, bool Priority = false, int ReplaceKey = 0);
 
 	void OnChatMessage(int ClientId, const char *pMessage);
 
@@ -106,7 +106,13 @@ private:
 	bool m_ShowKeyHint = false;
 	float m_AcceptDeadline = 0.0f;
 
-	std::vector<std::string> m_vSendQueue;
+	struct CQueuedWhisper
+	{
+		int m_ClientId;
+		int m_ReplaceKey;
+		std::string m_Command;
+	};
+	std::vector<CQueuedWhisper> m_vSendQueue;
 	float m_NextSendTime = 0.0f;
 	float m_ChatScore = 0.0f;
 	float m_ChatScoreTime = 0.0f;
@@ -189,7 +195,7 @@ private:
 	void StartGame(int OpponentId, bool Challenger);
 	void ResetTag();
 	void UpdateTagLobby();
-	void SendTagRoster(char Verb);
+	void SendTagRoster(char Verb, int PriorityClientId = -1);
 	bool ParseTagRoster(const char *pText, int *pIds, int &NumIds, int &LobbyId) const;
 	void StartTag();
 	void BeginTagCountdown();
@@ -200,7 +206,7 @@ private:
 	bool IsTagAdmin() const;
 	int NumTagAccepted() const;
 
-	void SendTo(int ClientId, const char *pMessage);
+	void SendTo(int ClientId, const char *pMessage, bool Priority = false, int ReplaceKey = 0);
 	void SendProtocol(const char *pMessage, int MaxRetries);
 	void FlushSendQueue();
 	void UpdateRetry();

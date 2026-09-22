@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace
 {
@@ -58,9 +59,10 @@ namespace
 	const int TAG_FRAME_HIT = 1;
 	const int TAG_FRAME_PAYLOAD = 8;
 	const int TAG_COUNTDOWN_SECONDS = 5;
-	const float TAG_HIT_RADIUS = 48.0f;
+	const float TAG_HIT_RADIUS = 64.0f;
 	const float TAG_HAMMER_REACH = 96.0f;
 	const int TAG_START_MAX_RETRIES = 3;
+	const int SEND_REPLACE_TAG_ROSTER = 1;
 
 	const float EMOTE_ECHO_TIMEOUT = 2.0f;
 	const int MAX_EMOTE_RETRIES = 4;
@@ -564,7 +566,7 @@ bool CMiniGames::ParseTagRoster(const char *pText, int *pIds, int &NumIds, int &
 	return true;
 }
 
-void CMiniGames::SendTagRoster(char Verb)
+void CMiniGames::SendTagRoster(char Verb, int PriorityClientId)
 {
 	int aIds[TAG_MAX_PLAYERS];
 	int NumIds = 0;
@@ -593,10 +595,12 @@ void CMiniGames::SendTagRoster(char Verb)
 		str_format(aId, sizeof(aId), " %d", aIds[i]);
 		str_append(aMessage, aId, sizeof(aMessage));
 	}
+	if(PriorityClientId != m_TagAdminId && PriorityClientId >= 0 && PriorityClientId < MAX_CLIENTS && m_aTagAccepted[PriorityClientId])
+		SendTo(PriorityClientId, aMessage, true, SEND_REPLACE_TAG_ROSTER);
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
 	{
-		if(ClientId != m_TagAdminId && m_aTagAccepted[ClientId])
-			SendTo(ClientId, aMessage);
+		if(ClientId != m_TagAdminId && ClientId != PriorityClientId && m_aTagAccepted[ClientId])
+			SendTo(ClientId, aMessage, false, SEND_REPLACE_TAG_ROSTER);
 	}
 }
 
@@ -835,7 +839,7 @@ void CMiniGames::OnHammerHit(vec2 Position)
 		if(ClientId == TargetId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
 			continue;
 		const auto &Attacker = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
-		if(Attacker.m_Weapon == WEAPON_HAMMER && Now - Attacker.m_AttackTick >= 0 && Now - Attacker.m_AttackTick <= Client()->GameTickSpeed() / 2 && distance(vec2(Attacker.m_X, Attacker.m_Y), TargetPos) <= TAG_HAMMER_REACH)
+		if(distance(vec2(Attacker.m_X, Attacker.m_Y), TargetPos) <= TAG_HAMMER_REACH)
 		{
 			ValidAttacker = true;
 			break;
@@ -874,7 +878,7 @@ void CMiniGames::StartGame(int OpponentId, bool Challenger)
 	ResetEmoteChannel();
 }
 
-void CMiniGames::QueueWhisper(int ClientId, const char *pMessage)
+void CMiniGames::QueueWhisper(int ClientId, const char *pMessage, bool Priority, int ReplaceKey)
 {
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !GameClient()->m_aClients[ClientId].m_Active)
 		return;
@@ -892,14 +896,24 @@ void CMiniGames::QueueWhisper(int ClientId, const char *pMessage)
 
 	char aLine[256];
 	str_format(aLine, sizeof(aLine), "/w \"%s\" %s", aName, pMessage);
-	m_vSendQueue.emplace_back(aLine);
+	if(ReplaceKey != 0)
+	{
+		m_vSendQueue.erase(std::remove_if(m_vSendQueue.begin(), m_vSendQueue.end(), [ClientId, ReplaceKey](const CQueuedWhisper &Queued) {
+			return Queued.m_ClientId == ClientId && Queued.m_ReplaceKey == ReplaceKey;
+		}), m_vSendQueue.end());
+	}
+	CQueuedWhisper Queued{ClientId, ReplaceKey, aLine};
+	if(Priority)
+		m_vSendQueue.insert(m_vSendQueue.begin(), std::move(Queued));
+	else
+		m_vSendQueue.push_back(std::move(Queued));
 }
 
-void CMiniGames::SendTo(int ClientId, const char *pMessage)
+void CMiniGames::SendTo(int ClientId, const char *pMessage, bool Priority, int ReplaceKey)
 {
 	char aProtocolMessage[256];
 	str_format(aProtocolMessage, sizeof(aProtocolMessage), "%s%s", PROTOCOL_PREFIX, pMessage);
-	QueueWhisper(ClientId, aProtocolMessage);
+	QueueWhisper(ClientId, aProtocolMessage, Priority, ReplaceKey);
 }
 
 void CMiniGames::SendProtocol(const char *pMessage, int MaxRetries)
@@ -940,7 +954,7 @@ void CMiniGames::FlushSendQueue()
 	if(m_ChatScore + CHAT_SCORE_PENALTY > CHAT_SCORE_BUDGET)
 		return;
 
-	GameClient()->m_Chat.SendChat(0, m_vSendQueue.front().c_str());
+	GameClient()->m_Chat.SendChat(0, m_vSendQueue.front().m_Command.c_str());
 	m_vSendQueue.erase(m_vSendQueue.begin());
 	m_ChatScore += CHAT_SCORE_PENALTY;
 	m_NextSendTime = Now + SEND_INTERVAL;
@@ -1679,7 +1693,7 @@ bool CMiniGames::OnWhisper(int ClientId, int Team, const char *pMessage)
 			if(str_toint(pRest, &LobbyId) && LobbyId == m_TagLobbyId && m_aTagInvited[ClientId] && (m_aTagAccepted[ClientId] || NumTagAccepted() < TAG_MAX_PLAYERS))
 			{
 				m_aTagAccepted[ClientId] = true;
-				SendTagRoster('L');
+				SendTagRoster('L', ClientId);
 			}
 		}
 		else if(FromOpponent && (m_State == STATE_CALLING || m_State == STATE_RINGING))
