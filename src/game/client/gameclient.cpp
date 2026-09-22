@@ -4044,6 +4044,7 @@ void CGameClient::HandlePredictedEvents(const int Tick)
 			}
 			else if(EventsIterator->m_EventId == NETEVENTTYPE_HAMMERHIT)
 			{
+				m_MiniGames.OnHammerHit(EventsIterator->m_Pos, EventsIterator->m_Id);
 				m_Effects.HammerHit(EventsIterator->m_Pos, Alpha, Volume);
 			}
 			else if(EventsIterator->m_EventId == NETEVENTTYPE_DAMAGEIND)

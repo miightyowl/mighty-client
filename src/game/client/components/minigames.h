@@ -43,7 +43,7 @@ public:
 	void OnChatMessage(int ClientId, const char *pMessage);
 
 	bool OnEmoticon(int ClientId, int Emoticon);
-	void OnHammerHit(vec2 Position);
+	void OnHammerHit(vec2 Position, int AttackerId = -1);
 	bool IsTagTarget(int ClientId) const;
 
 	bool QueueManualEmote(int Emoticon);
@@ -135,6 +135,7 @@ private:
 	bool m_ShowAllForEmoteGame = false;
 
 	int m_FrameOp = -1;
+	int m_FrameClientId = -1;
 	int m_FrameExpect = 0;
 	int m_FrameLen = 0;
 	int m_aFrame[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -221,7 +222,7 @@ private:
 	void ResetEmoteChannel();
 	void SetEmoteGameShowAll(bool Enable);
 	bool HandleEmoteEcho(int Emoticon);
-	bool HandleEmoteFrame(int Emoticon);
+	bool HandleEmoteFrame(int ClientId, int Emoticon);
 	void ProcessFrame();
 	void PlayCell(int Cell);
 	void ChessClick(int Square);
