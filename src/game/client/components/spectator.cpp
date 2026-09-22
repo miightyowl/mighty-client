@@ -89,7 +89,7 @@ void CSpectator::ConKeySpectator(IConsole::IResult *pResult, void *pUserData)
 	if(pSelf->GameClient()->m_Scoreboard.IsActive())
 		return;
 
-	if(pSelf->GameClient()->m_Snap.m_SpecInfo.m_Active || pSelf->Client()->State() == IClient::STATE_DEMOPLAYBACK)
+	if((pSelf->GameClient()->m_Snap.m_SpecInfo.m_Active && !pSelf->GameClient()->m_FastPractice.OwnsSpectatorState()) || pSelf->Client()->State() == IClient::STATE_DEMOPLAYBACK)
 		pSelf->m_Active = pResult->GetInteger(0) != 0;
 	else
 		pSelf->m_Active = false;
@@ -175,7 +175,7 @@ bool CSpectator::OnInput(const IInput::CEvent &Event)
 
 	if(g_Config.m_ClSpectatorMouseclicks)
 	{
-		if(GameClient()->m_Snap.m_SpecInfo.m_Active && !IsActive() && !GameClient()->m_MultiViewActivated &&
+		if(GameClient()->m_Snap.m_SpecInfo.m_Active && !GameClient()->m_FastPractice.OwnsSpectatorState() && !IsActive() && !GameClient()->m_MultiViewActivated &&
 			!Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive() && !GameClient()->m_Menus.IsActive())
 		{
 			if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_MOUSE_1)

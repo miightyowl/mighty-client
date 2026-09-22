@@ -143,7 +143,9 @@ void CControls::ConKeyInputState(IConsole::IResult *pResult, void *pUserData)
 {
 	CInputState *pState = (CInputState *)pUserData;
 
-	if(pState->m_pControls->GameClient()->m_GameInfo.m_BugDDRaceInput && pState->m_pControls->GameClient()->m_Snap.m_SpecInfo.m_Active)
+	if(pState->m_pControls->GameClient()->m_GameInfo.m_BugDDRaceInput &&
+		pState->m_pControls->GameClient()->m_Snap.m_SpecInfo.m_Active &&
+		!pState->m_pControls->GameClient()->m_FastPractice.UsesPlayerControls())
 		return;
 
 	*pState->m_apVariables[g_Config.m_ClDummy] = pResult->GetInteger(0);
@@ -152,7 +154,9 @@ void CControls::ConKeyInputState(IConsole::IResult *pResult, void *pUserData)
 void CControls::ConKeyEdgeJump(IConsole::IResult *pResult, void *pUserData)
 {
 	CControls *pSelf = (CControls *)pUserData;
-	if(pSelf->GameClient()->m_GameInfo.m_BugDDRaceInput && pSelf->GameClient()->m_Snap.m_SpecInfo.m_Active)
+	if(pSelf->GameClient()->m_GameInfo.m_BugDDRaceInput &&
+		pSelf->GameClient()->m_Snap.m_SpecInfo.m_Active &&
+		!pSelf->GameClient()->m_FastPractice.UsesPlayerControls())
 		return;
 
 	const int Dummy = g_Config.m_ClDummy;
@@ -208,7 +212,10 @@ void CControls::ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData)
 {
 	CInputState *pState = (CInputState *)pUserData;
 
-	if((pState->m_pControls->GameClient()->m_GameInfo.m_BugDDRaceInput && pState->m_pControls->GameClient()->m_Snap.m_SpecInfo.m_Active) || pState->m_pControls->GameClient()->m_Spectator.IsActive())
+	if((pState->m_pControls->GameClient()->m_GameInfo.m_BugDDRaceInput &&
+		   pState->m_pControls->GameClient()->m_Snap.m_SpecInfo.m_Active &&
+		   !pState->m_pControls->GameClient()->m_FastPractice.UsesPlayerControls()) ||
+		pState->m_pControls->GameClient()->m_Spectator.IsActive())
 		return;
 
 	int *pVariable = pState->m_apVariables[g_Config.m_ClDummy];
@@ -575,7 +582,7 @@ bool CControls::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 		}
 	}
 
-	if(GameClient()->m_Snap.m_SpecInfo.m_Active && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId < 0)
+	if(GameClient()->m_Snap.m_SpecInfo.m_Active && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId < 0 && !GameClient()->m_FastPractice.UsesPlayerControls())
 		Factor *= GameClient()->m_Camera.m_Zoom;
 
 	m_aMousePos[g_Config.m_ClDummy] += vec2(x, y) * Factor;
@@ -586,7 +593,7 @@ bool CControls::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 
 void CControls::ClampMousePos()
 {
-	if(GameClient()->m_Snap.m_SpecInfo.m_Active && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId < 0)
+	if(GameClient()->m_Snap.m_SpecInfo.m_Active && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId < 0 && !GameClient()->m_FastPractice.UsesPlayerControls())
 	{
 		m_aMousePos[g_Config.m_ClDummy].x = std::clamp(m_aMousePos[g_Config.m_ClDummy].x, -201.0f * 32, (Collision()->GetWidth() + 201.0f) * 32.0f);
 		m_aMousePos[g_Config.m_ClDummy].y = std::clamp(m_aMousePos[g_Config.m_ClDummy].y, -201.0f * 32, (Collision()->GetHeight() + 201.0f) * 32.0f);

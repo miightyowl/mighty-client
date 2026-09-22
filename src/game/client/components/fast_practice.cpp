@@ -53,6 +53,10 @@ void CFastPractice::Notify(const char *pMessage)
 void CFastPractice::OnReset()
 {
 	m_Active = false;
+	m_StartedInSpectator = false;
+	m_PracticePaused = false;
+	m_HasSpectatorStart = false;
+	m_SpectatorStartClientId = -1;
 	m_ClientId = -1;
 	m_LastTick = 0;
 	m_CheckpointTick = 0;
@@ -101,13 +105,22 @@ void CFastPractice::Start()
 	}
 
 	m_ClientId = GameClient()->m_Snap.m_LocalClientId;
+	m_StartedInSpectator = GameClient()->m_Snap.m_SpecInfo.m_Active;
+	m_PracticePaused = false;
 
 	const CCharacter *pChar = GameClient()->m_Snap.m_aCharacters[m_ClientId].m_Active ?
-		GameClient()->m_PredictedWorld.GetCharacterById(m_ClientId) :
-		nullptr;
+					  GameClient()->m_PredictedWorld.GetCharacterById(m_ClientId) :
+					  nullptr;
 	vec2 SpectatorSpawnPos;
 	const vec2 *pSpectatorSpawnPos = nullptr;
-	if(pChar != nullptr)
+	if(m_StartedInSpectator && m_HasSpectatorStart && m_SpectatorStartClientId == m_ClientId)
+	{
+		m_CheckpointCore = m_SpectatorStartCore;
+		ClearFreeze(&m_CheckpointCore);
+		m_CheckpointTick = m_SpectatorStartTick;
+		m_CheckpointTele = m_SpectatorStartTele;
+	}
+	else if(pChar != nullptr)
 	{
 		m_CheckpointCore = *pChar->Core();
 		ClearFreeze(&m_CheckpointCore);
@@ -118,12 +131,19 @@ void CFastPractice::Start()
 	}
 	else
 	{
-		SpectatorSpawnPos = GameClient()->m_Camera.m_Center;
+		if(GameClient()->m_Snap.m_SpecInfo.m_UsePosition)
+			SpectatorSpawnPos = GameClient()->m_Snap.m_SpecInfo.m_Position;
+		else if(GameClient()->m_Snap.m_SpecInfo.m_SpectatorId == SPEC_FREEVIEW)
+			SpectatorSpawnPos = GameClient()->m_Controls.m_aMousePos[g_Config.m_ClDummy];
+		else
+			SpectatorSpawnPos = GameClient()->m_Camera.m_Center;
 		pSpectatorSpawnPos = &SpectatorSpawnPos;
 	}
 
 	if(!Respawn(pSpectatorSpawnPos))
 	{
+		m_StartedInSpectator = false;
+		m_PracticePaused = false;
 		m_ClientId = -1;
 		return;
 	}
@@ -136,6 +156,28 @@ void CFastPractice::Start()
 		m_FrozenInput.m_TargetY = -1;
 
 	m_Active = true;
+}
+
+void CFastPractice::CaptureSpectatorStart()
+{
+	m_HasSpectatorStart = false;
+	m_SpectatorStartClientId = -1;
+
+	const int ClientId = GameClient()->m_Snap.m_LocalClientId;
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
+		return;
+
+	const CCharacter *pChar = GameClient()->m_PredictedWorld.GetCharacterById(ClientId);
+	if(pChar == nullptr)
+		return;
+
+	m_SpectatorStartCore = *pChar->Core();
+	m_SpectatorStartTick = GameClient()->m_PredictedWorld.GameTick();
+	m_SpectatorStartTele = GameClient()->m_Snap.m_aCharacters[ClientId].m_HasExtendedData ?
+						   GameClient()->m_Snap.m_aCharacters[ClientId].m_ExtendedData.m_TeleCheckpoint :
+						   pChar->m_TeleCheckpoint;
+	m_SpectatorStartClientId = ClientId;
+	m_HasSpectatorStart = true;
 }
 
 void CFastPractice::Stop()
@@ -172,6 +214,8 @@ void CFastPractice::Stop()
 		}
 	}
 	m_ClientId = -1;
+	m_StartedInSpectator = false;
+	m_PracticePaused = false;
 }
 
 void CFastPractice::SetCheckpoint()
@@ -518,8 +562,10 @@ bool CFastPractice::Suspended() const
 {
 	if(m_ClientId < 0 || !g_Config.m_ClPredict || GameClient()->IsWorldPaused())
 		return true;
+	if(m_PracticePaused)
+		return true;
 	if(GameClient()->m_Snap.m_SpecInfo.m_Active)
-		return false;
+		return !m_StartedInSpectator;
 	return !GameClient()->m_Snap.m_aCharacters[m_ClientId].m_Active || !GameClient()->Predict();
 }
 
@@ -964,11 +1010,19 @@ void CFastPractice::OnUpdatePositions()
 	GameClient()->m_PredictedChar = Shown;
 	GameClient()->m_PredictedPrevChar = ShownPrev;
 
-	if(GameClient()->m_Snap.m_SpecInfo.m_Active)
+	if(OwnsSpectatorState())
 	{
-		GameClient()->m_Snap.m_SpecInfo.m_Position = Shown.m_Pos;
-		GameClient()->m_Snap.m_SpecInfo.m_UsePosition = true;
-		GameClient()->m_LocalCharacterPos = Shown.m_Pos;
+		if(m_PracticePaused)
+		{
+			GameClient()->m_Snap.m_SpecInfo.m_SpectatorId = SPEC_FREEVIEW;
+			GameClient()->m_Snap.m_SpecInfo.m_UsePosition = false;
+		}
+		else
+		{
+			GameClient()->m_Snap.m_SpecInfo.m_Position = Shown.m_Pos;
+			GameClient()->m_Snap.m_SpecInfo.m_UsePosition = true;
+			GameClient()->m_LocalCharacterPos = Shown.m_Pos;
+		}
 	}
 }
 
@@ -1007,7 +1061,7 @@ bool CFastPractice::OnKill()
 
 bool CFastPractice::OnChatCommand(const char *pLine)
 {
-	if(!m_Active || pLine == nullptr || pLine[0] != '/')
+	if(pLine == nullptr || pLine[0] != '/')
 		return false;
 
 	char aCommand[32];
@@ -1020,6 +1074,24 @@ bool CFastPractice::OnChatCommand(const char *pLine)
 	}
 	aCommand[Length] = '\0';
 	const char *pArgument = str_skip_whitespaces_const(pRest + Length);
+
+	if(str_comp_nocase(aCommand, "spec") == 0)
+	{
+		if(m_Active)
+			Stop();
+		else
+			CaptureSpectatorStart();
+		return false;
+	}
+
+	if(!m_Active)
+		return false;
+
+	if(str_comp_nocase(aCommand, "pause") == 0 && m_StartedInSpectator)
+	{
+		m_PracticePaused = !m_PracticePaused;
+		return true;
+	}
 
 	static const struct
 	{
