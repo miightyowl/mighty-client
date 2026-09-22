@@ -21,6 +21,8 @@ public:
 	void OnRender() override;
 
 	bool IsActive() const { return m_Active; }
+	bool OwnsSpectatorState() const { return m_Active && m_StartedInSpectator; }
+	bool UsesPlayerControls() const { return OwnsSpectatorState() && !m_PracticePaused; }
 
 	bool HidesTee(int ClientId) const;
 
@@ -46,6 +48,13 @@ private:
 	static constexpr int MAX_CATCHUP_TICKS = 10;
 
 	bool m_Active = false;
+	bool m_StartedInSpectator = false;
+	bool m_PracticePaused = false;
+	bool m_HasSpectatorStart = false;
+	int m_SpectatorStartClientId = -1;
+	CCharacterCore m_SpectatorStartCore;
+	int m_SpectatorStartTick = 0;
+	int m_SpectatorStartTele = 0;
 	int m_ClientId = -1;
 	int m_LastTick = 0;
 
@@ -93,6 +102,7 @@ private:
 	};
 
 	void Notify(const char *pMessage);
+	void CaptureSpectatorStart();
 
 	bool CanRun() const;
 	void Toggle();

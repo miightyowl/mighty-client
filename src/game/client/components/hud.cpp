@@ -765,7 +765,7 @@ void CHud::RenderCursor()
 	CScreenRect ScreenRect = Graphics()->MapScreenToWorld(Center.x, Center.y, 100.0f, 100.0f, 100.0f, 0, 0, Graphics()->ScreenAspect(), 1.0f);
 	Graphics()->MapScreen(ScreenRect);
 
-	if(Client()->State() != IClient::STATE_DEMOPLAYBACK && GameClient()->m_Snap.m_pLocalCharacter)
+	if(Client()->State() != IClient::STATE_DEMOPLAYBACK && (GameClient()->m_Snap.m_pLocalCharacter || GameClient()->m_FastPractice.UsesPlayerControls()))
 	{
 		// Render local cursor
 		CurWeapon = std::max(0, GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_Predicted.m_ActiveWeapon);

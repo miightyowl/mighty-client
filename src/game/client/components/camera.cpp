@@ -116,7 +116,7 @@ void CCamera::ResetAutoSpecCamera()
 void CCamera::UpdateCamera()
 {
 	// use hardcoded smooth camera for spectating unless player explicitly turn it off
-	bool CanUseCameraInfo = !GameClient()->m_MultiViewActivated;
+	bool CanUseCameraInfo = !GameClient()->m_MultiViewActivated && !GameClient()->m_FastPractice.OwnsSpectatorState();
 	if(Client()->State() == IClient::STATE_DEMOPLAYBACK)
 	{
 		// only follow mode have the correct camera info
