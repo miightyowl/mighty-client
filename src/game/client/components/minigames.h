@@ -43,7 +43,6 @@ public:
 	void OnChatMessage(int ClientId, const char *pMessage);
 
 	bool OnEmoticon(int ClientId, int Emoticon);
-	void OnHammerHit(vec2 Position, int AttackerId = -1);
 	bool IsTagTarget(int ClientId) const;
 
 	bool QueueManualEmote(int Emoticon);
@@ -135,7 +134,6 @@ private:
 	bool m_ShowAllForEmoteGame = false;
 
 	int m_FrameOp = -1;
-	int m_FrameClientId = -1;
 	int m_FrameExpect = 0;
 	int m_FrameLen = 0;
 	int m_aFrame[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -173,6 +171,7 @@ private:
 	bool m_aTagReady[MAX_CLIENTS] = {false};
 	int m_aTagOrder[TAG_MAX_PLAYERS] = {0};
 	int m_aTagTimeCs[MAX_CLIENTS] = {0};
+	int m_aTagLastAttackTick[MAX_CLIENTS] = {0};
 
 	const char *GameName() const;
 	bool AmWhite() const { return m_MyMark == 'X'; }
@@ -196,6 +195,7 @@ private:
 	void StartGame(int OpponentId, bool Challenger);
 	void ResetTag();
 	void UpdateTagLobby();
+	void UpdateTagHitDetection();
 	void SendTagRoster(char Verb, int PriorityClientId = -1);
 	bool ParseTagRoster(const char *pText, int *pIds, int &NumIds, int &LobbyId) const;
 	void StartTag();
@@ -222,7 +222,7 @@ private:
 	void ResetEmoteChannel();
 	void SetEmoteGameShowAll(bool Enable);
 	bool HandleEmoteEcho(int Emoticon);
-	bool HandleEmoteFrame(int ClientId, int Emoticon);
+	bool HandleEmoteFrame(int Emoticon);
 	void ProcessFrame();
 	void PlayCell(int Cell);
 	void ChessClick(int Square);
