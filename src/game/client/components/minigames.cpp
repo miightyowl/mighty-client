@@ -250,7 +250,7 @@ bool CMiniGames::NeedsAttention() const
 bool CMiniGames::ViewShown() const
 {
 	if(m_Game == GAME_TAG)
-		return m_State == STATE_INVITED || m_State == STATE_TAG_LOBBY || m_TagPhase == TAG_PHASE_RESULTS;
+		return m_State == STATE_INVITED || (m_State == STATE_TAG_LOBBY && m_ViewActive) || m_TagPhase == TAG_PHASE_RESULTS;
 	if(m_State == STATE_INVITED || m_State == STATE_PLAYING)
 		return m_ViewActive;
 	return m_ViewActive && m_State == STATE_OVER && m_HasBoard;
@@ -360,7 +360,7 @@ void CMiniGames::HideView()
 {
 	if(m_State == STATE_GAMES || m_State == STATE_SELECT)
 		Close();
-	if(m_Game == GAME_TAG && (m_State == STATE_INVITED || m_State == STATE_TAG_LOBBY || m_TagPhase == TAG_PHASE_RESULTS))
+	if(m_Game == GAME_TAG && (m_State == STATE_INVITED || m_TagPhase == TAG_PHASE_RESULTS))
 		return;
 	m_ViewActive = false;
 	m_CursorActive = false;
@@ -2811,7 +2811,7 @@ void CMiniGames::OnRender()
 	if(!WindowVisible())
 		return;
 
-	m_ShowKeyHint = m_State == STATE_INVITED || m_State == STATE_PLAYING || (m_State == STATE_OVER && m_HasBoard);
+	m_ShowKeyHint = m_State == STATE_INVITED || m_State == STATE_PLAYING || m_State == STATE_TAG_LOBBY || (m_State == STATE_OVER && m_HasBoard);
 
 	if(m_IgnoreClick && !Input()->KeyIsPressed(KEY_MOUSE_1))
 		m_IgnoreClick = false;
