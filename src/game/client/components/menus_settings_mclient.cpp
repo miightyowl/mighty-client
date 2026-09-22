@@ -120,14 +120,18 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		// companion pet
 		Ui()->DoLabel_AutoLineSize(Localize("Companion pet"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
 		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPetTee, Localize("Show companion tee (pet)"), &g_Config.m_ClMClientPetTee, &RightView, LineSize);
+		const bool DummyPet = g_Config.m_ClDummy != 0;
+		int *pPetEnabled = DummyPet ? &g_Config.m_ClMClientDummyPetTee : &g_Config.m_ClMClientPetTee;
+		int *pPetSize = DummyPet ? &g_Config.m_ClMClientDummyPetTeeSize : &g_Config.m_ClMClientPetTeeSize;
+		int *pPetAlpha = DummyPet ? &g_Config.m_ClMClientDummyPetTeeAlpha : &g_Config.m_ClMClientPetTeeAlpha;
+		DoButton_CheckBoxAutoVMarginAndSet(pPetEnabled, Localize("Show companion tee (pet)"), pPetEnabled, &RightView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientPetTeeOthers, Localize("Show pets of other M-Client players"), &g_Config.m_ClMClientPetTeeOthers, &RightView, LineSize);
-		if(g_Config.m_ClMClientPetTee)
+		if(*pPetEnabled)
 		{
 			RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
-			Ui()->DoScrollbarOption(&g_Config.m_ClMClientPetTeeSize, &g_Config.m_ClMClientPetTeeSize, &Button, Localize("Companion tee size"), 10, 500, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+			Ui()->DoScrollbarOption(pPetSize, pPetSize, &Button, Localize("Companion tee size"), 10, 500, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
 			RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
-			Ui()->DoScrollbarOption(&g_Config.m_ClMClientPetTeeAlpha, &g_Config.m_ClMClientPetTeeAlpha, &Button, Localize("Companion tee opacity"), 10, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+			Ui()->DoScrollbarOption(pPetAlpha, pPetAlpha, &Button, Localize("Companion tee opacity"), 10, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
 		}
 		RightView.HSplitTop(LineSize, &Label, &RightView);
 		TextRender()->TextColor(0.6f, 0.6f, 0.6f, 1.0f);
@@ -318,16 +322,40 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 {
 	CUIRect Label, Button;
 
-	// Enable toggle
-	MainView.HSplitTop(20.0f, &Button, &MainView);
-	if(DoButton_CheckBox(&g_Config.m_ClMClientPetTee, Localize("Show companion tee (pet)"), g_Config.m_ClMClientPetTee, &Button))
+	CUIRect TargetBar, TargetLabel, PlayerButton, DummyButton;
+	MainView.HSplitTop(20.0f, &TargetBar, &MainView);
+	TargetBar.VSplitLeft(130.0f, &TargetLabel, &TargetBar);
+	Ui()->DoLabel(&TargetLabel, Localize("Companion for"), 14.0f, TEXTALIGN_ML);
+	TargetBar.VSplitLeft(100.0f, &PlayerButton, &TargetBar);
+	TargetBar.VSplitLeft(100.0f, &DummyButton, &TargetBar);
+	static CButtonContainer s_PlayerPetButton;
+	static CButtonContainer s_DummyPetButton;
+	if(DoButton_MenuTab(&s_PlayerPetButton, Localize("Player"), !m_Dummy, &PlayerButton, IGraphics::CORNER_L, nullptr, nullptr, nullptr, nullptr, 4.0f))
 	{
-		g_Config.m_ClMClientPetTee ^= 1;
+		m_Dummy = false;
+		m_SkinListScrollToSelected = true;
+	}
+	if(DoButton_MenuTab(&s_DummyPetButton, Localize("Dummy"), m_Dummy, &DummyButton, IGraphics::CORNER_R, nullptr, nullptr, nullptr, nullptr, 4.0f))
+	{
+		m_Dummy = true;
+		m_SkinListScrollToSelected = true;
 	}
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
-	char *pSkinName = g_Config.m_ClMClientPetTeeSkin;
-	const size_t SkinNameSize = sizeof(g_Config.m_ClMClientPetTeeSkin);
+	int *pEnabled = m_Dummy ? &g_Config.m_ClMClientDummyPetTee : &g_Config.m_ClMClientPetTee;
+	char *pSkinName = m_Dummy ? g_Config.m_ClMClientDummyPetTeeSkin : g_Config.m_ClMClientPetTeeSkin;
+	const size_t SkinNameSize = m_Dummy ? sizeof(g_Config.m_ClMClientDummyPetTeeSkin) : sizeof(g_Config.m_ClMClientPetTeeSkin);
+	int *pUseCustomColor = m_Dummy ? &g_Config.m_ClMClientDummyPetTeeUseCustomColor : &g_Config.m_ClMClientPetTeeUseCustomColor;
+	unsigned *pColorBody = m_Dummy ? &g_Config.m_ClMClientDummyPetTeeColorBody : &g_Config.m_ClMClientPetTeeColorBody;
+	unsigned *pColorFeet = m_Dummy ? &g_Config.m_ClMClientDummyPetTeeColorFeet : &g_Config.m_ClMClientPetTeeColorFeet;
+
+	// Enable toggle
+	MainView.HSplitTop(20.0f, &Button, &MainView);
+	if(DoButton_CheckBox(pEnabled, Localize("Show companion tee (pet)"), *pEnabled, &Button))
+	{
+		*pEnabled ^= 1;
+	}
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
 	CSkins::CSkinList &SkinList = GameClient()->m_Skins.SkinList();
 	const CSkin *pDefaultSkin = GameClient()->m_Skins.Find("default");
@@ -339,7 +367,7 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 
 	CTeeRenderInfo OwnSkinInfo;
 	OwnSkinInfo.Apply(pOwnSkinContainer == nullptr || pOwnSkinContainer->Skin() == nullptr ? pDefaultSkin : pOwnSkinContainer->Skin().get());
-	OwnSkinInfo.ApplyColors(g_Config.m_ClMClientPetTeeUseCustomColor, g_Config.m_ClMClientPetTeeColorBody, g_Config.m_ClMClientPetTeeColorFeet);
+	OwnSkinInfo.ApplyColors(*pUseCustomColor, *pColorBody, *pColorFeet);
 	OwnSkinInfo.m_Size = 50.0f;
 
 	// Preview tee + skin name edit box
@@ -375,17 +403,17 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 
 	// custom colors
 	MainView.HSplitTop(20.0f, &Button, &MainView);
-	if(DoButton_CheckBox(&g_Config.m_ClMClientPetTeeUseCustomColor, Localize("Custom colors"), g_Config.m_ClMClientPetTeeUseCustomColor, &Button))
+	if(DoButton_CheckBox(pUseCustomColor, Localize("Custom colors"), *pUseCustomColor, &Button))
 	{
-		g_Config.m_ClMClientPetTeeUseCustomColor ^= 1;
+		*pUseCustomColor ^= 1;
 	}
 	MainView.HSplitTop(5.0f, nullptr, &MainView);
-	if(g_Config.m_ClMClientPetTeeUseCustomColor)
+	if(*pUseCustomColor)
 	{
 		CUIRect CustomColors, aRects[2];
 		MainView.HSplitTop(95.0f, &CustomColors, &MainView);
 		CustomColors.VSplitMid(&aRects[0], &aRects[1], 20.0f);
-		unsigned *apColors[] = {&g_Config.m_ClMClientPetTeeColorBody, &g_Config.m_ClMClientPetTeeColorFeet};
+		unsigned *apColors[] = {pColorBody, pColorFeet};
 		const char *apParts[] = {Localize("Body"), Localize("Feet")};
 		for(int i = 0; i < 2; i++)
 		{
@@ -1035,7 +1063,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 	if(Ui()->DoButtonLogic(&s_SaveDummyButton, 0, &SaveDummyButton, BUTTONFLAG_LEFT))
 		SaveProfile(true);
 	if(Ui()->DoButtonLogic(&s_SavePetButton, 0, &SavePetButton, BUTTONFLAG_LEFT))
-		SavePetProfile();
+		SavePetProfile(g_Config.m_ClDummy != 0);
 
 	MainView.HSplitTop(1.0f, &Divider, &MainView);
 	Divider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_NONE, 0.0f);
@@ -1385,15 +1413,15 @@ void CMenus::SaveProfile(bool Dummy)
 	SaveMClient();
 }
 
-void CMenus::SavePetProfile()
+void CMenus::SavePetProfile(bool Dummy)
 {
 	CProfile Profile;
 	Profile.m_IsPet = true;
 	Profile.m_Number = NextFreeProfileNumber();
-	str_copy(Profile.m_aSkin, g_Config.m_ClMClientPetTeeSkin);
-	Profile.m_UseCustomColor = g_Config.m_ClMClientPetTeeUseCustomColor;
-	Profile.m_ColorBody = g_Config.m_ClMClientPetTeeColorBody;
-	Profile.m_ColorFeet = g_Config.m_ClMClientPetTeeColorFeet;
+	str_copy(Profile.m_aSkin, Dummy ? g_Config.m_ClMClientDummyPetTeeSkin : g_Config.m_ClMClientPetTeeSkin);
+	Profile.m_UseCustomColor = Dummy ? g_Config.m_ClMClientDummyPetTeeUseCustomColor : g_Config.m_ClMClientPetTeeUseCustomColor;
+	Profile.m_ColorBody = Dummy ? g_Config.m_ClMClientDummyPetTeeColorBody : g_Config.m_ClMClientPetTeeColorBody;
+	Profile.m_ColorFeet = Dummy ? g_Config.m_ClMClientDummyPetTeeColorFeet : g_Config.m_ClMClientPetTeeColorFeet;
 	m_vProfiles.push_back(Profile);
 	SortProfiles();
 	SaveMClient();
@@ -1403,10 +1431,14 @@ void CMenus::ApplyProfile(const CProfile &Profile, bool Dummy)
 {
 	if(Profile.m_IsPet)
 	{
-		str_copy(g_Config.m_ClMClientPetTeeSkin, Profile.m_aSkin);
-		g_Config.m_ClMClientPetTeeUseCustomColor = Profile.m_UseCustomColor;
-		g_Config.m_ClMClientPetTeeColorBody = Profile.m_ColorBody;
-		g_Config.m_ClMClientPetTeeColorFeet = Profile.m_ColorFeet;
+		char *pSkin = Dummy ? g_Config.m_ClMClientDummyPetTeeSkin : g_Config.m_ClMClientPetTeeSkin;
+		str_copy(pSkin, Profile.m_aSkin, sizeof(g_Config.m_ClMClientPetTeeSkin));
+		int *pUseCustomColor = Dummy ? &g_Config.m_ClMClientDummyPetTeeUseCustomColor : &g_Config.m_ClMClientPetTeeUseCustomColor;
+		unsigned *pColorBody = Dummy ? &g_Config.m_ClMClientDummyPetTeeColorBody : &g_Config.m_ClMClientPetTeeColorBody;
+		unsigned *pColorFeet = Dummy ? &g_Config.m_ClMClientDummyPetTeeColorFeet : &g_Config.m_ClMClientPetTeeColorFeet;
+		*pUseCustomColor = Profile.m_UseCustomColor;
+		*pColorBody = Profile.m_ColorBody;
+		*pColorFeet = Profile.m_ColorFeet;
 		return;
 	}
 

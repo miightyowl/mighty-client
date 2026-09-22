@@ -49,8 +49,6 @@ void CPetTee::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
-	const int LocalId = GameClient()->m_aLocalIds[g_Config.m_ClDummy];
-
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
 	{
 		const char *pSkinName = nullptr;
@@ -60,16 +58,20 @@ void CPetTee::OnRender()
 		float Scale = OTHERS_SIZE;
 		float Alpha = OTHERS_ALPHA;
 
-		if(ClientId == LocalId)
+		const bool LocalPlayer = ClientId == GameClient()->m_aLocalIds[IClient::CONN_MAIN];
+		const bool LocalDummy = ClientId == GameClient()->m_aLocalIds[IClient::CONN_DUMMY];
+		if(LocalPlayer || LocalDummy)
 		{
-			if(g_Config.m_ClMClientPetTee)
+			const bool Dummy = LocalDummy;
+			const bool Enabled = Dummy ? g_Config.m_ClMClientDummyPetTee != 0 : g_Config.m_ClMClientPetTee != 0;
+			if(Enabled)
 			{
-				pSkinName = g_Config.m_ClMClientPetTeeSkin;
-				UseCustomColor = g_Config.m_ClMClientPetTeeUseCustomColor != 0;
-				ColorBody = g_Config.m_ClMClientPetTeeColorBody;
-				ColorFeet = g_Config.m_ClMClientPetTeeColorFeet;
-				Scale = (float)g_Config.m_ClMClientPetTeeSize / 100.0f;
-				Alpha = (float)g_Config.m_ClMClientPetTeeAlpha / 100.0f;
+				pSkinName = Dummy ? g_Config.m_ClMClientDummyPetTeeSkin : g_Config.m_ClMClientPetTeeSkin;
+				UseCustomColor = Dummy ? g_Config.m_ClMClientDummyPetTeeUseCustomColor != 0 : g_Config.m_ClMClientPetTeeUseCustomColor != 0;
+				ColorBody = Dummy ? g_Config.m_ClMClientDummyPetTeeColorBody : g_Config.m_ClMClientPetTeeColorBody;
+				ColorFeet = Dummy ? g_Config.m_ClMClientDummyPetTeeColorFeet : g_Config.m_ClMClientPetTeeColorFeet;
+				Scale = (float)(Dummy ? g_Config.m_ClMClientDummyPetTeeSize : g_Config.m_ClMClientPetTeeSize) / 100.0f;
+				Alpha = (float)(Dummy ? g_Config.m_ClMClientDummyPetTeeAlpha : g_Config.m_ClMClientPetTeeAlpha) / 100.0f;
 			}
 		}
 		else if(g_Config.m_ClMClientPetTeeOthers)
@@ -100,8 +102,9 @@ void CPetTee::RenderPet(int ClientId, const char *pSkinName, bool UseCustomColor
 	const float Delta = Client()->RenderFrameTime();
 	const float Time = Client()->LocalTime();
 
+	const bool Local = ClientId == GameClient()->m_aLocalIds[IClient::CONN_MAIN] || ClientId == GameClient()->m_aLocalIds[IClient::CONN_DUMMY];
 	const bool Following = Player.m_Active && Player.m_Team != TEAM_SPECTATORS &&
-			       (ClientId == GameClient()->m_aLocalIds[g_Config.m_ClDummy] || GameClient()->m_Snap.m_aCharacters[ClientId].m_Active);
+			       (Local || GameClient()->m_Snap.m_aCharacters[ClientId].m_Active);
 
 	if(Following)
 	{
