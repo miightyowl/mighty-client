@@ -1,6 +1,7 @@
 #include "fast_practice.h"
 
 #include <base/math.h>
+#include <base/time.h>
 
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
@@ -59,6 +60,8 @@ void CFastPractice::OnReset()
 	m_SpectatorStartClientId = -1;
 	m_ClientId = -1;
 	m_LastTick = 0;
+	m_LastUpdateTime = 0;
+	m_LocalTickFraction = 0.0;
 	m_CheckpointTick = 0;
 	m_World.Clear();
 	m_RenderWorld.Clear();
@@ -316,6 +319,8 @@ bool CFastPractice::Respawn(const vec2 *pSpectatorSpawnPos)
 	m_Core = Core;
 	m_PrevCore = Core;
 	m_LastTick = Client()->PredGameTick(g_Config.m_ClDummy);
+	m_LastUpdateTime = time_get();
+	m_LocalTickFraction = 0.0;
 	return true;
 }
 
@@ -761,6 +766,11 @@ void CFastPractice::RenderPracticeTee()
 		return;
 
 	const CCharacterCore Core = ShownCore();
+	const int TickOffset = m_World.GameTick() - Client()->GameTick(g_Config.m_ClDummy);
+	CCharacterCore PrevCore = m_PrevCore;
+	RebaseCore(&PrevCore, -TickOffset);
+	const float Intra = m_StartedInSpectator ? (float)m_LocalTickFraction : Client()->PredIntraGameTick(g_Config.m_ClDummy);
+	const vec2 RenderPos = mix(PrevCore.m_Pos, Core.m_Pos, Intra);
 
 	CTeeRenderInfo TeeRenderInfo = GameClient()->m_aClients[m_ClientId].m_RenderInfo;
 	TeeRenderInfo.m_Size = 64.0f;
@@ -785,21 +795,23 @@ void CFastPractice::RenderPracticeTee()
 		}
 	}
 
+	CNetObj_Character Prev = {};
 	CNetObj_Character Render = {};
+	PrevCore.Write(&Prev);
 	Core.Write(&Render);
-	Render.m_Tick = Client()->GameTick(g_Config.m_ClDummy);
-	Render.m_Weapon = Core.m_ActiveWeapon;
-	Render.m_Emote = PracticeEyeEmote(Core);
+	Prev.m_Tick = Render.m_Tick = Client()->GameTick(g_Config.m_ClDummy);
+	Prev.m_Weapon = Render.m_Weapon = Core.m_ActiveWeapon;
+	Prev.m_Emote = Render.m_Emote = PracticeEyeEmote(Core);
 	if(const CCharacter *pChar = m_World.GetCharacterById(m_ClientId))
-		Render.m_AttackTick = Client()->GameTick(g_Config.m_ClDummy) - (m_World.GameTick() - pChar->GetAttackTick());
+		Prev.m_AttackTick = Render.m_AttackTick = Client()->GameTick(g_Config.m_ClDummy) - (m_World.GameTick() - pChar->GetAttackTick());
 
 	CScreenRect ScreenRect = Graphics()->GetScreen();
 	ScreenRect.Expand(100.0f);
 
 	const int SavedGhostAlpha = g_Config.m_ClRaceGhostAlpha;
 	g_Config.m_ClRaceGhostAlpha = 100;
-	GameClient()->m_Players.RenderHook(ScreenRect, &Render, &Render, &TeeRenderInfo, -2);
-	GameClient()->m_Players.RenderPlayer(ScreenRect, &Render, &Render, &TeeRenderInfo, -2);
+	GameClient()->m_Players.RenderHook(ScreenRect, &Prev, &Render, &TeeRenderInfo, -2, Intra);
+	GameClient()->m_Players.RenderPlayer(ScreenRect, &Prev, &Render, &TeeRenderInfo, -2, Intra);
 	g_Config.m_ClRaceGhostAlpha = SavedGhostAlpha;
 
 	if(!g_Config.m_ClShowFreezeBars)
@@ -819,7 +831,7 @@ void CFastPractice::RenderPracticeTee()
 	if(Core.m_IsInFreeze)
 		Alpha *= g_Config.m_ClFreezeBarsAlphaInsideFreeze / 100.0f;
 
-	GameClient()->m_FreezeBars.RenderFreezeBarPos(m_Core.m_Pos.x - 32.0f, m_Core.m_Pos.y + 32.0f, 64.0f, 16.0f, Progress, Alpha);
+	GameClient()->m_FreezeBars.RenderFreezeBarPos(RenderPos.x - 32.0f, RenderPos.y + 32.0f, 64.0f, 16.0f, Progress, Alpha);
 }
 
 void CFastPractice::RenderRealTee()
@@ -982,19 +994,44 @@ void CFastPractice::OnUpdatePositions()
 		return;
 	}
 
-	const int Tick = Client()->PredGameTick(g_Config.m_ClDummy);
-
-	if(!Suspended())
+	float Intra;
+	if(m_StartedInSpectator)
 	{
-		const int Elapsed = Tick - m_LastTick;
-		if(Elapsed > 0)
+		const int64_t Now = time_get();
+		const double DeltaSeconds = m_LastUpdateTime == 0 ? 0.0 :
+			std::clamp((Now - m_LastUpdateTime) / (double)time_freq(), 0.0, 0.25);
+		m_LastUpdateTime = Now;
+
+		if(!Suspended())
 		{
-			const int Simulate = std::min(Elapsed, MAX_CATCHUP_TICKS);
-			m_World.m_GameTick += Elapsed - Simulate;
-			Advance(Simulate);
+			m_LocalTickFraction += DeltaSeconds * Client()->GameTickSpeed();
+			const int Elapsed = (int)m_LocalTickFraction;
+			m_LocalTickFraction -= Elapsed;
+			if(Elapsed > 0)
+			{
+				const int Simulate = std::min(Elapsed, MAX_CATCHUP_TICKS);
+				m_World.m_GameTick += Elapsed - Simulate;
+				Advance(Simulate);
+			}
 		}
+		Intra = (float)m_LocalTickFraction;
 	}
-	m_LastTick = Tick;
+	else
+	{
+		const int Tick = Client()->PredGameTick(g_Config.m_ClDummy);
+		if(!Suspended())
+		{
+			const int Elapsed = Tick - m_LastTick;
+			if(Elapsed > 0)
+			{
+				const int Simulate = std::min(Elapsed, MAX_CATCHUP_TICKS);
+				m_World.m_GameTick += Elapsed - Simulate;
+				Advance(Simulate);
+			}
+		}
+		m_LastTick = Tick;
+		Intra = Client()->PredIntraGameTick(g_Config.m_ClDummy);
+	}
 
 	if(!m_Active)
 		return;
@@ -1003,6 +1040,7 @@ void CFastPractice::OnUpdatePositions()
 	const CCharacterCore Shown = ShownCore();
 	CCharacterCore ShownPrev = m_PrevCore;
 	RebaseCore(&ShownPrev, -TickOffset);
+	const vec2 RenderPos = mix(ShownPrev.m_Pos, Shown.m_Pos, Intra);
 
 	GameClient()->m_aClients[m_ClientId].m_Predicted = Shown;
 	GameClient()->m_aClients[m_ClientId].m_PrevPredicted = ShownPrev;
@@ -1019,9 +1057,9 @@ void CFastPractice::OnUpdatePositions()
 		}
 		else
 		{
-			GameClient()->m_Snap.m_SpecInfo.m_Position = Shown.m_Pos;
+			GameClient()->m_Snap.m_SpecInfo.m_Position = RenderPos;
 			GameClient()->m_Snap.m_SpecInfo.m_UsePosition = true;
-			GameClient()->m_LocalCharacterPos = Shown.m_Pos;
+			GameClient()->m_LocalCharacterPos = RenderPos;
 		}
 	}
 }
