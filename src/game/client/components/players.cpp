@@ -606,6 +606,22 @@ void CPlayers::RenderPlayer(
 
 	// set size
 	RenderInfo.m_Size = 64.0f;
+	const bool TagTarget = GameClient()->m_MiniGames.IsTagTarget(ClientId);
+	if(TagTarget)
+	{
+		const ColorRGBA TagRed(1.0f, 0.12f, 0.12f, 1.0f);
+		RenderInfo.m_CustomColoredSkin = true;
+		RenderInfo.m_ColorBody = TagRed;
+		RenderInfo.m_ColorFeet = TagRed;
+		for(auto &Sixup : RenderInfo.m_aSixup)
+		{
+			for(int Part = 0; Part < protocol7::NUM_SKINPARTS; Part++)
+			{
+				Sixup.m_aUseCustomColors[Part] = Sixup.m_aColorableTextures[Part].IsValid();
+				Sixup.m_aColors[Part] = TagRed;
+			}
+		}
+	}
 
 	if(ClientId >= 0)
 		Intra = GameClient()->m_aClients[ClientId].m_IsPredicted ? Client()->PredIntraGameTick(g_Config.m_ClDummy) : Client()->IntraGameTick(g_Config.m_ClDummy);
@@ -897,6 +913,15 @@ void CPlayers::RenderPlayer(
 		RenderTools()->RenderTee(&State, &RenderInfo, Emote, Direction, ShadowPosition, g_Config.m_ClUnpredictedShadowAlpha / 100.f); // render ghost
 	}
 
+	if(TagTarget)
+	{
+		CTeeRenderInfo GlowInfo = RenderInfo;
+		GlowInfo.m_Size = 72.0f;
+		const float GlowAlpha = (0.18f + 0.08f * std::sin(Client()->LocalTime() * 6.0f)) * Alpha;
+		Graphics()->BlendAdditive();
+		RenderTools()->RenderTee(&State, &GlowInfo, Emote, Direction, Position, GlowAlpha);
+		Graphics()->BlendNormal();
+	}
 	RenderTools()->RenderTee(&State, &RenderInfo, Emote, Direction, Position, Alpha);
 
 	float TeeAnimScale, TeeBaseSize;

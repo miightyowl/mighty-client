@@ -1516,6 +1516,7 @@ void CGameClient::ProcessEvents()
 			const CNetEvent_HammerHit *pEvent = (const CNetEvent_HammerHit *)Item.m_pData;
 
 			vec2 HammerHitPos = vec2(pEvent->m_X, pEvent->m_Y);
+			m_MiniGames.OnHammerHit(HammerHitPos);
 			if(!m_PredictedWorld.CheckPredictedEventHandled(CGameWorld::CPredictedEvent(Item.m_Type, HammerHitPos, -1, Client()->GameTick(g_Config.m_ClDummy))))
 			{
 				m_Effects.HammerHit(HammerHitPos, Alpha, Volume);
