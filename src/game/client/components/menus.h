@@ -600,7 +600,7 @@ protected:
 	// writes the combined mclient.json (profiles + bind wheel); loads profiles first if needed
 	void SaveMClient();
 	void SaveProfile(bool Dummy);
-	void SavePetProfile();
+	void SavePetProfile(bool Dummy);
 	void SortProfiles();
 	int NextFreeProfileNumber() const;
 	void ApplyProfile(const CProfile &Profile, bool Dummy);

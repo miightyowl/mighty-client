@@ -565,11 +565,13 @@ void CMClientDetect::RestoreColorBeacon()
 
 void CMClientDetect::LocalPet(bool *pOn, char *pSkin, int SkinSize, bool *pUseCustomColor, int *pColorBody, int *pColorFeet) const
 {
-	*pOn = g_Config.m_ClMClientPetTee != 0;
-	str_copy(pSkin, g_Config.m_ClMClientForceSkin ? "maodie" : g_Config.m_ClMClientPetTeeSkin, SkinSize);
-	*pUseCustomColor = g_Config.m_ClMClientPetTeeUseCustomColor != 0;
-	*pColorBody = g_Config.m_ClMClientPetTeeColorBody;
-	*pColorFeet = g_Config.m_ClMClientPetTeeColorFeet;
+	const bool Dummy = g_Config.m_ClDummy != 0;
+	*pOn = Dummy ? g_Config.m_ClMClientDummyPetTee != 0 : g_Config.m_ClMClientPetTee != 0;
+	const char *pConfiguredSkin = Dummy ? g_Config.m_ClMClientDummyPetTeeSkin : g_Config.m_ClMClientPetTeeSkin;
+	str_copy(pSkin, g_Config.m_ClMClientForceSkin ? "maodie" : pConfiguredSkin, SkinSize);
+	*pUseCustomColor = Dummy ? g_Config.m_ClMClientDummyPetTeeUseCustomColor != 0 : g_Config.m_ClMClientPetTeeUseCustomColor != 0;
+	*pColorBody = Dummy ? g_Config.m_ClMClientDummyPetTeeColorBody : g_Config.m_ClMClientPetTeeColorBody;
+	*pColorFeet = Dummy ? g_Config.m_ClMClientDummyPetTeeColorFeet : g_Config.m_ClMClientPetTeeColorFeet;
 }
 
 bool CMClientDetect::PetAudience() const
