@@ -59,7 +59,7 @@ namespace
 	const int TAG_FRAME_HIT = 1;
 	const int TAG_FRAME_PAYLOAD = 8;
 	const int TAG_COUNTDOWN_SECONDS = 5;
-	const float TAG_HAMMER_REACH = 96.0f;
+	const float TAG_HAMMER_HIT_RADIUS = 40.0f;
 	const int TAG_START_MAX_RETRIES = 3;
 	const int SEND_REPLACE_TAG_ROSTER = 1;
 
@@ -178,7 +178,6 @@ void CMiniGames::ResetTag()
 		m_aTagAccepted[ClientId] = false;
 		m_aTagReady[ClientId] = false;
 		m_aTagTimeCs[ClientId] = -1;
-		m_aTagLastAttackTick[ClientId] = -1;
 	}
 	for(int &ClientId : m_aTagOrder)
 		ClientId = -1;
@@ -759,37 +758,32 @@ void CMiniGames::UpdateTagHitDetection()
 		return;
 
 	const int TargetId = TagTargetId();
-	const bool CanFinishRound = IsTagAdmin() && m_TagPhase == TAG_PHASE_RUNNING && !m_TagHitFramePending && TargetId >= 0 && GameClient()->m_Snap.m_aCharacters[TargetId].m_Active;
-	vec2 TargetPos;
-	if(CanFinishRound)
-	{
-		const auto &Target = GameClient()->m_Snap.m_aCharacters[TargetId].m_Cur;
-		TargetPos = vec2(Target.m_X, Target.m_Y);
-	}
-
-	for(int i = 0; i < m_TagNumPlayers; i++)
-	{
-		const int ClientId = m_aTagOrder[i];
-		if(ClientId < 0 || ClientId >= MAX_CLIENTS || !m_aTagAccepted[ClientId] || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
-		{
-			if(ClientId >= 0 && ClientId < MAX_CLIENTS)
-				m_aTagLastAttackTick[ClientId] = -1;
-			continue;
-		}
-
-		const auto &Attacker = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
-		const bool NewAttack = m_aTagLastAttackTick[ClientId] >= 0 && Attacker.m_AttackTick != m_aTagLastAttackTick[ClientId];
-		m_aTagLastAttackTick[ClientId] = Attacker.m_AttackTick;
-		if(!CanFinishRound || ClientId == TargetId || !NewAttack || Attacker.m_Weapon != WEAPON_HAMMER)
-			continue;
-		if(distance(vec2(Attacker.m_X, Attacker.m_Y), TargetPos) > TAG_HAMMER_REACH)
-			continue;
-
-		const int ElapsedTicks = std::max(0, Client()->GameTick(g_Config.m_ClDummy) - m_TagRoundStartTick);
-		const int TimeCs = (ElapsedTicks * 100 + Client()->GameTickSpeed() / 2) / Client()->GameTickSpeed();
-		FinishTagRound(TimeCs, true);
+	if(!(IsTagAdmin() && m_TagPhase == TAG_PHASE_RUNNING && !m_TagHitFramePending && TargetId >= 0 && GameClient()->m_Snap.m_aCharacters[TargetId].m_Active))
 		return;
+
+	const auto &Target = GameClient()->m_Snap.m_aCharacters[TargetId].m_Cur;
+	const vec2 TargetPos = vec2(Target.m_X, Target.m_Y);
+
+	bool Hit = false;
+	const int Num = Client()->SnapNumItems(IClient::SNAP_CURRENT);
+	for(int Index = 0; Index < Num; Index++)
+	{
+		const IClient::CSnapItem Item = Client()->SnapGetItem(IClient::SNAP_CURRENT, Index);
+		if(Item.m_Type != NETEVENTTYPE_HAMMERHIT)
+			continue;
+		const CNetEvent_HammerHit *pEvent = (const CNetEvent_HammerHit *)Item.m_pData;
+		if(distance(vec2(pEvent->m_X, pEvent->m_Y), TargetPos) <= TAG_HAMMER_HIT_RADIUS)
+		{
+			Hit = true;
+			break;
+		}
 	}
+	if(!Hit)
+		return;
+
+	const int ElapsedTicks = std::max(0, Client()->GameTick(g_Config.m_ClDummy) - m_TagRoundStartTick);
+	const int TimeCs = (ElapsedTicks * 100 + Client()->GameTickSpeed() / 2) / Client()->GameTickSpeed();
+	FinishTagRound(TimeCs, true);
 }
 
 void CMiniGames::SendTagFrame(int Type, int Round, int TimeCs)

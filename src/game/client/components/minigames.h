@@ -171,7 +171,6 @@ private:
 	bool m_aTagReady[MAX_CLIENTS] = {false};
 	int m_aTagOrder[TAG_MAX_PLAYERS] = {0};
 	int m_aTagTimeCs[MAX_CLIENTS] = {0};
-	int m_aTagLastAttackTick[MAX_CLIENTS] = {0};
 
 	const char *GameName() const;
 	bool AmWhite() const { return m_MyMark == 'X'; }
