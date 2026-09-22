@@ -686,6 +686,8 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 				Data.m_Color = GameClient()->GetDDTeamColor(Team, 0.75f);
 		}
 	}
+	if(GameClient()->m_MiniGames.IsTagTarget(pPlayerInfo->m_ClientId))
+		Data.m_Color = ColorRGBA(1.0f, 0.15f, 0.15f, 1.0f);
 	Data.m_Color.a = Alpha;
 
 	int ShowDirectionConfig = g_Config.m_ClShowDirection;

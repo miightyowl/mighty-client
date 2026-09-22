@@ -28,7 +28,7 @@ namespace
 {
 	const char *PROTOCOL_PREFIX = "MGAME1 ";
 	const char *VIEW_BIND = "+minigames";
-	const char *g_apGameNames[CMiniGames::NUM_GAMES] = {"Tic tac toe", "Chess", "Battleship"};
+	const char *g_apGameNames[CMiniGames::NUM_GAMES] = {"Tic tac toe", "Chess", "Battleship", "Tag"};
 
 	const int g_aShipSizes[10] = {4, 3, 3, 2, 2, 2, 1, 1, 1, 1};
 	const int SHIP_CELLS = 20;
@@ -53,6 +53,14 @@ namespace
 	const int EMOTE_OP_MOVE = 12;
 	const int EMOTE_OP_ACK = 13;
 	const int EMOTE_OP_CHESS = 14;
+	const int EMOTE_OP_TAG = 15;
+	const int TAG_FRAME_START = 0;
+	const int TAG_FRAME_HIT = 1;
+	const int TAG_FRAME_PAYLOAD = 8;
+	const int TAG_COUNTDOWN_SECONDS = 5;
+	const float TAG_HIT_RADIUS = 48.0f;
+	const float TAG_HAMMER_REACH = 96.0f;
+	const int TAG_START_MAX_RETRIES = 3;
 
 	const float EMOTE_ECHO_TIMEOUT = 2.0f;
 	const int MAX_EMOTE_RETRIES = 4;
@@ -61,6 +69,8 @@ namespace
 
 	int FramePayload(int Op, int Game)
 	{
+		if(Op == EMOTE_OP_TAG)
+			return Game == CMiniGames::GAME_TAG ? TAG_FRAME_PAYLOAD : -1;
 		const bool Battle = Game == CMiniGames::GAME_BATTLESHIP;
 		switch(Op)
 		{
@@ -143,6 +153,32 @@ void CMiniGames::OnConsoleInit()
 	Console()->Register("+minigames", "", CFGFLAG_CLIENT, ConKeyMiniGames, this, "M-Client: open the game selection, hold to show a running game");
 }
 
+void CMiniGames::ResetTag()
+{
+	m_TagPhase = TAG_PHASE_NONE;
+	m_TagAdminId = -1;
+	m_TagLobbyId = 0;
+	m_TagNumPlayers = 0;
+	m_TagRound = 0;
+	m_TagRoundStartTick = 0;
+	m_TagStartRetries = 0;
+	m_TagStartRetryTime = 0.0f;
+	m_TagStarting = false;
+	m_TagStartFramePending = false;
+	m_TagHitFramePending = false;
+	m_TagPendingTimeCs = 0;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+	{
+		m_aTagSelected[ClientId] = false;
+		m_aTagInvited[ClientId] = false;
+		m_aTagAccepted[ClientId] = false;
+		m_aTagReady[ClientId] = false;
+		m_aTagTimeCs[ClientId] = -1;
+	}
+	for(int &ClientId : m_aTagOrder)
+		ClientId = -1;
+}
+
 void CMiniGames::OnReset()
 {
 	SetEmoteGameShowAll(false);
@@ -170,6 +206,7 @@ void CMiniGames::OnReset()
 	m_NextSendTime = 0.0f;
 	ClearRetry();
 	ResetEmoteChannel();
+	ResetTag();
 }
 
 bool CMiniGames::WhisperSupported() const
@@ -203,11 +240,15 @@ int CMiniGames::ViewKeyState() const
 
 bool CMiniGames::NeedsAttention() const
 {
+	if(m_Game == GAME_TAG)
+		return m_State == STATE_INVITED || m_TagPhase == TAG_PHASE_COUNTDOWN || m_TagPhase == TAG_PHASE_RUNNING;
 	return m_State == STATE_INVITED || MyTurn();
 }
 
 bool CMiniGames::ViewShown() const
 {
+	if(m_Game == GAME_TAG)
+		return m_State == STATE_INVITED || m_State == STATE_TAG_LOBBY || m_TagPhase == TAG_PHASE_RESULTS;
 	if(m_State == STATE_INVITED || m_State == STATE_PLAYING)
 		return m_ViewActive;
 	return m_ViewActive && m_State == STATE_OVER && m_HasBoard;
@@ -216,6 +257,8 @@ bool CMiniGames::ViewShown() const
 bool CMiniGames::MyTurn() const
 {
 	if(m_State != STATE_PLAYING)
+		return false;
+	if(m_Game == GAME_TAG)
 		return false;
 	if(m_Game == GAME_CHESS)
 		return m_Chess.WhiteToMove() == AmWhite();
@@ -237,7 +280,26 @@ void CMiniGames::StatusText(char *pBuf, size_t Size) const
 	case STATE_INVITED:
 		str_format(pBuf, Size, Localize("%s challenged you"), OpponentName());
 		break;
+	case STATE_TAG_LOBBY:
+		if(m_TagStarting)
+			str_copy(pBuf, Localize("Starting when everyone is ready..."), Size);
+		else if(IsTagAdmin())
+			str_format(pBuf, Size, Localize("%d players joined. Start with 3 or more."), NumTagAccepted());
+		else
+			str_format(pBuf, Size, Localize("Waiting for %s to start..."), OpponentName());
+		break;
 	case STATE_PLAYING:
+		if(m_Game == GAME_TAG)
+		{
+			const int TargetId = TagTargetId();
+			if(m_TagPhase == TAG_PHASE_COUNTDOWN)
+				str_format(pBuf, Size, Localize("Next runner: %s"), TargetId >= 0 ? GameClient()->m_aClients[TargetId].m_aName : "");
+			else if(TargetId == GameClient()->m_Snap.m_LocalClientId)
+				str_copy(pBuf, Localize("Run! Avoid the hammers."), Size);
+			else
+				str_format(pBuf, Size, Localize("Hammer %s!"), TargetId >= 0 ? GameClient()->m_aClients[TargetId].m_aName : "");
+			break;
+		}
 		if(m_Game == GAME_BATTLESHIP && m_BattleNote != NOTE_NONE && LocalTime() - m_BattleNoteTime < BATTLE_NOTE_TIME)
 		{
 			switch(m_BattleNote)
@@ -296,6 +358,8 @@ void CMiniGames::HideView()
 {
 	if(m_State == STATE_GAMES || m_State == STATE_SELECT)
 		Close();
+	if(m_Game == GAME_TAG && (m_State == STATE_INVITED || m_State == STATE_TAG_LOBBY || m_TagPhase == TAG_PHASE_RESULTS))
+		return;
 	m_ViewActive = false;
 	m_CursorActive = false;
 	m_IgnoreClick = false;
@@ -331,6 +395,8 @@ void CMiniGames::OpenGames()
 void CMiniGames::OpenSelect()
 {
 	m_SelectedId = -1;
+	for(bool &Selected : m_aTagSelected)
+		Selected = false;
 	m_State = STATE_SELECT;
 	if(GameClient()->m_MClientDetect.NumDetected() == 0)
 		GameClient()->m_MClientDetect.Refresh();
@@ -338,7 +404,22 @@ void CMiniGames::OpenSelect()
 
 void CMiniGames::Close()
 {
-	if(m_State == STATE_PLAYING || m_State == STATE_CALLING || m_State == STATE_RINGING)
+	if(m_Game == GAME_TAG && m_TagAdminId >= 0 && m_TagPhase != TAG_PHASE_RESULTS)
+	{
+		if(IsTagAdmin())
+		{
+			for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+			{
+				if(ClientId != m_TagAdminId && m_aTagInvited[ClientId])
+					SendTo(ClientId, "Q");
+			}
+		}
+		else if(m_State == STATE_INVITED)
+			SendTo(m_TagAdminId, "D");
+		else
+			SendTo(m_TagAdminId, "Q");
+	}
+	else if(m_State == STATE_PLAYING || m_State == STATE_CALLING || m_State == STATE_RINGING)
 		SendTo(m_OpponentId, "Q");
 	else if(m_State == STATE_INVITED)
 		SendTo(m_OpponentId, "D");
@@ -358,6 +439,7 @@ void CMiniGames::Close()
 	m_aStatus[0] = '\0';
 	ClearRetry();
 	ResetEmoteChannel();
+	ResetTag();
 }
 
 void CMiniGames::Finish(char Result, const char *pStatus)
@@ -395,6 +477,376 @@ void CMiniGames::Challenge(int ClientId)
 	char aMessage[16];
 	str_format(aMessage, sizeof(aMessage), "C %d", (int)m_Game);
 	SendProtocol(aMessage, MAX_CHALLENGE_RETRIES);
+}
+
+bool CMiniGames::IsTagAdmin() const
+{
+	return m_TagAdminId >= 0 && m_TagAdminId == GameClient()->m_Snap.m_LocalClientId;
+}
+
+int CMiniGames::NumTagAccepted() const
+{
+	int Count = 0;
+	for(bool Accepted : m_aTagAccepted)
+		Count += Accepted ? 1 : 0;
+	return Count;
+}
+
+int CMiniGames::TagTargetId() const
+{
+	if(m_TagRound < 0 || m_TagRound >= m_TagNumPlayers)
+		return -1;
+	return m_aTagOrder[m_TagRound];
+}
+
+bool CMiniGames::IsTagTarget(int ClientId) const
+{
+	return m_Game == GAME_TAG && m_State == STATE_PLAYING && m_TagPhase == TAG_PHASE_RUNNING && !m_TagHitFramePending && ClientId == TagTargetId();
+}
+
+void CMiniGames::ChallengeTag()
+{
+	int aInvitees[TAG_MAX_PLAYERS - 1];
+	int NumInvitees = 0;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS && NumInvitees < TAG_MAX_PLAYERS - 1; ClientId++)
+	{
+		if(m_aTagSelected[ClientId] && GameClient()->m_aClients[ClientId].m_Active)
+			aInvitees[NumInvitees++] = ClientId;
+	}
+	if(NumInvitees < 2)
+		return;
+
+	ResetTag();
+	m_LocalId = GameClient()->m_Snap.m_LocalClientId;
+	m_OpponentId = -1;
+	m_TagAdminId = m_LocalId;
+	m_TagLobbyId = secure_rand_below(999999) + 1;
+	m_TagPhase = TAG_PHASE_LOBBY;
+	m_aTagAccepted[m_LocalId] = true;
+	m_aTagInvited[m_LocalId] = true;
+	m_State = STATE_TAG_LOBBY;
+	m_ViewActive = true;
+	m_CursorActive = false;
+	m_HasBoard = false;
+
+	char aMessage[32];
+	str_format(aMessage, sizeof(aMessage), "C %d %d", (int)GAME_TAG, m_TagLobbyId);
+	for(int i = 0; i < NumInvitees; i++)
+	{
+		m_aTagInvited[aInvitees[i]] = true;
+		SendTo(aInvitees[i], aMessage);
+	}
+}
+
+bool CMiniGames::ParseTagRoster(const char *pText, int *pIds, int &NumIds, int &LobbyId) const
+{
+	char aToken[16];
+	const char *pRest = str_next_token(pText, " ", aToken, sizeof(aToken));
+	if(!str_toint(aToken, &LobbyId) || LobbyId <= 0 || !pRest)
+		return false;
+
+	pRest = str_next_token(pRest, " ", aToken, sizeof(aToken));
+	if(!str_toint(aToken, &NumIds) || NumIds < 1 || NumIds > TAG_MAX_PLAYERS)
+		return false;
+
+	bool aSeen[MAX_CLIENTS] = {false};
+	for(int i = 0; i < NumIds; i++)
+	{
+		pRest = str_next_token(pRest, " ", aToken, sizeof(aToken));
+		int ClientId;
+		if(!str_toint(aToken, &ClientId) || ClientId < 0 || ClientId >= MAX_CLIENTS || aSeen[ClientId])
+			return false;
+		aSeen[ClientId] = true;
+		pIds[i] = ClientId;
+		if(i + 1 < NumIds && !pRest)
+			return false;
+	}
+	return true;
+}
+
+void CMiniGames::SendTagRoster(char Verb)
+{
+	int aIds[TAG_MAX_PLAYERS];
+	int NumIds = 0;
+	if(Verb == 'S')
+	{
+		NumIds = m_TagNumPlayers;
+		for(int i = 0; i < NumIds; i++)
+			aIds[i] = m_aTagOrder[i];
+	}
+	else
+	{
+		if(m_TagAdminId >= 0 && m_aTagAccepted[m_TagAdminId])
+			aIds[NumIds++] = m_TagAdminId;
+		for(int ClientId = 0; ClientId < MAX_CLIENTS && NumIds < TAG_MAX_PLAYERS; ClientId++)
+		{
+			if(ClientId != m_TagAdminId && m_aTagAccepted[ClientId])
+				aIds[NumIds++] = ClientId;
+		}
+	}
+
+	char aMessage[192];
+	str_format(aMessage, sizeof(aMessage), "%c %d %d", Verb, m_TagLobbyId, NumIds);
+	for(int i = 0; i < NumIds; i++)
+	{
+		char aId[8];
+		str_format(aId, sizeof(aId), " %d", aIds[i]);
+		str_append(aMessage, aId, sizeof(aMessage));
+	}
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+	{
+		if(ClientId != m_TagAdminId && m_aTagAccepted[ClientId])
+			SendTo(ClientId, aMessage);
+	}
+}
+
+void CMiniGames::StartTag()
+{
+	if(!IsTagAdmin() || m_TagStarting || NumTagAccepted() < 3)
+		return;
+
+	m_TagNumPlayers = 0;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS && m_TagNumPlayers < TAG_MAX_PLAYERS; ClientId++)
+	{
+		if(m_aTagAccepted[ClientId])
+			m_aTagOrder[m_TagNumPlayers++] = ClientId;
+	}
+	for(int i = m_TagNumPlayers - 1; i > 0; i--)
+	{
+		const int Swap = secure_rand_below(i + 1);
+		std::swap(m_aTagOrder[i], m_aTagOrder[Swap]);
+	}
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+	{
+		if(ClientId != m_TagAdminId && m_aTagInvited[ClientId] && !m_aTagAccepted[ClientId])
+		{
+			SendTo(ClientId, "Q");
+			m_aTagInvited[ClientId] = false;
+		}
+	}
+
+	for(bool &Ready : m_aTagReady)
+		Ready = false;
+	m_aTagReady[m_TagAdminId] = true;
+	m_TagStarting = true;
+	m_TagStartRetries = 0;
+	m_TagStartRetryTime = LocalTime() + RETRY_INTERVAL;
+	SendTagRoster('S');
+}
+
+void CMiniGames::BeginTagCountdown()
+{
+	m_State = STATE_PLAYING;
+	m_TagPhase = TAG_PHASE_COUNTDOWN;
+	m_TagRound = 0;
+	m_TagRoundStartTick = Client()->GameTick(g_Config.m_ClDummy) + TAG_COUNTDOWN_SECONDS * Client()->GameTickSpeed();
+	m_TagStarting = false;
+	m_ViewActive = false;
+	m_CursorActive = false;
+	m_HasBoard = false;
+	for(int &Time : m_aTagTimeCs)
+		Time = -1;
+	SetEmoteGameShowAll(true);
+}
+
+void CMiniGames::UpdateTagLobby()
+{
+	if(m_Game != GAME_TAG)
+		return;
+
+	if(m_State == STATE_PLAYING && m_TagPhase == TAG_PHASE_COUNTDOWN && Client()->GameTick(g_Config.m_ClDummy) >= m_TagRoundStartTick)
+	{
+		m_TagPhase = TAG_PHASE_RUNNING;
+		m_TagRoundStartTick = Client()->GameTick(g_Config.m_ClDummy);
+		return;
+	}
+	if(m_State == STATE_PLAYING && IsTagAdmin())
+	{
+		for(int i = 0; i < m_TagNumPlayers; i++)
+		{
+			const int ClientId = m_aTagOrder[i];
+			if(GameClient()->m_aClients[ClientId].m_Active)
+				continue;
+			for(int OtherId = 0; OtherId < MAX_CLIENTS; OtherId++)
+			{
+				if(OtherId != m_TagAdminId && m_aTagAccepted[OtherId])
+					SendTo(OtherId, "Q");
+			}
+			Finish(0, "A player left the Tag game.");
+			ResetEmoteChannel();
+			return;
+		}
+	}
+
+	if(m_State != STATE_TAG_LOBBY || !IsTagAdmin())
+		return;
+
+	bool RosterChanged = false;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+	{
+		if(ClientId == m_TagAdminId || !m_aTagInvited[ClientId] || GameClient()->m_aClients[ClientId].m_Active)
+			continue;
+		RosterChanged |= m_aTagAccepted[ClientId];
+		m_aTagInvited[ClientId] = false;
+		m_aTagAccepted[ClientId] = false;
+		m_aTagReady[ClientId] = false;
+	}
+	if(RosterChanged)
+	{
+		if(m_TagStarting)
+		{
+			ResetEmoteChannel();
+			m_TagStartFramePending = false;
+			m_TagStarting = false;
+			for(bool &Ready : m_aTagReady)
+				Ready = false;
+		}
+		SendTagRoster('L');
+	}
+
+	if(!m_TagStarting)
+		return;
+
+	bool EveryoneReady = true;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+	{
+		if(m_aTagAccepted[ClientId] && !m_aTagReady[ClientId])
+		{
+			EveryoneReady = false;
+			break;
+		}
+	}
+	if(EveryoneReady)
+	{
+		if(!m_TagStartFramePending)
+		{
+			m_TagStartFramePending = true;
+			SendTagFrame(TAG_FRAME_START, 0, 0);
+		}
+		return;
+	}
+
+	if(LocalTime() < m_TagStartRetryTime)
+		return;
+	if(!m_vSendQueue.empty())
+	{
+		m_TagStartRetryTime = LocalTime() + SEND_INTERVAL;
+		return;
+	}
+	m_TagStartRetries++;
+	if(m_TagStartRetries > TAG_START_MAX_RETRIES)
+	{
+		m_TagStarting = false;
+		for(bool &Ready : m_aTagReady)
+			Ready = false;
+		SendTagRoster('L');
+		return;
+	}
+	SendTagRoster('S');
+	m_TagStartRetryTime = LocalTime() + RETRY_INTERVAL;
+}
+
+void CMiniGames::SendTagFrame(int Type, int Round, int TimeCs)
+{
+	int aDigits[TAG_FRAME_PAYLOAD];
+	aDigits[0] = Type;
+	aDigits[1] = (Round / EMOTE_RADIX) % EMOTE_RADIX;
+	aDigits[2] = Round % EMOTE_RADIX;
+	for(int i = TAG_FRAME_PAYLOAD - 1; i >= 3; i--)
+	{
+		aDigits[i] = TimeCs % EMOTE_RADIX;
+		TimeCs /= EMOTE_RADIX;
+	}
+	SendFrame(EMOTE_OP_TAG, aDigits, TAG_FRAME_PAYLOAD);
+}
+
+void CMiniGames::FinishTagRound(int TimeCs, bool Broadcast)
+{
+	const int TargetId = TagTargetId();
+	if(TargetId < 0 || m_TagPhase != TAG_PHASE_RUNNING)
+		return;
+
+	TimeCs = std::clamp(TimeCs, 0, 248831);
+	if(Broadcast)
+	{
+		SendTagFrame(TAG_FRAME_HIT, m_TagRound, TimeCs);
+		m_TagHitFramePending = true;
+		m_TagPendingTimeCs = TimeCs;
+		return;
+	}
+	m_aTagTimeCs[TargetId] = TimeCs;
+	m_TagRound++;
+
+	if(m_TagRound >= m_TagNumPlayers)
+	{
+		m_TagPhase = TAG_PHASE_RESULTS;
+		m_State = STATE_OVER;
+		m_ViewActive = true;
+		m_CursorActive = false;
+		m_FadeTime = 0.0f;
+		int BestId = -1;
+		for(int i = 0; i < m_TagNumPlayers; i++)
+		{
+			const int ClientId = m_aTagOrder[i];
+			if(BestId < 0 || m_aTagTimeCs[ClientId] > m_aTagTimeCs[BestId])
+				BestId = ClientId;
+		}
+		m_Result = BestId == GameClient()->m_Snap.m_LocalClientId ? 'W' : 'L';
+		str_copy(m_aStatus, BestId >= 0 ? GameClient()->m_aClients[BestId].m_aName : "");
+		return;
+	}
+
+	m_TagPhase = TAG_PHASE_COUNTDOWN;
+	m_TagRoundStartTick = Client()->GameTick(g_Config.m_ClDummy) + TAG_COUNTDOWN_SECONDS * Client()->GameTickSpeed();
+}
+
+void CMiniGames::ProcessTagFrame()
+{
+	const int Type = m_aFrame[0];
+	const int Round = m_aFrame[1] * EMOTE_RADIX + m_aFrame[2];
+	int TimeCs = 0;
+	for(int i = 3; i < TAG_FRAME_PAYLOAD; i++)
+		TimeCs = TimeCs * EMOTE_RADIX + m_aFrame[i];
+
+	if(Type == TAG_FRAME_START && m_State == STATE_TAG_LOBBY && !IsTagAdmin() && m_TagNumPlayers >= 3)
+		BeginTagCountdown();
+	else if(Type == TAG_FRAME_HIT && m_State == STATE_PLAYING && m_TagPhase == TAG_PHASE_RUNNING && Round == m_TagRound)
+		FinishTagRound(TimeCs, false);
+}
+
+void CMiniGames::OnHammerHit(vec2 Position)
+{
+	if(!IsTagAdmin() || m_Game != GAME_TAG || m_State != STATE_PLAYING || m_TagPhase != TAG_PHASE_RUNNING)
+		return;
+
+	const int TargetId = TagTargetId();
+	if(TargetId < 0 || !GameClient()->m_Snap.m_aCharacters[TargetId].m_Active)
+		return;
+	const auto &Target = GameClient()->m_Snap.m_aCharacters[TargetId].m_Cur;
+	const vec2 TargetPos(Target.m_X, Target.m_Y);
+	if(distance(Position, TargetPos) > TAG_HIT_RADIUS)
+		return;
+
+	bool ValidAttacker = false;
+	const int Now = Client()->GameTick(g_Config.m_ClDummy);
+	for(int i = 0; i < m_TagNumPlayers; i++)
+	{
+		const int ClientId = m_aTagOrder[i];
+		if(ClientId == TargetId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
+			continue;
+		const auto &Attacker = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
+		if(Attacker.m_Weapon == WEAPON_HAMMER && Now - Attacker.m_AttackTick >= 0 && Now - Attacker.m_AttackTick <= Client()->GameTickSpeed() / 2 && distance(vec2(Attacker.m_X, Attacker.m_Y), TargetPos) <= TAG_HAMMER_REACH)
+		{
+			ValidAttacker = true;
+			break;
+		}
+	}
+	if(!ValidAttacker)
+		return;
+
+	const int ElapsedTicks = std::max(0, Now - m_TagRoundStartTick);
+	const int TimeCs = (ElapsedTicks * 100 + Client()->GameTickSpeed() / 2) / Client()->GameTickSpeed();
+	FinishTagRound(TimeCs, true);
 }
 
 void CMiniGames::StartGame(int OpponentId, bool Challenger)
@@ -652,8 +1104,29 @@ void CMiniGames::FlushEmoteQueue()
 		if(m_EmoteRetries > MAX_EMOTE_RETRIES)
 		{
 			const bool Running = m_State == STATE_PLAYING;
+			const bool TagStartFailed = m_TagStartFramePending;
+			const bool TagHitFailed = m_TagHitFramePending;
 			ResetEmoteChannel();
-			if(Running)
+			if(TagStartFailed)
+			{
+				m_TagStartFramePending = false;
+				m_TagStarting = false;
+				for(bool &Ready : m_aTagReady)
+					Ready = false;
+				SendTagRoster('L');
+			}
+			else if(TagHitFailed)
+			{
+				m_TagHitFramePending = false;
+				for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+				{
+					if(ClientId != m_TagAdminId && m_aTagAccepted[ClientId])
+						SendTo(ClientId, "Q");
+				}
+				Finish(0, "Stopped, this server does not pass emoticons through.");
+				m_ViewActive = false;
+			}
+			else if(Running)
 				Finish(0, "Stopped, this server does not pass emoticons through.");
 			return;
 		}
@@ -685,6 +1158,19 @@ bool CMiniGames::HandleEmoteEcho(int Emoticon)
 	m_EmoteWaiting = false;
 	m_EmoteTime = 0.0f;
 	m_EmoteRetries = 0;
+	if(Protocol && m_Game == GAME_TAG && (m_vEmoteQueue.empty() || !m_vEmoteQueue.front().m_Protocol))
+	{
+		if(m_TagStartFramePending)
+		{
+			m_TagStartFramePending = false;
+			BeginTagCountdown();
+		}
+		else if(m_TagHitFramePending)
+		{
+			m_TagHitFramePending = false;
+			FinishTagRound(m_TagPendingTimeCs, false);
+		}
+	}
 	return Protocol;
 }
 
@@ -716,6 +1202,12 @@ bool CMiniGames::HandleEmoteFrame(int Emoticon)
 
 void CMiniGames::ProcessFrame()
 {
+	if(m_FrameOp == EMOTE_OP_TAG)
+	{
+		ProcessTagFrame();
+		return;
+	}
+
 	if(m_FrameOp == EMOTE_OP_ACK)
 	{
 		if(!m_MovePending)
@@ -790,6 +1282,8 @@ bool CMiniGames::OnEmoticon(int ClientId, int Emoticon)
 
 	if(ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1])
 		return HandleEmoteEcho(Emoticon);
+	if(m_Game == GAME_TAG && ClientId == m_TagAdminId && (m_State == STATE_TAG_LOBBY || m_State == STATE_PLAYING || m_State == STATE_OVER))
+		return HandleEmoteFrame(Emoticon);
 	if(ClientId == m_OpponentId && (m_State == STATE_PLAYING || m_State == STATE_OVER))
 		return HandleEmoteFrame(Emoticon);
 	return false;
@@ -1069,7 +1563,7 @@ void CMiniGames::OnChatMessage(int ClientId, const char *pMessage)
 
 	if(ClientId >= 0 || LocalId < 0)
 		return;
-	if(m_State != STATE_CALLING && m_State != STATE_RINGING && m_State != STATE_INVITED)
+	if(m_State != STATE_CALLING && m_State != STATE_RINGING && m_State != STATE_INVITED && m_State != STATE_TAG_LOBBY)
 		return;
 
 	const bool Muted = str_find(pMessage, "You are not permitted to talk") != nullptr ||
@@ -1104,9 +1598,31 @@ bool CMiniGames::OnWhisper(int ClientId, int Team, const char *pMessage)
 	{
 	case 'C':
 	{
-		const bool Busy = m_State == STATE_CALLING || m_State == STATE_RINGING || m_State == STATE_INVITED || m_State == STATE_PLAYING;
+		char aGame[16];
+		const char *pGameRest = str_next_token(pRest, " ", aGame, sizeof(aGame));
+		int Game;
+		if(!str_toint(aGame, &Game) || Game < 0 || Game >= NUM_GAMES)
+		{
+			SendTo(ClientId, "D");
+			break;
+		}
+
+		int TagLobbyId = 0;
+		if(Game == GAME_TAG && (!pGameRest || !str_toint(pGameRest, &TagLobbyId) || TagLobbyId <= 0))
+		{
+			SendTo(ClientId, "D");
+			break;
+		}
+
+		const bool Busy = m_State == STATE_CALLING || m_State == STATE_RINGING || m_State == STATE_INVITED || m_State == STATE_TAG_LOBBY || m_State == STATE_PLAYING;
 		const bool Local = ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1];
-		if(FromOpponent && m_State == STATE_INVITED)
+		if(Game == GAME_TAG && m_Game == GAME_TAG && ClientId == m_TagAdminId && TagLobbyId == m_TagLobbyId && m_State == STATE_INVITED)
+		{
+			char aReady[32];
+			str_format(aReady, sizeof(aReady), "R %d", m_TagLobbyId);
+			SendTo(ClientId, aReady);
+		}
+		else if(FromOpponent && m_State == STATE_INVITED)
 		{
 			SendTo(ClientId, "R");
 		}
@@ -1116,14 +1632,8 @@ bool CMiniGames::OnWhisper(int ClientId, int Team, const char *pMessage)
 		}
 		else
 		{
-			int Game;
-			if(!str_toint(pRest, &Game) || Game < 0 || Game >= NUM_GAMES)
-			{
-				SendTo(ClientId, "D");
-				break;
-			}
-
 			ClearRetry();
+			ResetTag();
 			m_Game = (EGame)Game;
 			m_OpponentId = ClientId;
 			m_LocalId = GameClient()->m_Snap.m_LocalClientId;
@@ -1133,7 +1643,22 @@ bool CMiniGames::OnWhisper(int ClientId, int Team, const char *pMessage)
 			m_aStatus[0] = '\0';
 			m_State = STATE_INVITED;
 			m_AcceptDeadline = LocalTime() + ACCEPT_TIMEOUT;
-			SendTo(ClientId, "R");
+			if(m_Game == GAME_TAG)
+			{
+				m_TagAdminId = ClientId;
+				m_TagLobbyId = TagLobbyId;
+				m_TagPhase = TAG_PHASE_LOBBY;
+				m_aTagInvited[ClientId] = true;
+				m_aTagInvited[m_LocalId] = true;
+				m_aTagAccepted[ClientId] = true;
+				m_ViewActive = true;
+				m_CursorActive = false;
+				char aReady[32];
+				str_format(aReady, sizeof(aReady), "R %d", m_TagLobbyId);
+				SendTo(ClientId, aReady);
+			}
+			else
+				SendTo(ClientId, "R");
 		}
 		break;
 	}
@@ -1148,7 +1673,16 @@ bool CMiniGames::OnWhisper(int ClientId, int Team, const char *pMessage)
 		break;
 
 	case 'A':
-		if(FromOpponent && (m_State == STATE_CALLING || m_State == STATE_RINGING))
+		if(m_Game == GAME_TAG && IsTagAdmin() && m_State == STATE_TAG_LOBBY && !m_TagStarting)
+		{
+			int LobbyId;
+			if(str_toint(pRest, &LobbyId) && LobbyId == m_TagLobbyId && m_aTagInvited[ClientId] && (m_aTagAccepted[ClientId] || NumTagAccepted() < TAG_MAX_PLAYERS))
+			{
+				m_aTagAccepted[ClientId] = true;
+				SendTagRoster('L');
+			}
+		}
+		else if(FromOpponent && (m_State == STATE_CALLING || m_State == STATE_RINGING))
 		{
 			StartGame(ClientId, true);
 			SendTo(ClientId, "K");
@@ -1160,7 +1694,16 @@ bool CMiniGames::OnWhisper(int ClientId, int Team, const char *pMessage)
 		break;
 
 	case 'D':
-		if(FromOpponent && (m_State == STATE_CALLING || m_State == STATE_RINGING))
+		if(m_Game == GAME_TAG && IsTagAdmin() && m_State == STATE_TAG_LOBBY && m_aTagInvited[ClientId])
+		{
+			const bool WasAccepted = m_aTagAccepted[ClientId];
+			m_aTagInvited[ClientId] = false;
+			m_aTagAccepted[ClientId] = false;
+			m_aTagReady[ClientId] = false;
+			if(WasAccepted && !m_TagStarting)
+				SendTagRoster('L');
+		}
+		else if(FromOpponent && (m_State == STATE_CALLING || m_State == STATE_RINGING))
 		{
 			char aStatus[128];
 			str_format(aStatus, sizeof(aStatus), "%s declined the challenge.", OpponentName());
@@ -1168,13 +1711,96 @@ bool CMiniGames::OnWhisper(int ClientId, int Team, const char *pMessage)
 		}
 		break;
 
+	case 'L':
+	case 'S':
+		if(m_Game == GAME_TAG && ClientId == m_TagAdminId && (m_State == STATE_TAG_LOBBY || m_State == STATE_INVITED))
+		{
+			int aIds[TAG_MAX_PLAYERS];
+			int NumIds = 0;
+			int LobbyId = 0;
+			if(!ParseTagRoster(pRest, aIds, NumIds, LobbyId) || LobbyId != m_TagLobbyId)
+				break;
+			bool HasLocal = false;
+			for(int i = 0; i < NumIds; i++)
+				HasLocal |= aIds[i] == m_LocalId;
+			if(!HasLocal)
+				break;
+
+			for(bool &Accepted : m_aTagAccepted)
+				Accepted = false;
+			for(bool &Invited : m_aTagInvited)
+				Invited = false;
+			for(int i = 0; i < NumIds; i++)
+			{
+				m_aTagAccepted[aIds[i]] = true;
+				m_aTagInvited[aIds[i]] = true;
+			}
+			m_State = STATE_TAG_LOBBY;
+			m_TagPhase = TAG_PHASE_LOBBY;
+			m_TagStarting = Verb == 'S';
+			m_ViewActive = true;
+			m_CursorActive = false;
+			if(Verb == 'S')
+			{
+				m_TagNumPlayers = NumIds;
+				for(int i = 0; i < NumIds; i++)
+					m_aTagOrder[i] = aIds[i];
+				char aAck[32];
+				str_format(aAck, sizeof(aAck), "K %d", m_TagLobbyId);
+				SendTo(m_TagAdminId, aAck);
+			}
+		}
+		break;
+
 	case 'K':
-		if(FromOpponent)
+		if(m_Game == GAME_TAG && IsTagAdmin() && m_State == STATE_TAG_LOBBY && m_TagStarting)
+		{
+			int LobbyId;
+			if(str_toint(pRest, &LobbyId) && LobbyId == m_TagLobbyId && m_aTagAccepted[ClientId])
+				m_aTagReady[ClientId] = true;
+		}
+		else if(FromOpponent)
 			ClearRetry();
 		break;
 
 	case 'Q':
-		if(FromOpponent && (m_State == STATE_CALLING || m_State == STATE_RINGING || m_State == STATE_INVITED || m_State == STATE_PLAYING))
+		if(m_Game == GAME_TAG && m_TagAdminId >= 0)
+		{
+			if(ClientId == m_TagAdminId && !IsTagAdmin() && (m_State == STATE_INVITED || m_State == STATE_TAG_LOBBY || m_State == STATE_PLAYING))
+			{
+				Finish(0, "The Tag lobby was closed by its admin.");
+				ResetEmoteChannel();
+			}
+			else if(IsTagAdmin() && m_aTagAccepted[ClientId])
+			{
+				m_aTagAccepted[ClientId] = false;
+				m_aTagInvited[ClientId] = false;
+				m_aTagReady[ClientId] = false;
+				if(m_State == STATE_TAG_LOBBY)
+				{
+					if(m_TagStarting)
+					{
+						ResetEmoteChannel();
+						m_TagStartFramePending = false;
+						m_TagStarting = false;
+						for(bool &Ready : m_aTagReady)
+							Ready = false;
+					}
+					SendTagRoster('L');
+				}
+				else if(m_State == STATE_PLAYING)
+				{
+					for(int OtherId = 0; OtherId < MAX_CLIENTS; OtherId++)
+					{
+						if(OtherId != m_TagAdminId && m_aTagAccepted[OtherId])
+							SendTo(OtherId, "Q");
+					}
+					Finish(0, "A player left the Tag game.");
+					ResetEmoteChannel();
+				}
+			}
+		}
+		else if(FromOpponent && (m_State == STATE_CALLING || m_State == STATE_RINGING || m_State == STATE_INVITED || m_State == STATE_PLAYING))
 		{
 			char aStatus[128];
 			str_format(aStatus, sizeof(aStatus), "%s left the game.", OpponentName());
@@ -1237,7 +1863,25 @@ void CMiniGames::RenderGameIcon(int Game, CUIRect Area, float Alpha)
 	Grid.h = Size;
 
 	TextRender()->TextOutlineColor(COLOR_OUTLINE.WithAlpha(Alpha));
-	if(Game == GAME_CHESS)
+	if(Game == GAME_TAG)
+	{
+		const vec2 Center = Grid.Center();
+		Graphics()->TextureClear();
+		Graphics()->QuadsBegin();
+		Graphics()->SetColor(1.0f, 0.12f, 0.12f, 0.2f * Alpha);
+		Graphics()->DrawCircle(Center.x + Size * 0.2f, Center.y - Size * 0.05f, Size * 0.24f, 32);
+		Graphics()->SetColor(1.0f, 0.18f, 0.18f, 0.95f * Alpha);
+		Graphics()->DrawCircle(Center.x + Size * 0.2f, Center.y - Size * 0.05f, Size * 0.14f, 32);
+		Graphics()->SetColor(0.95f, 0.95f, 0.95f, 0.8f * Alpha);
+		Graphics()->DrawCircle(Center.x - Size * 0.24f, Center.y - Size * 0.22f, Size * 0.09f, 24);
+		Graphics()->DrawCircle(Center.x - Size * 0.27f, Center.y + Size * 0.2f, Size * 0.09f, 24);
+		Graphics()->QuadsEnd();
+
+		CUIRect Mark = {Center.x - Size * 0.02f, Center.y - Size * 0.2f, Size * 0.44f, Size * 0.3f};
+		TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, Alpha));
+		Ui()->DoLabel(&Mark, "!", Size * 0.22f, TEXTALIGN_MC);
+	}
+	else if(Game == GAME_CHESS)
 	{
 		const float CellSize = Size / 4.0f;
 		for(int i = 0; i < 16; i++)
@@ -1362,7 +2006,7 @@ void CMiniGames::RenderSelectModal()
 	if(GameClient()->m_MClientDetect.Refreshing())
 		pHint = Localize("Looking for other M-Client players on this server...");
 	else if(NumPlayers > 0)
-		pHint = Localize("Pick the M-Client player you want to challenge.");
+		pHint = m_Game == GAME_TAG ? Localize("Pick at least two players to invite to your Tag lobby.") : Localize("Pick the M-Client player you want to challenge.");
 	else if(GameClient()->m_MClientDetect.Enabled())
 		pHint = Localize("No other M-Client player answered on this server.");
 	else
@@ -1396,9 +2040,25 @@ void CMiniGames::RenderSelectModal()
 
 		const int ClientId = aPlayerIds[i];
 		if(Ui()->DoButtonLogic(&s_aTeeButtonIds[ClientId], 0, &Cell, BUTTONFLAG_LEFT))
-			m_SelectedId = m_SelectedId == ClientId ? -1 : ClientId;
+		{
+			if(m_Game == GAME_TAG)
+			{
+				if(m_aTagSelected[ClientId])
+					m_aTagSelected[ClientId] = false;
+				else
+				{
+					int SelectedCount = 0;
+					for(bool Selected : m_aTagSelected)
+						SelectedCount += Selected ? 1 : 0;
+					if(SelectedCount < TAG_MAX_PLAYERS - 1)
+						m_aTagSelected[ClientId] = true;
+				}
+			}
+			else
+				m_SelectedId = m_SelectedId == ClientId ? -1 : ClientId;
+		}
 
-		const bool Selected = m_SelectedId == ClientId;
+		const bool Selected = m_Game == GAME_TAG ? m_aTagSelected[ClientId] : m_SelectedId == ClientId;
 		if(Selected)
 			Cell.Draw(CMenus::AccentColor().WithAlpha(0.25f), IGraphics::CORNER_ALL, 4.0f);
 		else if(Ui()->HotItem() == &s_aTeeButtonIds[ClientId])
@@ -1438,12 +2098,18 @@ void CMiniGames::RenderSelectModal()
 	static CButtonContainer s_RefreshButton;
 	static CButtonContainer s_CancelButton;
 
-	const bool CanChallenge = m_SelectedId >= 0;
+	int SelectedCount = 0;
+	for(bool Selected : m_aTagSelected)
+		SelectedCount += Selected ? 1 : 0;
+	const bool CanChallenge = m_Game == GAME_TAG ? SelectedCount >= 2 : m_SelectedId >= 0;
 	ChallengeButton.Draw(CanChallenge ? (Ui()->HotItem() == &s_ChallengeButton ? CMenus::AccentColor() : CMenus::AccentColor().WithAlpha(0.7f)) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.1f), IGraphics::CORNER_ALL, 5.0f);
-	Ui()->DoLabel(&ChallengeButton, Localize("Challenge"), 11.0f, TEXTALIGN_MC);
+	Ui()->DoLabel(&ChallengeButton, m_Game == GAME_TAG ? Localize("Create lobby") : Localize("Challenge"), 11.0f, TEXTALIGN_MC);
 	if(Ui()->DoButtonLogic(&s_ChallengeButton, 0, &ChallengeButton, BUTTONFLAG_LEFT) && CanChallenge)
 	{
-		Challenge(m_SelectedId);
+		if(m_Game == GAME_TAG)
+			ChallengeTag();
+		else
+			Challenge(m_SelectedId);
 		return;
 	}
 
@@ -1455,6 +2121,189 @@ void CMiniGames::RenderSelectModal()
 	CancelButton.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_CancelButton ? 0.2f : 0.1f), IGraphics::CORNER_ALL, 5.0f);
 	Ui()->DoLabel(&CancelButton, Localize("Cancel"), 11.0f, TEXTALIGN_MC);
 	if(Ui()->DoButtonLogic(&s_CancelButton, 0, &CancelButton, BUTTONFLAG_LEFT))
+		Close();
+}
+
+void CMiniGames::RenderTagLobby(bool Interactive)
+{
+	CUIRect Window = OpenWindow(380.0f, 286.0f);
+	CUIRect Title, Status, Players, ButtonRow;
+	Window.HSplitTop(22.0f, &Title, &Window);
+	Window.HSplitTop(18.0f, &Status, &Window);
+	Window.HSplitTop(8.0f, nullptr, &Window);
+	Window.HSplitBottom(24.0f, &Players, &ButtonRow);
+	Players.HSplitBottom(8.0f, &Players, nullptr);
+
+	Ui()->DoLabel(&Title, Localize("Tag lobby"), 16.0f, TEXTALIGN_ML);
+	char aStatus[128];
+	StatusText(aStatus, sizeof(aStatus));
+	TextRender()->TextColor(ColorRGBA(0.8f, 0.8f, 0.8f, 1.0f));
+	Ui()->DoLabel(&Status, aStatus, 9.0f, TEXTALIGN_ML);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	CScrollRegionParams ScrollParams;
+	ScrollParams.m_ScrollUnit = 18.0f;
+	static CScrollRegion s_TagLobbyScroll;
+	s_TagLobbyScroll.Begin(&Players, &ScrollParams);
+	int RowIndex = 0;
+	for(int Pass = 0; Pass < 2; Pass++)
+	{
+		for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+		{
+			if(!m_aTagInvited[ClientId] || (Pass == 0) != m_aTagAccepted[ClientId])
+				continue;
+			CUIRect Row;
+			Players.HSplitTop(18.0f, &Row, &Players);
+			s_TagLobbyScroll.AddRect(Row);
+			if(RowIndex++ % 2 == 0)
+				Row.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.04f), IGraphics::CORNER_ALL, 3.0f);
+
+			CUIRect State, Name;
+			Row.VSplitLeft(64.0f, &State, &Name);
+			TextRender()->TextColor(m_aTagAccepted[ClientId] ? ColorRGBA(0.45f, 1.0f, 0.55f, 1.0f) : ColorRGBA(0.65f, 0.65f, 0.65f, 1.0f));
+			Ui()->DoLabel(&State, m_aTagAccepted[ClientId] ? Localize("Ready") : Localize("Invited"), 8.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(ClientId == m_TagAdminId ? CMenus::AccentColor() : TextRender()->DefaultTextColor());
+			char aName[MAX_NAME_LENGTH + 16];
+			str_format(aName, sizeof(aName), ClientId == m_TagAdminId ? "%s (admin)" : "%s", GameClient()->m_aClients[ClientId].m_aName);
+			Ui()->DoLabel(&Name, aName, 9.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
+	}
+	s_TagLobbyScroll.End();
+	if(!Interactive)
+	{
+		TextRender()->TextColor(ColorRGBA(0.6f, 0.6f, 0.6f, 1.0f));
+		Ui()->DoLabel(&ButtonRow, Localize("Left click to use the mouse"), 8.0f, TEXTALIGN_MC);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+		return;
+	}
+
+	CUIRect LeaveButton, StartButton;
+	ButtonRow.VSplitRight(90.0f, &ButtonRow, &LeaveButton);
+	ButtonRow.VSplitRight(8.0f, &ButtonRow, nullptr);
+	ButtonRow.VSplitRight(90.0f, nullptr, &StartButton);
+	static CButtonContainer s_TagLeaveButton;
+	static CButtonContainer s_TagStartButton;
+	LeaveButton.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_TagLeaveButton ? 0.25f : 0.12f), IGraphics::CORNER_ALL, 5.0f);
+	Ui()->DoLabel(&LeaveButton, IsTagAdmin() ? Localize("Cancel") : Localize("Leave"), 10.0f, TEXTALIGN_MC);
+	if(Ui()->DoButtonLogic(&s_TagLeaveButton, 0, &LeaveButton, BUTTONFLAG_LEFT))
+	{
+		Close();
+		return;
+	}
+
+	if(!IsTagAdmin())
+		return;
+	const bool CanStart = NumTagAccepted() >= 3 && !m_TagStarting;
+	StartButton.Draw(CanStart ? (Ui()->HotItem() == &s_TagStartButton ? CMenus::AccentColor() : CMenus::AccentColor().WithAlpha(0.7f)) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.1f), IGraphics::CORNER_ALL, 5.0f);
+	Ui()->DoLabel(&StartButton, Localize("Start"), 10.0f, TEXTALIGN_MC);
+	if(CanStart && Ui()->DoButtonLogic(&s_TagStartButton, 0, &StartButton, BUTTONFLAG_LEFT))
+		StartTag();
+}
+
+void CMiniGames::RenderTagTimer()
+{
+	if(m_Game != GAME_TAG || m_State != STATE_PLAYING)
+		return;
+	const int TargetId = TagTargetId();
+	if(TargetId < 0)
+		return;
+
+	const CUIRect Screen = *Ui()->Screen();
+	CUIRect Timer = {Screen.x + Screen.w / 2.0f - 100.0f, Screen.y + 28.0f, 200.0f, 58.0f};
+	Timer.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.55f), IGraphics::CORNER_ALL, 8.0f);
+	CUIRect Value, Runner;
+	Timer.Margin(6.0f, &Timer);
+	Timer.HSplitTop(32.0f, &Value, &Runner);
+	char aValue[64];
+	if(m_TagHitFramePending)
+	{
+		str_copy(aValue, Localize("Hit!"));
+		TextRender()->TextColor(ColorRGBA(1.0f, 0.3f, 0.3f, 1.0f));
+	}
+	else if(m_TagPhase == TAG_PHASE_COUNTDOWN)
+	{
+		const int TicksLeft = std::max(0, m_TagRoundStartTick - Client()->GameTick(g_Config.m_ClDummy));
+		const int SecondsLeft = std::max(1, (TicksLeft + Client()->GameTickSpeed() - 1) / Client()->GameTickSpeed());
+		str_format(aValue, sizeof(aValue), "%d", SecondsLeft);
+		TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+	}
+	else
+	{
+		const int ElapsedTicks = std::max(0, Client()->GameTick(g_Config.m_ClDummy) - m_TagRoundStartTick);
+		str_format(aValue, sizeof(aValue), "%.2f s", ElapsedTicks / (float)Client()->GameTickSpeed());
+		TextRender()->TextColor(ColorRGBA(1.0f, 0.3f, 0.3f, 1.0f));
+	}
+	Ui()->DoLabel(&Value, aValue, 26.0f, TEXTALIGN_MC);
+	TextRender()->TextColor(ColorRGBA(1.0f, 0.35f, 0.35f, 1.0f));
+	Ui()->DoLabel(&Runner, GameClient()->m_aClients[TargetId].m_aName, 10.0f, TEXTALIGN_MC);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+}
+
+void CMiniGames::RenderTagResults(bool Interactive)
+{
+	CUIRect Window = OpenWindow(380.0f, 320.0f);
+	CUIRect Title, Winner, Rows, ButtonRow;
+	Window.HSplitTop(24.0f, &Title, &Window);
+	Window.HSplitTop(22.0f, &Winner, &Window);
+	Window.HSplitTop(8.0f, nullptr, &Window);
+	Window.HSplitBottom(24.0f, &Rows, &ButtonRow);
+	Rows.HSplitBottom(8.0f, &Rows, nullptr);
+	Ui()->DoLabel(&Title, Localize("Tag results"), 16.0f, TEXTALIGN_ML);
+	char aWinner[128];
+	str_format(aWinner, sizeof(aWinner), Localize("Winner: %s"), m_aStatus);
+	TextRender()->TextColor(ColorRGBA(1.0f, 0.85f, 0.3f, 1.0f));
+	Ui()->DoLabel(&Winner, aWinner, 11.0f, TEXTALIGN_ML);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	int aRanked[TAG_MAX_PLAYERS];
+	for(int i = 0; i < m_TagNumPlayers; i++)
+		aRanked[i] = m_aTagOrder[i];
+	std::stable_sort(aRanked, aRanked + m_TagNumPlayers, [&](int A, int B) { return m_aTagTimeCs[A] > m_aTagTimeCs[B]; });
+
+	CScrollRegionParams ScrollParams;
+	ScrollParams.m_ScrollUnit = 20.0f;
+	static CScrollRegion s_TagResultsScroll;
+	s_TagResultsScroll.Begin(&Rows, &ScrollParams);
+	for(int Rank = 0; Rank < m_TagNumPlayers; Rank++)
+	{
+		CUIRect Row;
+		Rows.HSplitTop(20.0f, &Row, &Rows);
+		s_TagResultsScroll.AddRect(Row);
+		if(Rank == 0)
+			Row.Draw(ColorRGBA(1.0f, 0.75f, 0.15f, 0.13f), IGraphics::CORNER_ALL, 3.0f);
+		else if(Rank % 2 == 1)
+			Row.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.04f), IGraphics::CORNER_ALL, 3.0f);
+		CUIRect Place, Time, Name;
+		Row.VSplitLeft(38.0f, &Place, &Name);
+		Name.VSplitRight(70.0f, &Name, &Time);
+		char aPlace[16];
+		char aTime[32];
+		str_format(aPlace, sizeof(aPlace), "#%d", Rank + 1);
+		str_format(aTime, sizeof(aTime), "%.2f s", m_aTagTimeCs[aRanked[Rank]] / 100.0f);
+		TextRender()->TextColor(Rank == 0 ? ColorRGBA(1.0f, 0.85f, 0.3f, 1.0f) : ColorRGBA(0.8f, 0.8f, 0.8f, 1.0f));
+		Ui()->DoLabel(&Place, aPlace, 9.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(aRanked[Rank] == GameClient()->m_Snap.m_LocalClientId ? CMenus::AccentColor() : TextRender()->DefaultTextColor());
+		Ui()->DoLabel(&Name, GameClient()->m_aClients[aRanked[Rank]].m_aName, 9.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(ColorRGBA(0.85f, 0.85f, 0.85f, 1.0f));
+		Ui()->DoLabel(&Time, aTime, 9.0f, TEXTALIGN_MR);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+	s_TagResultsScroll.End();
+	if(!Interactive)
+	{
+		TextRender()->TextColor(ColorRGBA(0.6f, 0.6f, 0.6f, 1.0f));
+		Ui()->DoLabel(&ButtonRow, Localize("Left click to use the mouse"), 8.0f, TEXTALIGN_MC);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+		return;
+	}
+
+	CUIRect CloseButton;
+	ButtonRow.VSplitRight(90.0f, nullptr, &CloseButton);
+	static CButtonContainer s_TagResultsClose;
+	CloseButton.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_TagResultsClose ? 0.25f : 0.12f), IGraphics::CORNER_ALL, 5.0f);
+	Ui()->DoLabel(&CloseButton, Localize("Close"), 10.0f, TEXTALIGN_MC);
+	if(Ui()->DoButtonLogic(&s_TagResultsClose, 0, &CloseButton, BUTTONFLAG_LEFT))
 		Close();
 }
 
@@ -1531,6 +2380,17 @@ void CMiniGames::RenderStatusBar(float Alpha)
 
 void CMiniGames::RenderView(bool Interactive, float Alpha)
 {
+	if(m_Game == GAME_TAG && m_State == STATE_TAG_LOBBY)
+	{
+		RenderTagLobby(Interactive);
+		return;
+	}
+	if(m_Game == GAME_TAG && m_TagPhase == TAG_PHASE_RESULTS)
+	{
+		RenderTagResults(Interactive);
+		return;
+	}
+
 	const bool ShowBoard = m_HasBoard && (m_State == STATE_PLAYING || m_State == STATE_OVER);
 
 	const CUIRect Screen = *Ui()->Screen();
@@ -1634,8 +2494,20 @@ void CMiniGames::RenderView(bool Interactive, float Alpha)
 	{
 		if(m_State == STATE_INVITED)
 		{
-			StartGame(m_OpponentId, false);
-			SendProtocol("A", MAX_RETRIES);
+			if(m_Game == GAME_TAG)
+			{
+				m_aTagAccepted[m_LocalId] = true;
+				m_State = STATE_TAG_LOBBY;
+				m_TagPhase = TAG_PHASE_LOBBY;
+				char aAccept[32];
+				str_format(aAccept, sizeof(aAccept), "A %d", m_TagLobbyId);
+				SendTo(m_TagAdminId, aAccept);
+			}
+			else
+			{
+				StartGame(m_OpponentId, false);
+				SendProtocol("A", MAX_RETRIES);
+			}
 		}
 		else
 		{
@@ -1818,6 +2690,7 @@ void CMiniGames::RenderChessBoard(CUIRect Grid, bool Interactive, float Alpha)
 void CMiniGames::OnUpdate()
 {
 	FlushSendQueue();
+	UpdateTagLobby();
 	if(m_State == STATE_OVER && m_vEmoteQueue.empty() && !m_EmoteWaiting && !m_MovePending)
 		SetEmoteGameShowAll(false);
 }
@@ -1840,10 +2713,28 @@ void CMiniGames::OnRender()
 
 	if(m_State != STATE_SELECT && m_State != STATE_OVER && m_LocalId != GameClient()->m_Snap.m_LocalClientId)
 	{
+		if(m_Game == GAME_TAG && m_TagAdminId >= 0)
+		{
+			if(m_LocalId == m_TagAdminId)
+			{
+				for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+				{
+					if(ClientId != m_TagAdminId && m_aTagInvited[ClientId])
+						SendTo(ClientId, "Q");
+				}
+			}
+			else
+				SendTo(m_TagAdminId, "Q");
+		}
 		Finish(0, "Aborted, you switched to another tee.");
 		ResetEmoteChannel();
 	}
-	else if(m_State != STATE_SELECT && m_State != STATE_OVER && (m_OpponentId < 0 || !GameClient()->m_aClients[m_OpponentId].m_Active))
+	else if(m_Game == GAME_TAG && m_State != STATE_SELECT && m_State != STATE_OVER && m_TagAdminId >= 0 && !GameClient()->m_aClients[m_TagAdminId].m_Active)
+	{
+		Finish(0, "The Tag lobby admin left the server.");
+		ResetEmoteChannel();
+	}
+	else if(m_Game != GAME_TAG && m_State != STATE_SELECT && m_State != STATE_OVER && (m_OpponentId < 0 || !GameClient()->m_aClients[m_OpponentId].m_Active))
 	{
 		Finish(0, "Your opponent left the server.");
 		ResetEmoteChannel();
@@ -1863,7 +2754,7 @@ void CMiniGames::OnRender()
 	UpdateRetry();
 	UpdateMoveRetry();
 
-	if(m_State == STATE_OVER && !m_HasBoard && m_ViewActive && !m_KeyBlocked)
+	if(m_State == STATE_OVER && !m_HasBoard && m_ViewActive && !m_KeyBlocked && !(m_Game == GAME_TAG && m_TagPhase == TAG_PHASE_RESULTS))
 		OpenGames();
 
 	if(m_State == STATE_GAMES || m_State == STATE_SELECT)
@@ -1884,7 +2775,7 @@ void CMiniGames::OnRender()
 	}
 
 	float Alpha = 1.0f;
-	if(m_State == STATE_OVER)
+	if(m_State == STATE_OVER && !(m_Game == GAME_TAG && m_TagPhase == TAG_PHASE_RESULTS))
 	{
 		if(m_ViewActive)
 			m_FadeTime = LocalTime() + RESULT_HOLD;
@@ -1905,22 +2796,25 @@ void CMiniGames::OnRender()
 	if(m_IgnoreClick && !Input()->KeyIsPressed(KEY_MOUSE_1))
 		m_IgnoreClick = false;
 
-	const bool CursorShown = ViewShown() && m_CursorActive;
+	const bool ViewVisible = ViewShown();
+	const bool CursorShown = ViewVisible && m_CursorActive;
 	const bool Interactive = CursorShown && !m_IgnoreClick;
 	Ui()->MapScreen();
-	if(CursorShown)
+	if(ViewVisible)
 	{
 		Ui()->StartCheck();
 		Ui()->Update();
 	}
 
 	RenderStatusBar(Alpha);
-	if(ViewShown())
+	RenderTagTimer();
+	if(ViewVisible)
 		RenderView(Interactive, Alpha);
 
-	if(CursorShown)
+	if(ViewVisible)
 	{
-		RenderTools()->RenderCursor(Ui()->MousePos(), 24.0f * g_Config.m_ClMClientMenuCursorSize / 100.0f);
+		if(CursorShown)
+			RenderTools()->RenderCursor(Ui()->MousePos(), 24.0f * g_Config.m_ClMClientMenuCursorSize / 100.0f);
 		Ui()->FinishCheck();
 	}
 }

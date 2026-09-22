@@ -5,6 +5,7 @@
 
 #include <engine/console.h>
 #include <engine/input.h>
+#include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
 #include <game/client/ui_rect.h>
@@ -20,6 +21,7 @@ public:
 		GAME_TICTACTOE,
 		GAME_CHESS,
 		GAME_BATTLESHIP,
+		GAME_TAG,
 		NUM_GAMES,
 	};
 
@@ -41,6 +43,8 @@ public:
 	void OnChatMessage(int ClientId, const char *pMessage);
 
 	bool OnEmoticon(int ClientId, int Emoticon);
+	void OnHammerHit(vec2 Position);
+	bool IsTagTarget(int ClientId) const;
 
 	bool QueueManualEmote(int Emoticon);
 
@@ -55,6 +59,7 @@ private:
 		STATE_CALLING,
 		STATE_RINGING,
 		STATE_INVITED,
+		STATE_TAG_LOBBY,
 		STATE_PLAYING,
 		STATE_OVER,
 	};
@@ -126,13 +131,41 @@ private:
 	int m_FrameOp = -1;
 	int m_FrameExpect = 0;
 	int m_FrameLen = 0;
-	int m_aFrame[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+	int m_aFrame[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	int m_aMoveFrame[5] = {0, 0, 0, 0, 0};
 	int m_MoveFrameLen = 0;
 	bool m_MovePending = false;
 	float m_MoveRetryTime = 0.0f;
 	int m_MoveRetryCount = 0;
+
+	static constexpr int TAG_MAX_PLAYERS = 16;
+	enum ETagPhase
+	{
+		TAG_PHASE_NONE,
+		TAG_PHASE_LOBBY,
+		TAG_PHASE_COUNTDOWN,
+		TAG_PHASE_RUNNING,
+		TAG_PHASE_RESULTS,
+	};
+	ETagPhase m_TagPhase = TAG_PHASE_NONE;
+	int m_TagAdminId = -1;
+	int m_TagLobbyId = 0;
+	int m_TagNumPlayers = 0;
+	int m_TagRound = 0;
+	int m_TagRoundStartTick = 0;
+	int m_TagStartRetries = 0;
+	float m_TagStartRetryTime = 0.0f;
+	bool m_TagStarting = false;
+	bool m_TagStartFramePending = false;
+	bool m_TagHitFramePending = false;
+	int m_TagPendingTimeCs = 0;
+	bool m_aTagSelected[MAX_CLIENTS] = {false};
+	bool m_aTagInvited[MAX_CLIENTS] = {false};
+	bool m_aTagAccepted[MAX_CLIENTS] = {false};
+	bool m_aTagReady[MAX_CLIENTS] = {false};
+	int m_aTagOrder[TAG_MAX_PLAYERS] = {0};
+	int m_aTagTimeCs[MAX_CLIENTS] = {0};
 
 	const char *GameName() const;
 	bool AmWhite() const { return m_MyMark == 'X'; }
@@ -152,7 +185,20 @@ private:
 	void Close();
 	void Finish(char Result, const char *pStatus);
 	void Challenge(int ClientId);
+	void ChallengeTag();
 	void StartGame(int OpponentId, bool Challenger);
+	void ResetTag();
+	void UpdateTagLobby();
+	void SendTagRoster(char Verb);
+	bool ParseTagRoster(const char *pText, int *pIds, int &NumIds, int &LobbyId) const;
+	void StartTag();
+	void BeginTagCountdown();
+	void FinishTagRound(int TimeCs, bool Broadcast);
+	void SendTagFrame(int Type, int Round, int TimeCs);
+	void ProcessTagFrame();
+	int TagTargetId() const;
+	bool IsTagAdmin() const;
+	int NumTagAccepted() const;
 
 	void SendTo(int ClientId, const char *pMessage);
 	void SendProtocol(const char *pMessage, int MaxRetries);
@@ -186,6 +232,9 @@ private:
 	void RenderGameMenu();
 	void RenderGameIcon(int Game, CUIRect Area, float Alpha);
 	void RenderSelectModal();
+	void RenderTagLobby(bool Interactive);
+	void RenderTagTimer();
+	void RenderTagResults(bool Interactive);
 	void RenderStatusBar(float Alpha);
 	void RenderView(bool Interactive, float Alpha);
 	void RenderBoard(CUIRect Area, bool Interactive, float Alpha);
