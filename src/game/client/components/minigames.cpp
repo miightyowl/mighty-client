@@ -1881,11 +1881,12 @@ void CMiniGames::RenderGameIcon(int Game, CUIRect Area, float Alpha)
 	if(Game == GAME_TAG)
 	{
 		const vec2 Center = Grid.Center();
+		const ColorRGBA Accent = CMenus::AccentColor();
 		Graphics()->TextureClear();
 		Graphics()->QuadsBegin();
-		Graphics()->SetColor(1.0f, 0.12f, 0.12f, 0.2f * Alpha);
+		Graphics()->SetColor(Accent.r, Accent.g, Accent.b, 0.2f * Alpha);
 		Graphics()->DrawCircle(Center.x + Size * 0.2f, Center.y - Size * 0.05f, Size * 0.24f, 32);
-		Graphics()->SetColor(1.0f, 0.18f, 0.18f, 0.95f * Alpha);
+		Graphics()->SetColor(Accent.r, Accent.g, Accent.b, 0.95f * Alpha);
 		Graphics()->DrawCircle(Center.x + Size * 0.2f, Center.y - Size * 0.05f, Size * 0.14f, 32);
 		Graphics()->SetColor(0.95f, 0.95f, 0.95f, 0.8f * Alpha);
 		Graphics()->DrawCircle(Center.x - Size * 0.24f, Center.y - Size * 0.22f, Size * 0.09f, 24);
