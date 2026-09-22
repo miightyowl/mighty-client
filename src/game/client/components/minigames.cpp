@@ -818,9 +818,9 @@ void CMiniGames::ProcessTagFrame()
 		FinishTagRound(TimeCs, false);
 }
 
-void CMiniGames::OnHammerHit(vec2 Position)
+void CMiniGames::OnHammerHit(vec2 Position, int AttackerId)
 {
-	if(!IsTagAdmin() || m_Game != GAME_TAG || m_State != STATE_PLAYING || m_TagPhase != TAG_PHASE_RUNNING)
+	if(m_Game != GAME_TAG || m_State != STATE_PLAYING || m_TagPhase != TAG_PHASE_RUNNING || m_TagHitFramePending)
 		return;
 
 	const int TargetId = TagTargetId();
@@ -831,21 +831,25 @@ void CMiniGames::OnHammerHit(vec2 Position)
 	if(distance(Position, TargetPos) > TAG_HIT_RADIUS)
 		return;
 
-	bool ValidAttacker = false;
 	const int Now = Client()->GameTick(g_Config.m_ClDummy);
-	for(int i = 0; i < m_TagNumPlayers; i++)
+	if(AttackerId < 0)
 	{
-		const int ClientId = m_aTagOrder[i];
-		if(ClientId == TargetId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
-			continue;
-		const auto &Attacker = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
-		if(distance(vec2(Attacker.m_X, Attacker.m_Y), TargetPos) <= TAG_HAMMER_REACH)
+		for(int LocalId : GameClient()->m_aLocalIds)
 		{
-			ValidAttacker = true;
-			break;
+			if(LocalId < 0 || LocalId == TargetId || !m_aTagAccepted[LocalId] || !GameClient()->m_Snap.m_aCharacters[LocalId].m_Active)
+				continue;
+			const auto &Local = GameClient()->m_Snap.m_aCharacters[LocalId].m_Cur;
+			const int AttackAge = Now - Local.m_AttackTick;
+			if(Local.m_Weapon == WEAPON_HAMMER && AttackAge >= 0 && AttackAge <= Client()->GameTickSpeed() && distance(vec2(Local.m_X, Local.m_Y), TargetPos) <= TAG_HAMMER_REACH)
+			{
+				AttackerId = LocalId;
+				break;
+			}
 		}
 	}
-	if(!ValidAttacker)
+
+	const bool LocalAttacker = AttackerId == GameClient()->m_aLocalIds[0] || AttackerId == GameClient()->m_aLocalIds[1];
+	if(!LocalAttacker || AttackerId == TargetId || AttackerId < 0 || AttackerId >= MAX_CLIENTS || !m_aTagAccepted[AttackerId])
 		return;
 
 	const int ElapsedTicks = std::max(0, Now - m_TagRoundStartTick);
@@ -1020,6 +1024,7 @@ void CMiniGames::ResetEmoteChannel()
 	m_EmoteTime = 0.0f;
 	m_EmoteRetries = 0;
 	m_FrameOp = -1;
+	m_FrameClientId = -1;
 	m_FrameExpect = 0;
 	m_FrameLen = 0;
 	ClearMoveRetry();
@@ -1188,17 +1193,18 @@ bool CMiniGames::HandleEmoteEcho(int Emoticon)
 	return Protocol;
 }
 
-bool CMiniGames::HandleEmoteFrame(int Emoticon)
+bool CMiniGames::HandleEmoteFrame(int ClientId, int Emoticon)
 {
 	if(Emoticon >= EMOTE_RADIX)
 	{
 		m_FrameExpect = FramePayload(Emoticon, m_Game);
 		m_FrameOp = m_FrameExpect < 0 ? -1 : Emoticon;
+		m_FrameClientId = m_FrameOp < 0 ? -1 : ClientId;
 		m_FrameLen = 0;
 		return m_FrameOp >= 0;
 	}
 
-	if(m_FrameOp < 0)
+	if(m_FrameOp < 0 || ClientId != m_FrameClientId)
 		return false;
 
 	m_aFrame[m_FrameLen++] = Emoticon;
@@ -1211,6 +1217,7 @@ bool CMiniGames::HandleEmoteFrame(int Emoticon)
 	if(Check % EMOTE_RADIX == m_aFrame[m_FrameExpect])
 		ProcessFrame();
 	m_FrameOp = -1;
+	m_FrameClientId = -1;
 	return true;
 }
 
@@ -1296,10 +1303,14 @@ bool CMiniGames::OnEmoticon(int ClientId, int Emoticon)
 
 	if(ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1])
 		return HandleEmoteEcho(Emoticon);
-	if(m_Game == GAME_TAG && ClientId == m_TagAdminId && (m_State == STATE_TAG_LOBBY || m_State == STATE_PLAYING || m_State == STATE_OVER))
-		return HandleEmoteFrame(Emoticon);
+	if(m_Game == GAME_TAG && (m_State == STATE_TAG_LOBBY || m_State == STATE_PLAYING || m_State == STATE_OVER))
+	{
+		const bool AcceptedHitSender = m_State == STATE_PLAYING && ClientId >= 0 && ClientId < MAX_CLIENTS && m_aTagAccepted[ClientId] && ClientId != TagTargetId();
+		if(ClientId == m_TagAdminId || AcceptedHitSender)
+			return HandleEmoteFrame(ClientId, Emoticon);
+	}
 	if(ClientId == m_OpponentId && (m_State == STATE_PLAYING || m_State == STATE_OVER))
-		return HandleEmoteFrame(Emoticon);
+		return HandleEmoteFrame(ClientId, Emoticon);
 	return false;
 }
 
