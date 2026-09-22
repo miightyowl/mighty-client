@@ -237,10 +237,11 @@ void CMClientDetect::ForgetLeftPeers()
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
 	{
 		const CGameClient::CClientData &Client = GameClient()->m_aClients[ClientId];
+		CPeer &Peer = m_aPeers[ClientId];
 		if(!Client.m_Active)
 			ClearPeer(ClientId);
-		else if(m_aPeers[ClientId].m_aName[0] != '\0' && str_comp(Client.m_aRealName, m_aPeers[ClientId].m_aName) != 0)
-			ClearPeer(ClientId);
+		else if(Peer.m_aName[0] != '\0' && str_comp(Client.m_aRealName, Peer.m_aName) != 0)
+			str_copy(Peer.m_aName, Client.m_aRealName);
 	}
 }
 
