@@ -295,7 +295,7 @@ void CMiniGames::StatusText(char *pBuf, size_t Size) const
 		{
 			const int TargetId = TagTargetId();
 			if(m_TagPhase == TAG_PHASE_COUNTDOWN)
-				str_format(pBuf, Size, Localize("Next runner: %s"), TargetId >= 0 ? GameClient()->m_aClients[TargetId].m_aName : "");
+				str_copy(pBuf, Localize("Get ready..."), Size);
 			else if(TargetId == GameClient()->m_Snap.m_LocalClientId)
 				str_copy(pBuf, Localize("Run! Avoid the hammers."), Size);
 			else
@@ -2254,7 +2254,8 @@ void CMiniGames::RenderTagTimer()
 	}
 	Ui()->DoLabel(&Value, aValue, 26.0f, TEXTALIGN_MC);
 	TextRender()->TextColor(ColorRGBA(1.0f, 0.35f, 0.35f, 1.0f));
-	Ui()->DoLabel(&Runner, GameClient()->m_aClients[TargetId].m_aName, 10.0f, TEXTALIGN_MC);
+	if(m_TagPhase == TAG_PHASE_RUNNING || m_TagHitFramePending)
+		Ui()->DoLabel(&Runner, GameClient()->m_aClients[TargetId].m_aName, 10.0f, TEXTALIGN_MC);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 }
 
