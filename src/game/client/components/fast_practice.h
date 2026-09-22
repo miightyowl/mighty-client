@@ -57,6 +57,8 @@ private:
 	int m_SpectatorStartTele = 0;
 	int m_ClientId = -1;
 	int m_LastTick = 0;
+	int64_t m_LastUpdateTime = 0;
+	double m_LocalTickFraction = 0.0;
 
 	CGameWorld m_World;
 	CGameWorld m_RenderWorld;
