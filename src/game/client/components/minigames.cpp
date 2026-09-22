@@ -250,7 +250,7 @@ bool CMiniGames::NeedsAttention() const
 bool CMiniGames::ViewShown() const
 {
 	if(m_Game == GAME_TAG)
-		return m_State == STATE_INVITED || (m_State == STATE_TAG_LOBBY && m_ViewActive) || m_TagPhase == TAG_PHASE_RESULTS;
+		return m_State == STATE_INVITED || (m_State == STATE_TAG_LOBBY && m_ViewActive) || (m_TagPhase == TAG_PHASE_RESULTS && m_ViewActive);
 	if(m_State == STATE_INVITED || m_State == STATE_PLAYING)
 		return m_ViewActive;
 	return m_ViewActive && m_State == STATE_OVER && m_HasBoard;
@@ -360,7 +360,7 @@ void CMiniGames::HideView()
 {
 	if(m_State == STATE_GAMES || m_State == STATE_SELECT)
 		Close();
-	if(m_Game == GAME_TAG && (m_State == STATE_INVITED || m_TagPhase == TAG_PHASE_RESULTS))
+	if(m_Game == GAME_TAG && m_State == STATE_INVITED)
 		return;
 	m_ViewActive = false;
 	m_CursorActive = false;
@@ -645,7 +645,7 @@ void CMiniGames::BeginTagCountdown()
 	m_TagRound = 0;
 	m_TagRoundStartTick = Client()->GameTick(g_Config.m_ClDummy) + TAG_COUNTDOWN_SECONDS * Client()->GameTickSpeed();
 	m_TagStarting = false;
-	m_ViewActive = false;
+	m_ViewActive = true;
 	m_CursorActive = false;
 	m_HasBoard = false;
 	for(int &Time : m_aTagTimeCs)
@@ -2826,7 +2826,8 @@ void CMiniGames::OnRender()
 		Ui()->Update();
 	}
 
-	RenderStatusBar(Alpha);
+	if(!(m_Game == GAME_TAG && m_State == STATE_PLAYING))
+		RenderStatusBar(Alpha);
 	RenderTagTimer();
 	if(ViewVisible)
 		RenderView(Interactive, Alpha);
