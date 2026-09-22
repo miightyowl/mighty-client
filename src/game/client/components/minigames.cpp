@@ -139,7 +139,10 @@ void CMiniGames::ConKeyMiniGames(IConsole::IResult *pResult, void *pUserData)
 
 	if(ToggleMode && pSelf->m_ViewActive)
 	{
-		pSelf->HideView();
+		if(pSelf->m_Game == GAME_TAG && pSelf->m_TagPhase == TAG_PHASE_RESULTS)
+			pSelf->Close();
+		else
+			pSelf->HideView();
 		return;
 	}
 
@@ -2228,11 +2231,16 @@ void CMiniGames::RenderTagTimer()
 		return;
 
 	const CUIRect Screen = *Ui()->Screen();
-	CUIRect Timer = {Screen.x + Screen.w / 2.0f - 100.0f, Screen.y + 28.0f, 200.0f, 58.0f};
+	const bool ShowRunner = m_TagPhase == TAG_PHASE_RUNNING || m_TagHitFramePending;
+	const float Height = ShowRunner ? 58.0f : 40.0f;
+	CUIRect Timer = {Screen.x + Screen.w / 2.0f - 100.0f, Screen.y + 28.0f, 200.0f, Height};
 	Timer.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.55f), IGraphics::CORNER_ALL, 8.0f);
 	CUIRect Value, Runner;
 	Timer.Margin(6.0f, &Timer);
-	Timer.HSplitTop(32.0f, &Value, &Runner);
+	if(ShowRunner)
+		Timer.HSplitTop(32.0f, &Value, &Runner);
+	else
+		Value = Timer;
 	char aValue[64];
 	if(m_TagHitFramePending)
 	{
@@ -2254,7 +2262,7 @@ void CMiniGames::RenderTagTimer()
 	}
 	Ui()->DoLabel(&Value, aValue, 26.0f, TEXTALIGN_MC);
 	TextRender()->TextColor(ColorRGBA(1.0f, 0.35f, 0.35f, 1.0f));
-	if(m_TagPhase == TAG_PHASE_RUNNING || m_TagHitFramePending)
+	if(ShowRunner)
 		Ui()->DoLabel(&Runner, GameClient()->m_aClients[TargetId].m_aName, 10.0f, TEXTALIGN_MC);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 }
@@ -2826,7 +2834,7 @@ void CMiniGames::OnRender()
 		Ui()->Update();
 	}
 
-	if(!(m_Game == GAME_TAG && m_State == STATE_PLAYING))
+	if(!(m_Game == GAME_TAG && (m_State == STATE_PLAYING || m_TagPhase == TAG_PHASE_RESULTS)))
 		RenderStatusBar(Alpha);
 	RenderTagTimer();
 	if(ViewVisible)
