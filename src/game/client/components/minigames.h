@@ -159,6 +159,8 @@ private:
 	int m_TagNumPlayers = 0;
 	int m_TagRound = 0;
 	int m_TagRoundStartTick = 0;
+	int m_TagTargetDDTeam = -1;
+	int m_TagTargetGameTeam = -1;
 	int m_TagStartRetries = 0;
 	float m_TagStartRetryTime = 0.0f;
 	bool m_TagStarting = false;
@@ -171,6 +173,7 @@ private:
 	bool m_aTagReady[MAX_CLIENTS] = {false};
 	int m_aTagOrder[TAG_MAX_PLAYERS] = {0};
 	int m_aTagTimeCs[MAX_CLIENTS] = {0};
+	bool m_aTagDisqualified[MAX_CLIENTS] = {false};
 
 	const char *GameName() const;
 	bool AmWhite() const { return m_MyMark == 'X'; }

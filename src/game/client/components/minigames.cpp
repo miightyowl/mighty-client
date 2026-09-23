@@ -165,6 +165,8 @@ void CMiniGames::ResetTag()
 	m_TagNumPlayers = 0;
 	m_TagRound = 0;
 	m_TagRoundStartTick = 0;
+	m_TagTargetDDTeam = -1;
+	m_TagTargetGameTeam = -1;
 	m_TagStartRetries = 0;
 	m_TagStartRetryTime = 0.0f;
 	m_TagStarting = false;
@@ -178,6 +180,7 @@ void CMiniGames::ResetTag()
 		m_aTagAccepted[ClientId] = false;
 		m_aTagReady[ClientId] = false;
 		m_aTagTimeCs[ClientId] = -1;
+		m_aTagDisqualified[ClientId] = false;
 	}
 	for(int &ClientId : m_aTagOrder)
 		ClientId = -1;
@@ -652,6 +655,10 @@ void CMiniGames::BeginTagCountdown()
 	m_HasBoard = false;
 	for(int &Time : m_aTagTimeCs)
 		Time = -1;
+	for(bool &Disqualified : m_aTagDisqualified)
+		Disqualified = false;
+	m_TagTargetDDTeam = -1;
+	m_TagTargetGameTeam = -1;
 	SetEmoteGameShowAll(true);
 }
 
@@ -664,6 +671,9 @@ void CMiniGames::UpdateTagLobby()
 	{
 		m_TagPhase = TAG_PHASE_RUNNING;
 		m_TagRoundStartTick = Client()->GameTick(g_Config.m_ClDummy);
+		const int TargetId = TagTargetId();
+		m_TagTargetDDTeam = TargetId >= 0 ? GameClient()->m_Teams.Team(TargetId) : -1;
+		m_TagTargetGameTeam = TargetId >= 0 ? GameClient()->m_aClients[TargetId].m_Team : -1;
 		return;
 	}
 	if(m_State == STATE_PLAYING && IsTagAdmin())
@@ -758,7 +768,20 @@ void CMiniGames::UpdateTagHitDetection()
 		return;
 
 	const int TargetId = TagTargetId();
-	if(!(IsTagAdmin() && m_TagPhase == TAG_PHASE_RUNNING && !m_TagHitFramePending && TargetId >= 0 && GameClient()->m_Snap.m_aCharacters[TargetId].m_Active))
+	if(!(IsTagAdmin() && m_TagPhase == TAG_PHASE_RUNNING && !m_TagHitFramePending && TargetId >= 0))
+		return;
+
+	const auto &TargetClient = GameClient()->m_aClients[TargetId];
+	const bool Disqualified = TargetClient.m_Solo || TargetClient.m_Spec ||
+		GameClient()->m_Teams.Team(TargetId) != m_TagTargetDDTeam ||
+		TargetClient.m_Team != m_TagTargetGameTeam;
+	if(Disqualified)
+	{
+		FinishTagRound(0, true);
+		return;
+	}
+
+	if(!GameClient()->m_Snap.m_aCharacters[TargetId].m_Active)
 		return;
 
 	const auto &Target = GameClient()->m_Snap.m_aCharacters[TargetId].m_Cur;
@@ -782,7 +805,7 @@ void CMiniGames::UpdateTagHitDetection()
 		return;
 
 	const int ElapsedTicks = std::max(0, Client()->GameTick(g_Config.m_ClDummy) - m_TagRoundStartTick);
-	const int TimeCs = (ElapsedTicks * 100 + Client()->GameTickSpeed() / 2) / Client()->GameTickSpeed();
+	const int TimeCs = std::max(1, (ElapsedTicks * 100 + Client()->GameTickSpeed() / 2) / Client()->GameTickSpeed());
 	FinishTagRound(TimeCs, true);
 }
 
@@ -815,7 +838,10 @@ void CMiniGames::FinishTagRound(int TimeCs, bool Broadcast)
 		return;
 	}
 	m_aTagTimeCs[TargetId] = TimeCs;
+	m_aTagDisqualified[TargetId] = TimeCs == 0;
 	m_TagRound++;
+	m_TagTargetDDTeam = -1;
+	m_TagTargetGameTeam = -1;
 
 	if(m_TagRound >= m_TagNumPlayers)
 	{
@@ -828,7 +854,7 @@ void CMiniGames::FinishTagRound(int TimeCs, bool Broadcast)
 		for(int i = 0; i < m_TagNumPlayers; i++)
 		{
 			const int ClientId = m_aTagOrder[i];
-			if(BestId < 0 || m_aTagTimeCs[ClientId] > m_aTagTimeCs[BestId])
+			if(!m_aTagDisqualified[ClientId] && (BestId < 0 || m_aTagTimeCs[ClientId] > m_aTagTimeCs[BestId]))
 				BestId = ClientId;
 		}
 		m_Result = BestId == GameClient()->m_Snap.m_LocalClientId ? 'W' : 'L';
@@ -2281,7 +2307,11 @@ void CMiniGames::RenderTagResults(bool Interactive)
 	int aRanked[TAG_MAX_PLAYERS];
 	for(int i = 0; i < m_TagNumPlayers; i++)
 		aRanked[i] = m_aTagOrder[i];
-	std::stable_sort(aRanked, aRanked + m_TagNumPlayers, [&](int A, int B) { return m_aTagTimeCs[A] > m_aTagTimeCs[B]; });
+	std::stable_sort(aRanked, aRanked + m_TagNumPlayers, [&](int A, int B) {
+		if(m_aTagDisqualified[A] != m_aTagDisqualified[B])
+			return !m_aTagDisqualified[A];
+		return m_aTagTimeCs[A] > m_aTagTimeCs[B];
+	});
 
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 20.0f;
@@ -2302,7 +2332,10 @@ void CMiniGames::RenderTagResults(bool Interactive)
 		char aPlace[16];
 		char aTime[32];
 		str_format(aPlace, sizeof(aPlace), "#%d", Rank + 1);
-		str_format(aTime, sizeof(aTime), "%.2f s", m_aTagTimeCs[aRanked[Rank]] / 100.0f);
+		if(m_aTagDisqualified[aRanked[Rank]])
+			str_copy(aTime, Localize("DQ"));
+		else
+			str_format(aTime, sizeof(aTime), "%.2f s", m_aTagTimeCs[aRanked[Rank]] / 100.0f);
 		TextRender()->TextColor(Rank == 0 ? ColorRGBA(1.0f, 0.85f, 0.3f, 1.0f) : ColorRGBA(0.8f, 0.8f, 0.8f, 1.0f));
 		Ui()->DoLabel(&Place, aPlace, 9.0f, TEXTALIGN_ML);
 		TextRender()->TextColor(aRanked[Rank] == GameClient()->m_Snap.m_LocalClientId ? CMenus::AccentColor() : TextRender()->DefaultTextColor());
