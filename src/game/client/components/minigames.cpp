@@ -773,8 +773,8 @@ void CMiniGames::UpdateTagHitDetection()
 
 	const auto &TargetClient = GameClient()->m_aClients[TargetId];
 	const bool Disqualified = TargetClient.m_Solo || TargetClient.m_Spec ||
-		GameClient()->m_Teams.Team(TargetId) != m_TagTargetDDTeam ||
-		TargetClient.m_Team != m_TagTargetGameTeam;
+				  GameClient()->m_Teams.Team(TargetId) != m_TagTargetDDTeam ||
+				  TargetClient.m_Team != m_TagTargetGameTeam;
 	if(Disqualified)
 	{
 		FinishTagRound(0, true);
@@ -927,7 +927,8 @@ void CMiniGames::QueueWhisper(int ClientId, const char *pMessage, bool Priority,
 	{
 		m_vSendQueue.erase(std::remove_if(m_vSendQueue.begin(), m_vSendQueue.end(), [ClientId, ReplaceKey](const CQueuedWhisper &Queued) {
 			return Queued.m_ClientId == ClientId && Queued.m_ReplaceKey == ReplaceKey;
-		}), m_vSendQueue.end());
+		}),
+			m_vSendQueue.end());
 	}
 	CQueuedWhisper Queued{ClientId, ReplaceKey, aLine};
 	if(Priority)

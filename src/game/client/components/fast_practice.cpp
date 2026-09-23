@@ -177,8 +177,8 @@ void CFastPractice::CaptureSpectatorStart()
 	m_SpectatorStartCore = *pChar->Core();
 	m_SpectatorStartTick = GameClient()->m_PredictedWorld.GameTick();
 	m_SpectatorStartTele = GameClient()->m_Snap.m_aCharacters[ClientId].m_HasExtendedData ?
-						   GameClient()->m_Snap.m_aCharacters[ClientId].m_ExtendedData.m_TeleCheckpoint :
-						   pChar->m_TeleCheckpoint;
+				       GameClient()->m_Snap.m_aCharacters[ClientId].m_ExtendedData.m_TeleCheckpoint :
+				       pChar->m_TeleCheckpoint;
 	m_SpectatorStartClientId = ClientId;
 	m_HasSpectatorStart = true;
 }
@@ -362,10 +362,10 @@ void CFastPractice::TeleportTo(CCharacter *pChar, const std::vector<vec2> &vOuts
 	const int DestinationIndex = pCollision->GetMapIndex(Core.m_Pos);
 	const int SwitchNumber = pCollision->GetSwitchNumber(DestinationIndex);
 	const bool SwitchActive = SwitchNumber == 0 ||
-		(SwitchNumber < (int)pChar->Switchers().size() && pChar->Switchers()[SwitchNumber].m_aStatus[pChar->Team()]);
+				  (SwitchNumber < (int)pChar->Switchers().size() && pChar->Switchers()[SwitchNumber].m_aStatus[pChar->Team()]);
 	const bool DestinationIsFreeze = IsFreezeTile(pCollision->GetTileIndex(DestinationIndex)) ||
-		IsFreezeTile(pCollision->GetFrontTileIndex(DestinationIndex)) ||
-		(SwitchActive && IsFreezeTile(pCollision->GetSwitchType(DestinationIndex)));
+					 IsFreezeTile(pCollision->GetFrontTileIndex(DestinationIndex)) ||
+					 (SwitchActive && IsFreezeTile(pCollision->GetSwitchType(DestinationIndex)));
 	if(!DestinationIsFreeze)
 		ClearFreeze(&Core);
 
@@ -999,7 +999,7 @@ void CFastPractice::OnUpdatePositions()
 	{
 		const int64_t Now = time_get();
 		const double DeltaSeconds = m_LastUpdateTime == 0 ? 0.0 :
-			std::clamp((Now - m_LastUpdateTime) / (double)time_freq(), 0.0, 0.25);
+								    std::clamp((Now - m_LastUpdateTime) / (double)time_freq(), 0.0, 0.25);
 		m_LastUpdateTime = Now;
 
 		if(!Suspended())
