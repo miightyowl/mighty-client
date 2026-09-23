@@ -1055,15 +1055,44 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 	static CButtonContainer s_SavePlayerButton;
 	static CButtonContainer s_SaveDummyButton;
 	static CButtonContainer s_SavePetButton;
+	static CUi::SSelectionPopupContext s_SavePetPopup;
+	static CScrollRegion s_SavePetPopupScrollRegion;
 	MenuButton(SavePlayerButton, Localize("Save player"), 13.0f, Ui()->HotItem() == &s_SavePlayerButton);
 	MenuButton(SaveDummyButton, Localize("Save dummy"), 13.0f, Ui()->HotItem() == &s_SaveDummyButton);
-	MenuButton(SavePetButton, Localize("Save pet"), 13.0f, Ui()->HotItem() == &s_SavePetButton);
+	MenuButton(SavePetButton, Localize("Save pet"), 13.0f, Ui()->HotItem() == &s_SavePetButton || Ui()->IsPopupOpen(&s_SavePetPopup));
+	CUIRect SavePetIcon;
+	SavePetButton.VSplitRight(18.0f, nullptr, &SavePetIcon);
+	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+	TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+	Ui()->DoLabel(&SavePetIcon, FontIcon::CIRCLE_CHEVRON_DOWN, 10.0f, TEXTALIGN_MC);
+	TextRender()->SetRenderFlags(0);
+	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 	if(Ui()->DoButtonLogic(&s_SavePlayerButton, 0, &SavePlayerButton, BUTTONFLAG_LEFT))
 		SaveProfile(false);
 	if(Ui()->DoButtonLogic(&s_SaveDummyButton, 0, &SaveDummyButton, BUTTONFLAG_LEFT))
 		SaveProfile(true);
 	if(Ui()->DoButtonLogic(&s_SavePetButton, 0, &SavePetButton, BUTTONFLAG_LEFT))
-		SavePetProfile(g_Config.m_ClDummy != 0);
+	{
+		s_SavePetPopup.Reset();
+		s_SavePetPopup.m_pScrollRegion = &s_SavePetPopupScrollRegion;
+		s_SavePetPopup.m_Props.m_BorderColor = ColorRGBA(0.7f, 0.7f, 0.7f, 0.9f);
+		s_SavePetPopup.m_Props.m_BackgroundColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f);
+		s_SavePetPopup.m_vEntries.emplace_back(Localize("Player pet"));
+		s_SavePetPopup.m_vEntries.emplace_back(Localize("Dummy pet"));
+		s_SavePetPopup.m_EntryHeight = SavePetButton.h;
+		s_SavePetPopup.m_EntryPadding = 2.0f;
+		s_SavePetPopup.m_FontSize = 12.0f;
+		s_SavePetPopup.m_Width = SavePetButton.w;
+		s_SavePetPopup.m_AlignmentHeight = SavePetButton.h;
+		s_SavePetPopup.m_TransparentButtons = true;
+		Ui()->ShowPopupSelection(SavePetButton.x, SavePetButton.y, &s_SavePetPopup);
+	}
+	if(s_SavePetPopup.m_SelectionIndex >= 0)
+	{
+		const bool DummyPet = s_SavePetPopup.m_SelectionIndex == 1;
+		s_SavePetPopup.Reset();
+		SavePetProfile(DummyPet);
+	}
 
 	MainView.HSplitTop(1.0f, &Divider, &MainView);
 	Divider.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f), IGraphics::CORNER_NONE, 0.0f);
