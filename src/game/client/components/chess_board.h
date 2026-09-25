@@ -29,7 +29,6 @@ public:
 
 	bool ApplyMove(int From, int To);
 
-	bool InCheck(bool White) const;
 	bool HasAnyMove(bool White) const;
 	EResult Result() const;
 
@@ -50,7 +49,6 @@ private:
 
 	bool PseudoLegal(int From, int To) const;
 	bool PathFree(int From, int To) const;
-	bool Attacked(int Square, bool ByWhite) const;
 	int KingSquare(bool White) const;
 	void PlayMove(int From, int To);
 };

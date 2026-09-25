@@ -26,8 +26,11 @@ private:
 		char m_aValue[40] = "";
 		bool m_Highlight = false;
 	};
+	std::vector<SSegment> m_vLeftSegments;
+	std::vector<SSegment> m_vCenterSegments;
+	std::vector<SSegment> m_vRightSegments;
 
-	void BuildSegments(std::vector<SSegment> &vLeft, std::vector<SSegment> &vCenter, std::vector<SSegment> &vRight);
+	void BuildSegments();
 	bool IsFreezeAt(int TileX, int TileY) const;
 	int EdgeJumpDirection(vec2 Pos) const;
 	bool EdgeJumpInfo(char *pBuf, int BufSize, bool *pOnSpot) const;

@@ -120,7 +120,6 @@ public:
 
 	void UpdateRemainingMaps();
 	bool IsMapUnfinished(const char *pMapName) const { return m_RemainingMapNames.contains(pMapName); }
-	bool RemainingMapsLoading() const { return m_RemainingLoading; }
 	bool RemainingMapsKnown() const { return !m_RemainingLoading && !m_RemainingDirty && !m_vRemainingNames.empty(); }
 };
 

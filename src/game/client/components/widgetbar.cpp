@@ -125,9 +125,13 @@ bool CWidgetBar::EdgeJumpInfo(char *pBuf, int BufSize, bool *pOnSpot) const
 	const char *pArrow = Dir > 0 ? ">" : "<";
 
 	if(ContainsCoordinate(pSpots, Count, Decimal))
+	{
 		str_format(pBuf, BufSize, "%s .%02d single", pArrow, Decimal);
+	}
 	else if(ContainsCoordinate(pDouble, DoubleCount, Decimal))
+	{
 		str_format(pBuf, BufSize, "%s .%02d double", pArrow, Decimal);
+	}
 	else
 	{
 		int Nearest = NearestCoordinate(pSpots, Count, Decimal, -1);
@@ -140,15 +144,19 @@ bool CWidgetBar::EdgeJumpInfo(char *pBuf, int BufSize, bool *pOnSpot) const
 	return true;
 }
 
-void CWidgetBar::BuildSegments(std::vector<SSegment> &vLeft, std::vector<SSegment> &vCenter, std::vector<SSegment> &vRight)
+void CWidgetBar::BuildSegments()
 {
+	m_vLeftSegments.clear();
+	m_vCenterSegments.clear();
+	m_vRightSegments.clear();
+
 	const bool InGame = (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK);
 	const int Conn = g_Config.m_ClDummy;
 	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
 	const bool HasChar = InGame && LocalId >= 0 && GameClient()->m_Snap.m_aCharacters[LocalId].m_Active;
 
 	const auto &&Add = [&](int Mode, const char *pLabel, const char *pValue, bool Highlight = false) {
-		std::vector<SSegment> *pTarget = Mode == 1 ? &vLeft : (Mode == 2 ? &vCenter : (Mode == 3 ? &vRight : nullptr));
+		std::vector<SSegment> *pTarget = Mode == 1 ? &m_vLeftSegments : (Mode == 2 ? &m_vCenterSegments : (Mode == 3 ? &m_vRightSegments : nullptr));
 		if(pTarget == nullptr)
 			return;
 		SSegment Segment;
@@ -161,6 +169,7 @@ void CWidgetBar::BuildSegments(std::vector<SSegment> &vLeft, std::vector<SSegmen
 	char aValue[40];
 
 	// clock
+	if(g_Config.m_ClMClientInfoBarClock != 0)
 	{
 		char aClock[16] = "--:--";
 		const std::time_t Now = std::time(nullptr);
@@ -171,6 +180,7 @@ void CWidgetBar::BuildSegments(std::vector<SSegment> &vLeft, std::vector<SSegmen
 	}
 
 	// fps
+	if(g_Config.m_ClMClientInfoBarFps != 0)
 	{
 		const int Fps = round_to_int(1.0f / Client()->FrameTimeAverage());
 		str_format(aValue, sizeof(aValue), "%d", Fps);
@@ -178,6 +188,7 @@ void CWidgetBar::BuildSegments(std::vector<SSegment> &vLeft, std::vector<SSegmen
 	}
 
 	// ping
+	if(g_Config.m_ClMClientInfoBarPing != 0)
 	{
 		int Ping = 0;
 		if(InGame && LocalId >= 0 && GameClient()->m_Snap.m_apPlayerInfos[LocalId] != nullptr)
@@ -187,26 +198,29 @@ void CWidgetBar::BuildSegments(std::vector<SSegment> &vLeft, std::vector<SSegmen
 	}
 
 	// prediction
+	if(g_Config.m_ClMClientInfoBarPred != 0)
 	{
 		str_format(aValue, sizeof(aValue), "%d", InGame ? Client()->GetPredictionTime() : 0);
 		Add(g_Config.m_ClMClientInfoBarPred, "Pred", aValue);
 	}
 
 	// position / speed / angle
-	CHud::CMovementInformation Info;
-	Info.m_Pos = vec2(0.0f, 0.0f);
-	Info.m_Speed = vec2(0.0f, 0.0f);
-	if(HasChar)
+	CHud::CMovementInformation Info{};
+	const bool NeedsMovementInfo = g_Config.m_ClMClientInfoBarPos != 0 || g_Config.m_ClMClientInfoBarAngle != 0 || g_Config.m_ClMClientInfoBarSpeed != 0;
+	if(HasChar && NeedsMovementInfo)
 		Info = GameClient()->m_Hud.GetMovementInformation(LocalId, Conn);
 
+	if(g_Config.m_ClMClientInfoBarPos != 0)
 	{
 		str_format(aValue, sizeof(aValue), "%.2f, %.2f", Info.m_Pos.x, Info.m_Pos.y);
 		Add(g_Config.m_ClMClientInfoBarPos, "Pos", aValue);
 	}
+	if(g_Config.m_ClMClientInfoBarAngle != 0)
 	{
 		str_format(aValue, sizeof(aValue), "%.2f", Info.m_Angle);
 		Add(g_Config.m_ClMClientInfoBarAngle, "Angle", aValue);
 	}
+	if(g_Config.m_ClMClientInfoBarSpeed != 0)
 	{
 		str_format(aValue, sizeof(aValue), "%.2f", length(Info.m_Speed));
 		Add(g_Config.m_ClMClientInfoBarSpeed, "Speed", aValue);
@@ -257,17 +271,16 @@ void CWidgetBar::RenderBar(const CUIRect &Bar)
 	const float Pad = 10.0f;
 	const float Gap = 16.0f;
 
-	std::vector<SSegment> vLeft, vCenter, vRight;
-	BuildSegments(vLeft, vCenter, vRight);
+	BuildSegments();
 
 	float x = Bar.x + Pad;
-	for(const SSegment &Segment : vLeft)
+	for(const SSegment &Segment : m_vLeftSegments)
 	{
 		x = DrawSegment(x, y, FontSize, Segment) + Gap;
 	}
 
 	float XRight = Bar.x + Bar.w - Pad;
-	for(const SSegment &Segment : vRight)
+	for(const SSegment &Segment : m_vRightSegments)
 	{
 		XRight -= SegmentWidth(FontSize, Segment);
 		DrawSegment(XRight, y, FontSize, Segment);
@@ -275,14 +288,14 @@ void CWidgetBar::RenderBar(const CUIRect &Bar)
 	}
 
 	// center group
-	if(!vCenter.empty())
+	if(!m_vCenterSegments.empty())
 	{
 		float TotalWidth = 0.0f;
-		for(const SSegment &Segment : vCenter)
+		for(const SSegment &Segment : m_vCenterSegments)
 			TotalWidth += SegmentWidth(FontSize, Segment) + Gap;
 		TotalWidth -= Gap;
 		float XCenter = Bar.x + (Bar.w - TotalWidth) / 2.0f;
-		for(const SSegment &Segment : vCenter)
+		for(const SSegment &Segment : m_vCenterSegments)
 			XCenter = DrawSegment(XCenter, y, FontSize, Segment) + Gap;
 	}
 }
