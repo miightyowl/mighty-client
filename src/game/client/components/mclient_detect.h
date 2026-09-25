@@ -36,7 +36,6 @@ public:
 	};
 	SPetAppearance PetAppearance(int ClientId) const;
 
-	bool EmoteInFlight() const { return m_EmoteWaiting; }
 	bool EmoteChannelBusy() const { return !m_vEmoteQueue.empty(); }
 	bool QueueManualEmote(int Emoticon);
 	// drop the frame we are sending so a mini game can have the emoticon channel
@@ -87,7 +86,6 @@ private:
 	CPeer m_aPeers[MAX_CLIENTS] = {};
 
 	std::vector<int> m_vEmoteQueue;
-	int m_QueuedKind = -1;
 	int m_ProtocolLeft = 0;
 	bool m_EmoteWaiting = false;
 	float m_EmoteTime = 0.0f;
@@ -127,9 +125,6 @@ private:
 	int m_PetColorBodySent = 0;
 	int m_PetColorFeetSent = 0;
 	int m_PetLocalId = -1;
-	float m_PetCooldown = 0.0f;
-	bool m_QueuedPetOn = false;
-	char m_aQueuedPetSkin[MAX_SKIN_LENGTH] = "";
 
 	char m_aLocalName[MAX_NAME_LENGTH] = "";
 	float m_BeaconHeardUntil = 0.0f;
@@ -153,12 +148,10 @@ private:
 	void SendInfoColors(int Conn, int ColorBody, int ColorFeet) const;
 	void UpdatePet();
 	bool PetAudience() const;
-	void MarkPetTold();
 	void ForgetPetTold();
 	void LocalPet(bool *pOn, char *pSkin, int SkinSize, bool *pUseCustomColor, int *pColorBody, int *pColorFeet) const;
 	void SendPetWhisper(int ClientId, bool On, const char *pSkin, bool UseCustomColor, int ColorBody, int ColorFeet);
 	void SendBeacon(int Kind);
-	void SendPetBeacon(bool On, const char *pSkin);
 	void AbortBeacon();
 	void FlushEmoteQueue();
 	bool HandleEcho(int Emoticon);

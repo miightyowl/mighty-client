@@ -20,11 +20,15 @@ const char *CFinishRename::ActiveName() const
 	return g_Config.m_ClDummy ? Client()->DummyName() : Client()->PlayerName();
 }
 
-std::vector<std::string> CFinishRename::AlternativeNames() const
+void CFinishRename::UpdateAlternativeNames()
 {
-	std::vector<std::string> vNames;
+	if(m_AlternativeNamesConfig == g_Config.m_ClFinishRenameNames)
+		return;
+
+	m_AlternativeNamesConfig = g_Config.m_ClFinishRenameNames;
+	m_vAlternativeNames.clear();
 	const char *pList = g_Config.m_ClFinishRenameNames;
-	while(*pList && vNames.size() < 16)
+	while(*pList && m_vAlternativeNames.size() < 16)
 	{
 		const char *pComma = str_find(pList, ",");
 		std::string Name = pComma ? std::string(pList, pComma - pList) : std::string(pList);
@@ -37,9 +41,9 @@ std::vector<std::string> CFinishRename::AlternativeNames() const
 		Name = Name.substr(Begin, End - Begin + 1);
 		if(Name.length() >= MAX_NAME_LENGTH)
 			Name.resize(MAX_NAME_LENGTH - 1);
-		vNames.push_back(Name);
+		m_vAlternativeNames.push_back(std::move(Name));
 	}
-	return vNames;
+	m_Decided = false;
 }
 
 void CFinishRename::ResetMapState()
@@ -52,7 +56,7 @@ void CFinishRename::ResetMapState()
 	m_JustFinished = false;
 	m_Decided = false;
 	m_aTargetName[0] = '\0';
-	m_DecisionInputs.clear();
+	m_aDecisionName[0] = '\0';
 }
 
 void CFinishRename::OnMapLoad()
@@ -154,14 +158,14 @@ CFinishRename::EStatus CFinishRename::LookupStatus(const char *pName) const
 	return Lookup->second.m_Failed ? STATUS_FAILED : STATUS_UNFINISHED;
 }
 
-float CFinishRename::DistanceToFinish(vec2 Pos) const
+float CFinishRename::DistanceToFinishSquared(vec2 Pos) const
 {
 	float Nearest = -1.0f;
 	for(const vec2 &TilePos : m_vFinishTilePositions)
 	{
-		const float Distance = distance(Pos, TilePos);
-		if(Nearest < 0.0f || Distance < Nearest)
-			Nearest = Distance;
+		const float DistanceSquared = distance_squared(Pos, TilePos);
+		if(Nearest < 0.0f || DistanceSquared < Nearest)
+			Nearest = DistanceSquared;
 	}
 	return Nearest;
 }
@@ -185,8 +189,9 @@ bool CFinishRename::PathIsClear(vec2 From, vec2 To) const
 
 bool CFinishRename::FinishReachable(vec2 Pos, float Range) const
 {
+	const float RangeSquared = Range * Range;
 	return std::ranges::any_of(m_vFinishTilePositions, [&](const vec2 &TilePos) {
-		return distance(Pos, TilePos) <= Range && PathIsClear(Pos, TilePos);
+		return distance_squared(Pos, TilePos) <= RangeSquared && PathIsClear(Pos, TilePos);
 	});
 }
 
@@ -195,8 +200,10 @@ void CFinishRename::OnRender()
 	if(!g_Config.m_ClFinishRename || Client()->State() != IClient::STATE_ONLINE)
 		return;
 
-	EnsureLookup(ActiveName());
-	for(const std::string &Name : AlternativeNames())
+	UpdateAlternativeNames();
+	const char *pActiveName = ActiveName();
+	EnsureLookup(pActiveName);
+	for(const std::string &Name : m_vAlternativeNames)
 		EnsureLookup(Name.c_str());
 	UpdateLookups();
 
@@ -209,10 +216,9 @@ void CFinishRename::OnRender()
 		m_Decided = false;
 	}
 
-	std::string Inputs = std::string(ActiveName()) + "\n" + g_Config.m_ClFinishRenameNames;
-	if(Inputs != m_DecisionInputs)
+	if(str_comp(pActiveName, m_aDecisionName) != 0)
 	{
-		m_DecisionInputs = Inputs;
+		str_copy(m_aDecisionName, pActiveName);
 		m_Decided = false;
 	}
 	if(!m_Decided)
@@ -229,14 +235,16 @@ void CFinishRename::OnRender()
 	if(!GameClient()->m_Snap.m_pLocalCharacter)
 		return;
 	const float TriggerDistance = g_Config.m_ClFinishRenameDistance * 32.0f;
-	const float Distance = DistanceToFinish(GameClient()->m_LocalCharacterPos);
-	if(Distance > 1.5f * TriggerDistance)
+	const float TriggerDistanceSquared = TriggerDistance * TriggerDistance;
+	const float RearmDistance = 1.5f * TriggerDistance;
+	const float DistanceSquared = DistanceToFinishSquared(GameClient()->m_LocalCharacterPos);
+	if(DistanceSquared > RearmDistance * RearmDistance)
 	{
 		m_Armed = true;
 		m_JustFinished = false;
 		return;
 	}
-	if(Distance > TriggerDistance || !m_Armed)
+	if(DistanceSquared > TriggerDistanceSquared || !m_Armed)
 		return;
 	if(!m_Decided || m_aTargetName[0] == '\0')
 		return;
@@ -256,7 +264,7 @@ void CFinishRename::ComputeDecision()
 	m_aTargetName[0] = '\0';
 	if(CurrentStatus == STATUS_FINISHED)
 	{
-		for(const std::string &Name : AlternativeNames())
+		for(const std::string &Name : m_vAlternativeNames)
 		{
 			if(str_comp(Name.c_str(), ActiveName()) == 0)
 				continue;

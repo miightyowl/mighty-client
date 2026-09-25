@@ -66,59 +66,6 @@ bool CChessBoard::PathFree(int From, int To) const
 	return true;
 }
 
-bool CChessBoard::Attacked(int Square, bool ByWhite) const
-{
-	for(int From = 0; From < 64; From++)
-	{
-		const char Piece = m_aSquares[From];
-		if(Piece == '.' || !IsOwn(Piece, ByWhite))
-			continue;
-
-		const int FileDiff = File(Square) - File(From);
-		const int RankDiff = Rank(Square) - Rank(From);
-		const int FileDist = absolute(FileDiff);
-		const int RankDist = absolute(RankDiff);
-		const char Upper = Piece >= 'a' ? Piece - ('a' - 'A') : Piece;
-
-		switch(Upper)
-		{
-		case 'P':
-			if(FileDist == 1 && RankDiff == (ByWhite ? -1 : 1))
-				return true;
-			break;
-		case 'N':
-			if((FileDist == 1 && RankDist == 2) || (FileDist == 2 && RankDist == 1))
-				return true;
-			break;
-		case 'B':
-			if(FileDist == RankDist && FileDist > 0 && PathFree(From, Square))
-				return true;
-			break;
-		case 'R':
-			if((FileDist == 0) != (RankDist == 0) && PathFree(From, Square))
-				return true;
-			break;
-		case 'Q':
-			if(((FileDist == RankDist && FileDist > 0) || ((FileDist == 0) != (RankDist == 0))) && PathFree(From, Square))
-				return true;
-			break;
-		case 'K':
-			if(FileDist <= 1 && RankDist <= 1 && (FileDist != 0 || RankDist != 0))
-				return true;
-			break;
-		default:
-			break;
-		}
-	}
-	return false;
-}
-
-bool CChessBoard::InCheck(bool White) const
-{
-	const int King = KingSquare(White);
-	return King >= 0 && Attacked(King, !White);
-}
-
 bool CChessBoard::PseudoLegal(int From, int To) const
 {
 	if(!Valid(From) || !Valid(To) || From == To)

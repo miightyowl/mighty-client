@@ -43,20 +43,22 @@ class CFinishRename : public CComponent
 
 	bool m_Decided = false;
 	char m_aTargetName[MAX_NAME_LENGTH] = "";
-	std::string m_DecisionInputs;
+	char m_aDecisionName[MAX_NAME_LENGTH] = "";
+	std::string m_AlternativeNamesConfig;
+	std::vector<std::string> m_vAlternativeNames;
 
 	char m_aOriginalName[MAX_NAME_LENGTH] = "";
 	int m_RenamedDummy = -1;
 
 	const char *ActiveName() const;
-	std::vector<std::string> AlternativeNames() const;
+	void UpdateAlternativeNames();
 	void ResetMapState();
 	void ScanFinishTiles();
 	void EnsureLookup(const char *pName);
 	void UpdateLookups();
 	EStatus LookupStatus(const char *pName) const;
 	void ParseFinishedMaps(const _json_value *pJson, std::set<std::string> *pFinishedMaps) const;
-	float DistanceToFinish(vec2 Pos) const;
+	float DistanceToFinishSquared(vec2 Pos) const;
 	bool PathIsClear(vec2 From, vec2 To) const;
 	bool FinishReachable(vec2 Pos, float Range) const;
 	void ComputeDecision();
