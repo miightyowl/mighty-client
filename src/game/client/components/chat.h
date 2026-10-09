@@ -272,6 +272,8 @@ public:
 	void UnregisterCommand(const char *pName);
 	void Echo(const char *pString);
 
+	bool IsSpammer(const char *pName) const;
+
 	void OnWindowResize() override;
 	void OnConsoleInit() override;
 	void OnStateChange(int NewState, int OldState) override;
