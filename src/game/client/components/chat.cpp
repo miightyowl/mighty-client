@@ -733,6 +733,12 @@ bool CChat::IsSpamName(const char *pName) const
 	return std::any_of(m_vSpamNames.begin(), m_vSpamNames.end(), [pName](const std::string &Name) { return Name == pName; });
 }
 
+bool CChat::IsSpammer(const char *pName) const
+{
+	return g_Config.m_ClChatSpamFilter &&
+	       (IsSpamName(pName) || std::any_of(m_vHeldMessages.begin(), m_vHeldMessages.end(), [pName](const CHeldMessage &Held) { return str_comp(Held.m_aName, pName) == 0; }));
+}
+
 bool CChat::HasSpamHandle(const char *pText) const
 {
 	char aHandle[64];

@@ -276,6 +276,9 @@ void CInfoMessages::OnKillMessage(const CNetMsg_Sv_KillMsg *pMsg)
 		return; // message would be empty
 	}
 
+	if(Kill.m_TeamSize == 1 && GameClient()->m_Chat.IsSpammer(Kill.m_aVictimName))
+		return;
+
 	AddInfoMsg(Kill);
 }
 
