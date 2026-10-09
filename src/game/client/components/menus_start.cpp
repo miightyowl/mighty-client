@@ -6,7 +6,6 @@
 #include <base/io.h>
 #include <base/log.h>
 
-#include <engine/client/updater.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/http.h>
@@ -431,9 +430,8 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 
 	CUIRect FooterLeft, ConsoleBtn;
 	Footer.VSplitRight(100.0f, &FooterLeft, &ConsoleBtn);
-	CUIRect QuitBtn, UpdateArea;
-	FooterLeft.VSplitLeft(95.0f, &QuitBtn, &UpdateArea);
-	UpdateArea.VSplitLeft(12.0f, nullptr, &UpdateArea);
+	CUIRect QuitBtn;
+	FooterLeft.VSplitLeft(95.0f, &QuitBtn, nullptr);
 
 	static CButtonContainer s_QuitButton;
 	const float QuitHover = HoverProgress(&s_QuitButton);
@@ -457,67 +455,6 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	Label(ConsoleBtn, pConsole, 12.0f, TEXTALIGN_MR, ConsoleCol);
 	if(Ui()->DoButtonLogic(&s_ConsoleButton, 0, &ConsoleBtn, BUTTONFLAG_LEFT))
 		GameClient()->m_GameConsole.Toggle(CGameConsole::CONSOLETYPE_LOCAL);
-
-	// update notification
-#if defined(CONF_AUTOUPDATE)
-	CUIRect UpdateButton;
-	UpdateArea.VSplitRight(90.0f, &UpdateArea, &UpdateButton);
-	UpdateArea.VSplitRight(8.0f, &UpdateArea, nullptr);
-	UpdateButton.HMargin(3.0f, &UpdateButton);
-
-	char aBuf[128];
-	const IUpdater::EUpdaterState State = Updater()->GetCurrentState();
-	const bool NeedUpdate = str_comp(Client()->LatestVersion(), "0");
-
-	if(State == IUpdater::CLEAN && NeedUpdate)
-	{
-		static CButtonContainer s_VersionUpdate;
-		if(GameClient()->m_Menus.DoButton_Menu(&s_VersionUpdate, Localize("Update now"), 0, &UpdateButton, BUTTONFLAG_LEFT, 0, IGraphics::CORNER_ALL, 6.0f, 0.0f, CMenus::AccentColor().WithAlpha(0.7f)))
-			Updater()->InitiateUpdate();
-	}
-	else if(State == IUpdater::NEED_RESTART)
-	{
-		static CButtonContainer s_VersionUpdate;
-		if(GameClient()->m_Menus.DoButton_Menu(&s_VersionUpdate, Localize("Restart"), 0, &UpdateButton, BUTTONFLAG_LEFT, 0, IGraphics::CORNER_ALL, 6.0f, 0.0f, CMenus::AccentColor().WithAlpha(0.7f)))
-			Client()->Restart();
-	}
-	else if(State >= IUpdater::GETTING_MANIFEST && State < IUpdater::NEED_RESTART)
-	{
-		Ui()->RenderProgressBar(UpdateButton, Updater()->GetCurrentPercent() / 100.0f);
-	}
-
-	if(State == IUpdater::CLEAN && NeedUpdate)
-		str_format(aBuf, sizeof(aBuf), Localize("DDNet %s is out!"), Client()->LatestVersion());
-	else if(State == IUpdater::CLEAN)
-		aBuf[0] = '\0';
-	else if(State >= IUpdater::GETTING_MANIFEST && State < IUpdater::NEED_RESTART)
-	{
-		char aCurrentFile[64];
-		Updater()->GetCurrentFile(aCurrentFile, sizeof(aCurrentFile));
-		str_format(aBuf, sizeof(aBuf), Localize("Downloading %s:"), aCurrentFile);
-	}
-	else if(State == IUpdater::FAIL)
-		str_copy(aBuf, Localize("Update failed! Check log…"));
-	else if(State == IUpdater::NEED_RESTART)
-		str_copy(aBuf, Localize("DDNet Client updated!"));
-	Label(UpdateArea, aBuf, 10.0f, TEXTALIGN_MR, ColorRGBA(0.86f, 0.42f, 0.36f, 1.0f));
-#elif defined(CONF_INFORM_UPDATE)
-	if(str_comp(Client()->LatestVersion(), "0") != 0)
-	{
-		CUIRect DownloadButton;
-		UpdateArea.VSplitRight(90.0f, &UpdateArea, &DownloadButton);
-		UpdateArea.VSplitRight(8.0f, &UpdateArea, nullptr);
-		DownloadButton.HMargin(3.0f, &DownloadButton);
-
-		static CButtonContainer s_DownloadButton;
-		if(GameClient()->m_Menus.DoButton_Menu(&s_DownloadButton, Localize("Download"), 0, &DownloadButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.0f, 0.0f, CMenus::AccentColor().WithAlpha(0.7f)))
-			Client()->ViewLink("https://ddnet.org/downloads/");
-
-		char aBuf[64];
-		str_format(aBuf, sizeof(aBuf), Localize("DDNet %s is out!"), Client()->LatestVersion());
-		Label(UpdateArea, aBuf, 10.0f, TEXTALIGN_MR, ColorRGBA(0.86f, 0.42f, 0.36f, 1.0f));
-	}
-#endif
 
 	// new-version popup
 	if(m_UpdateAvailable)
