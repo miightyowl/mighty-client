@@ -1490,6 +1490,7 @@ void CMenus::RenderPopupMClientSetup(CUIRect Box)
 	static CUi::SDropDownState s_SourceState;
 	static CScrollRegion s_SourceScroll;
 	s_SourceState.m_SelectionPopupContext.m_pScrollRegion = &s_SourceScroll;
+	s_SourceState.m_Searchable = true;
 	const int OldSource = FindLang(g_Config.m_ClChatTranslateOutSource);
 	const int NewSource = Ui()->DoDropDown(&Field, OldSource, s_apLangNames, NumLang, s_SourceState);
 	if(NewSource != OldSource)
@@ -1509,6 +1510,7 @@ void CMenus::RenderPopupMClientSetup(CUIRect Box)
 	static CUi::SDropDownState s_TargetState;
 	static CScrollRegion s_TargetScroll;
 	s_TargetState.m_SelectionPopupContext.m_pScrollRegion = &s_TargetScroll;
+	s_TargetState.m_Searchable = true;
 	const int OldTarget = FindSendAs(g_Config.m_ClChatTranslateOutTarget);
 	const int NewTarget = Ui()->DoDropDown(&Field, OldTarget, s_vSendAsNames.data(), NumSendAs, s_TargetState);
 	if(NewTarget != OldTarget)
