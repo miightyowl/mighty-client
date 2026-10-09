@@ -800,6 +800,8 @@ public:
 		float m_Width;
 		float m_AlignmentHeight;
 		bool m_TransparentButtons;
+		const char *m_pFilter;
+		std::string m_LastFilter;
 
 		SSelectionPopupContext();
 		void Reset();
@@ -839,6 +841,8 @@ public:
 		CUIElement m_UiElement;
 		CButtonContainer m_ButtonContainer;
 		bool m_Init = false;
+		bool m_Searchable = false;
+		CLineInputBuffered<64> m_SearchInput;
 	};
 	int DoDropDown(CUIRect *pRect, int CurSelection, const char **pStrs, int Num, SDropDownState &State);
 };

@@ -239,6 +239,8 @@ void CUi::SSelectionPopupContext::Reset()
 	m_Width = 300.0f + (SPopupMenu::POPUP_BORDER + SPopupMenu::POPUP_MARGIN) * 2;
 	m_AlignmentHeight = -1.0f;
 	m_TransparentButtons = false;
+	m_pFilter = nullptr;
+	m_LastFilter.clear();
 }
 
 CUi::EPopupMenuFunctionResult CUi::PopupSelection(void *pContext, CUIRect View, bool Active)
@@ -267,13 +269,35 @@ CUi::EPopupMenuFunctionResult CUi::PopupSelection(void *pContext, CUIRect View, 
 
 	pSelectionPopup->m_vButtonContainers.resize(pSelectionPopup->m_vEntries.size());
 
+	const char *pFilter = pSelectionPopup->m_pFilter != nullptr ? pSelectionPopup->m_pFilter : "";
+	bool ScrollToFirst = false;
+	if(pSelectionPopup->m_LastFilter != pFilter)
+	{
+		pSelectionPopup->m_LastFilter = pFilter;
+		ScrollToFirst = true;
+	}
+	const bool SelectFirst = pFilter[0] != '\0' && Active && pUI->ConsumeHotkey(CUi::HOTKEY_ENTER);
+
 	size_t Index = 0;
+	bool AnyShown = false;
 	for(const auto &Entry : pSelectionPopup->m_vEntries)
 	{
-		if(pSelectionPopup->m_aMessage[0] != '\0' || Index != 0)
+		if(pFilter[0] != '\0' && !str_utf8_find_nocase(Entry.c_str(), pFilter))
+		{
+			++Index;
+			continue;
+		}
+		if(SelectFirst && !AnyShown)
+		{
+			pSelectionPopup->m_pSelection = &Entry;
+			pSelectionPopup->m_SelectionIndex = Index;
+		}
+		if(pSelectionPopup->m_aMessage[0] != '\0' || AnyShown)
 			View.HSplitTop(pSelectionPopup->m_EntrySpacing, nullptr, &View);
 		View.HSplitTop(pSelectionPopup->m_EntryHeight, &Slot, &View);
-		if(pScrollRegion->AddRect(Slot))
+		const bool ScrollHere = ScrollToFirst && !AnyShown;
+		AnyShown = true;
+		if(pScrollRegion->AddRect(Slot, ScrollHere))
 		{
 			if(pUI->DoButton_PopupMenu(&pSelectionPopup->m_vButtonContainers[Index], Entry.c_str(), &Slot, pSelectionPopup->m_FontSize, TEXTALIGN_ML, pSelectionPopup->m_EntryPadding, pSelectionPopup->m_TransparentButtons))
 			{
@@ -334,9 +358,15 @@ int CUi::DoDropDown(CUIRect *pRect, int CurSelection, const char **pStrs, int Nu
 	Props.m_HintRequiresStringCheck = true;
 	Props.m_HintCanChangePositionOrSize = true;
 	Props.m_ShowDropDownIcon = true;
-	if(IsPopupOpen(&State.m_SelectionPopupContext))
+	const bool PopupOpen = IsPopupOpen(&State.m_SelectionPopupContext);
+	if(PopupOpen)
 		Props.m_Corners = IGraphics::CORNER_ALL & (~State.m_SelectionPopupContext.m_Props.m_Corners);
-	if(DoButton_Menu(State.m_UiElement, &State.m_ButtonContainer, LabelFunc, pRect, Props))
+	if(State.m_Searchable && PopupOpen)
+	{
+		State.m_SearchInput.SetEmptyText(LabelFunc());
+		DoEditBox(&State.m_SearchInput, pRect, State.m_SelectionPopupContext.m_FontSize, Props.m_Corners);
+	}
+	else if(DoButton_Menu(State.m_UiElement, &State.m_ButtonContainer, LabelFunc, pRect, Props))
 	{
 		State.m_SelectionPopupContext.Reset();
 		State.m_SelectionPopupContext.m_Props.m_BorderColor = ColorRGBA(0.7f, 0.7f, 0.7f, 0.9f);
@@ -349,6 +379,12 @@ int CUi::DoDropDown(CUIRect *pRect, int CurSelection, const char **pStrs, int Nu
 		State.m_SelectionPopupContext.m_Width = pRect->w;
 		State.m_SelectionPopupContext.m_AlignmentHeight = pRect->h;
 		State.m_SelectionPopupContext.m_TransparentButtons = true;
+		if(State.m_Searchable)
+		{
+			State.m_SearchInput.Clear();
+			State.m_SelectionPopupContext.m_pFilter = State.m_SearchInput.GetString();
+			SetActiveItem(&State.m_SearchInput);
+		}
 		ShowPopupSelection(pRect->x, pRect->y, &State.m_SelectionPopupContext);
 	}
 

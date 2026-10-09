@@ -218,6 +218,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		static CUi::SDropDownState s_SourceLangDropDownState;
 		static CScrollRegion s_SourceLangScrollRegion;
 		s_SourceLangDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_SourceLangScrollRegion;
+		s_SourceLangDropDownState.m_Searchable = true;
 		const int OldSourceLang = FindTranslateLang(g_Config.m_ClChatTranslateOutSource);
 		const int NewSourceLang = Ui()->DoDropDown(&TranslateDropDown, OldSourceLang, s_apTranslateLangNames, s_NumTranslateLang, s_SourceLangDropDownState);
 		if(NewSourceLang != OldSourceLang)
@@ -230,6 +231,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		static CUi::SDropDownState s_TargetLangDropDownState;
 		static CScrollRegion s_TargetLangScrollRegion;
 		s_TargetLangDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_TargetLangScrollRegion;
+		s_TargetLangDropDownState.m_Searchable = true;
 		const int OldTargetLang = FindSendAsLang(g_Config.m_ClChatTranslateOutTarget);
 		const int NewTargetLang = Ui()->DoDropDown(&TranslateDropDown, OldTargetLang, s_vSendAsLangNames.data(), NumSendAsLang, s_TargetLangDropDownState);
 		if(NewTargetLang != OldTargetLang)
