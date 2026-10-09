@@ -38,7 +38,11 @@ public:
 	bool IsActive() const { return m_State != STATE_IDLE; }
 
 	bool OnWhisper(int ClientId, int Team, const char *pMessage);
-	void QueueWhisper(int ClientId, const char *pMessage, bool Priority = false, int ReplaceKey = 0);
+	enum
+	{
+		WHISPER_REPLACE_PET = -1,
+	};
+	void QueueWhisper(int ClientId, const char *pMessage, bool Priority = false, int ReplaceKey = 0, int Conn = -1);
 
 	void OnChatMessage(int ClientId, const char *pMessage);
 
@@ -110,6 +114,8 @@ private:
 		int m_ClientId;
 		int m_ReplaceKey;
 		std::string m_Command;
+		int m_Conn;
+		int m_SenderId;
 	};
 	std::vector<CQueuedWhisper> m_vSendQueue;
 	float m_NextSendTime = 0.0f;

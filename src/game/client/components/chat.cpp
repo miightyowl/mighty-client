@@ -16,6 +16,7 @@
 #include <engine/shared/config.h>
 #include <engine/shared/csv.h>
 #include <engine/shared/json.h>
+#include <engine/shared/linereader.h>
 #include <engine/textrender.h>
 
 #include <generated/protocol.h>
@@ -31,6 +32,8 @@
 #include <game/localization.h>
 
 #include <algorithm>
+
+static constexpr const char *SPAM_NAMES_FILE = "mclient-spam-names.txt";
 
 char CChat::ms_aDisplayText[MAX_CHAT_LENGTH] = "";
 
@@ -48,6 +51,8 @@ void CChat::CLine::Reset(CChat &This)
 	m_Time = 0;
 	m_aText[0] = '\0';
 	m_aName[0] = '\0';
+	m_aAuthor[0] = '\0';
+	m_Hidden = false;
 	m_Friend = false;
 	m_TimesRepeated = 0;
 	m_pManagedTeeRenderInfo = nullptr;
@@ -146,6 +151,10 @@ void CChat::Reset()
 	}
 	m_vPendingTranslations.clear();
 	m_TranslationCache.clear();
+
+	m_vHeldMessages.clear();
+	std::fill(std::begin(m_aJoinTime), std::end(m_aJoinTime), 0);
+	m_HadSnapshot = false;
 
 	m_Show = false;
 	m_CompletionUsed = false;
@@ -254,11 +263,14 @@ void CChat::OnConsoleInit()
 	Console()->Register("+show_chat", "", CFGFLAG_CLIENT, ConShowChat, this, "Show chat");
 	Console()->Register("echo", "r[message]", CFGFLAG_CLIENT | CFGFLAG_STORE, ConEcho, this, "Echo the text in chat window");
 	Console()->Register("clear_chat", "", CFGFLAG_CLIENT | CFGFLAG_STORE, ConClearChat, this, "Clear chat messages");
+	Console()->Register("chat_spam_names", "", CFGFLAG_CLIENT, ConSpamNames, this, "List the names muted by the chat spam filter");
+	Console()->Register("chat_spam_unmute", "r[name]", CFGFLAG_CLIENT, ConSpamUnmute, this, "Remove a name from the chat spam filter");
 }
 
 void CChat::OnInit()
 {
 	Reset();
+	LoadSpamNames();
 	Console()->Chain("cl_chat_old", ConchainChatOld, this);
 	Console()->Chain("cl_chat_size", ConchainChatFontSize, this);
 	Console()->Chain("cl_chat_width", ConchainChatWidth, this);
@@ -598,11 +610,13 @@ void CChat::OnMessage(int MsgType, void *pRawMsg)
 		const bool OwnMessage = pMsg->m_ClientId >= 0 &&
 					(pMsg->m_ClientId == GameClient()->m_aLocalIds[0] || pMsg->m_ClientId == GameClient()->m_aLocalIds[1]);
 		char aMasked[1024];
+		const char *pText = pMsg->m_pMessage;
 		if(!OwnMessage && (pMsg->m_ClientId < 0 || !g_Config.m_ClFoeAnonymizeRealNamesInChat) &&
 			GameClient()->MaskFoeNames(pMsg->m_pMessage, aMasked, sizeof(aMasked)))
-			AddLine(pMsg->m_ClientId, pMsg->m_Team, aMasked);
-		else
-			AddLine(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage);
+			pText = aMasked;
+
+		if(!FilterSpam(pMsg->m_ClientId, pMsg->m_Team, pMsg->m_pMessage, pText))
+			AddLine(pMsg->m_ClientId, pMsg->m_Team, pText);
 
 		if(Client()->State() != IClient::STATE_DEMOPLAYBACK &&
 			pMsg->m_ClientId == SERVER_MSG)
@@ -625,6 +639,283 @@ void CChat::OnMessage(int MsgType, void *pRawMsg)
 		CNetMsg_Sv_CommandInfoRemove *pMsg = (CNetMsg_Sv_CommandInfoRemove *)pRawMsg;
 		UnregisterCommand(pMsg->m_pName);
 	}
+}
+
+static bool IsSpamWordChar(char c)
+{
+	return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+int CChat::SpamScore(const char *pName, const char *pText)
+{
+	static constexpr const char *SPAM_WORDS[] = {
+		"tg", "telegram", "channel", "download", "free", "crack", "cracked", "bot",
+		"cheat", "cheats", "hack", "hacks", "client", "inject", "injector", "guides", "instructions"};
+
+	char aText[MAX_CHAT_LENGTH];
+	str_copy(aText, pText);
+	str_utf8_tolower(aText, aText, sizeof(aText));
+
+	int Score = 0;
+	if(str_find(aText, "t.me/"))
+		Score += 2;
+
+	bool Handle = false;
+	bool Leet = false;
+	bool aWordSeen[std::size(SPAM_WORDS)] = {};
+	for(const char *p = aText; *p;)
+	{
+		if(!IsSpamWordChar(*p))
+		{
+			p++;
+			continue;
+		}
+		const char *pWord = p;
+		while(IsSpamWordChar(*p))
+			p++;
+		const int Length = p - pWord;
+
+		if(pWord > aText && pWord[-1] == '@' && Length >= 4)
+			Handle = true;
+
+		for(int i = 1; i + 1 < Length; i++)
+		{
+			if(pWord[i] >= '0' && pWord[i] <= '9' && pWord[i - 1] >= 'a' && pWord[i - 1] <= 'z' && pWord[i + 1] >= 'a' && pWord[i + 1] <= 'z')
+				Leet = true;
+		}
+
+		for(size_t i = 0; i < std::size(SPAM_WORDS); i++)
+		{
+			if(!aWordSeen[i] && str_length(SPAM_WORDS[i]) == Length && str_comp_num(pWord, SPAM_WORDS[i], Length) == 0)
+			{
+				aWordSeen[i] = true;
+				Score++;
+			}
+		}
+	}
+	Score += Handle + Leet;
+
+	static constexpr const char *SPAM_NAME_PARTS[] = {"free", "crack", "cheat", "hack", "@"};
+	for(const char *pPart : SPAM_NAME_PARTS)
+	{
+		if(str_find_nocase(pName, pPart))
+		{
+			Score++;
+			break;
+		}
+	}
+	return Score;
+}
+
+bool CChat::ParseJoinLeave(const char *pText, char *pName, int NameSize, bool &Join)
+{
+	if(pText[0] != '\'')
+		return false;
+	const char *pEnd = str_find(pText, "' entered and joined the ");
+	Join = pEnd != nullptr;
+	if(!pEnd)
+		pEnd = str_find(pText, "' has left the game");
+	if(!pEnd)
+		return false;
+	str_truncate(pName, NameSize, pText + 1, pEnd - pText - 1);
+	return true;
+}
+
+bool CChat::IsNewPlayer(int ClientId)
+{
+	if(m_aJoinTime[ClientId] == 0)
+		m_aJoinTime[ClientId] = time();
+	return time() - m_aJoinTime[ClientId] < time_freq() * g_Config.m_ClChatSpamWindow;
+}
+
+bool CChat::IsSpamName(const char *pName) const
+{
+	return std::any_of(m_vSpamNames.begin(), m_vSpamNames.end(), [pName](const std::string &Name) { return Name == pName; });
+}
+
+bool CChat::HasSpamHandle(const char *pText) const
+{
+	char aHandle[64];
+	const char *pList = g_Config.m_ClChatSpamHandles;
+	while((pList = str_next_token(pList, ",", aHandle, sizeof(aHandle))))
+	{
+		const char *pHandle = str_utf8_skip_whitespaces(aHandle);
+		str_utf8_trim_right(aHandle);
+		if(pHandle[0] == '@')
+			pHandle++;
+		if(pHandle[0] != '\0' && str_utf8_find_nocase(pText, pHandle))
+			return true;
+	}
+	return false;
+}
+
+bool CChat::FilterSpam(int ClientId, int Team, const char *pRawText, const char *pText)
+{
+	if(!g_Config.m_ClChatSpamFilter || Client()->State() != IClient::STATE_ONLINE || !m_HadSnapshot)
+		return false;
+
+	if(ClientId == SERVER_MSG)
+	{
+		char aName[MAX_NAME_LENGTH];
+		bool Join;
+		if(!ParseJoinLeave(pRawText, aName, sizeof(aName), Join))
+			return false;
+		if(!Join && std::any_of(m_vHeldMessages.begin(), m_vHeldMessages.end(), [&](const CHeldMessage &Held) { return str_comp(Held.m_aName, aName) == 0; }))
+			ConfirmSpammer(aName);
+		return IsSpamName(aName);
+	}
+
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS ||
+		ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1])
+		return false;
+
+	const auto &Author = GameClient()->m_aClients[ClientId];
+	if(Author.m_aName[0] == '\0')
+		return false;
+	if(IsSpamName(Author.m_aName))
+	{
+		log_info("chat/spam", "hidden message of muted '%s': %s", Author.m_aName, pText);
+		return true;
+	}
+	if(Author.m_Friend || !IsNewPlayer(ClientId))
+		return false;
+
+	if(HasSpamHandle(pText))
+	{
+		log_info("chat/spam", "hidden message of '%s': %s", Author.m_aName, pText);
+		ConfirmSpammer(Author.m_aName);
+		return true;
+	}
+
+	if(SpamScore(Author.m_aName, pText) < SPAM_SCORE_HOLD)
+		return false;
+
+	CHeldMessage Held;
+	Held.m_ClientId = ClientId;
+	Held.m_Team = Team;
+	Held.m_ReleaseTime = time() + time_freq() * g_Config.m_ClChatSpamDelay;
+	str_copy(Held.m_aName, Author.m_aName);
+	Held.m_Text = pText;
+	m_vHeldMessages.push_back(std::move(Held));
+	return true;
+}
+
+void CChat::ConfirmSpammer(const char *pName)
+{
+	if(!IsSpamName(pName))
+	{
+		m_vSpamNames.emplace_back(pName);
+		SaveSpamNames();
+		log_info("chat/spam", "muted '%s', use chat_spam_unmute to undo", pName);
+	}
+
+	m_vHeldMessages.erase(std::remove_if(m_vHeldMessages.begin(), m_vHeldMessages.end(), [pName](const CHeldMessage &Held) {
+		if(str_comp(Held.m_aName, pName) != 0)
+			return false;
+		log_info("chat/spam", "hidden message of '%s': %s", Held.m_aName, Held.m_Text.c_str());
+		return true;
+	}),
+		m_vHeldMessages.end());
+
+	for(CLine &Line : m_aLines)
+	{
+		if(!Line.m_Initialized)
+			continue;
+		char aName[MAX_NAME_LENGTH];
+		bool Join;
+		if((Line.m_ClientId >= 0 && str_comp(Line.m_aAuthor, pName) == 0) ||
+			(Line.m_ClientId == SERVER_MSG && ParseJoinLeave(Line.m_aText, aName, sizeof(aName), Join) && str_comp(aName, pName) == 0))
+			Line.m_Hidden = true;
+	}
+}
+
+void CChat::UpdateHeldMessages()
+{
+	const int64_t Now = time();
+	for(size_t i = 0; i < m_vHeldMessages.size();)
+	{
+		const CHeldMessage &Held = m_vHeldMessages[i];
+		if(str_comp(GameClient()->m_aClients[Held.m_ClientId].m_aName, Held.m_aName) != 0)
+		{
+			char aName[MAX_NAME_LENGTH];
+			str_copy(aName, Held.m_aName);
+			ConfirmSpammer(aName);
+			i = 0;
+		}
+		else if(Now >= Held.m_ReleaseTime)
+		{
+			const CHeldMessage Released = Held;
+			m_vHeldMessages.erase(m_vHeldMessages.begin() + i);
+			AddLine(Released.m_ClientId, Released.m_Team, Released.m_Text.c_str());
+		}
+		else
+			i++;
+	}
+}
+
+void CChat::LoadSpamNames()
+{
+	m_vSpamNames.clear();
+	CLineReader LineReader;
+	if(!LineReader.OpenFile(Storage()->OpenFile(SPAM_NAMES_FILE, IOFLAG_READ, IStorage::TYPE_SAVE)))
+		return;
+	while(const char *pLine = LineReader.Get())
+	{
+		if(pLine[0] != '\0' && !IsSpamName(pLine))
+			m_vSpamNames.emplace_back(pLine);
+	}
+}
+
+void CChat::SaveSpamNames()
+{
+	IOHANDLE File = Storage()->OpenFile(SPAM_NAMES_FILE, IOFLAG_WRITE, IStorage::TYPE_SAVE);
+	if(!File)
+		return;
+	for(const std::string &Name : m_vSpamNames)
+	{
+		io_write(File, Name.c_str(), Name.size());
+		io_write_newline(File);
+	}
+	io_close(File);
+}
+
+void CChat::ConSpamNames(IConsole::IResult *pResult, void *pUserData)
+{
+	CChat *pSelf = (CChat *)pUserData;
+	log_info("chat/spam", "%d muted names", (int)pSelf->m_vSpamNames.size());
+	for(const std::string &Name : pSelf->m_vSpamNames)
+		log_info("chat/spam", "'%s'", Name.c_str());
+}
+
+void CChat::ConSpamUnmute(IConsole::IResult *pResult, void *pUserData)
+{
+	CChat *pSelf = (CChat *)pUserData;
+	const char *pName = pResult->GetString(0);
+	auto It = std::find(pSelf->m_vSpamNames.begin(), pSelf->m_vSpamNames.end(), pName);
+	if(It == pSelf->m_vSpamNames.end())
+	{
+		log_info("chat/spam", "'%s' is not muted", pName);
+		return;
+	}
+	pSelf->m_vSpamNames.erase(It);
+	pSelf->SaveSpamNames();
+	log_info("chat/spam", "unmuted '%s'", pName);
+}
+
+void CChat::OnNewSnapshot()
+{
+	if(Client()->State() != IClient::STATE_ONLINE)
+		return;
+
+	const int64_t JoinTime = m_HadSnapshot ? time() : 1;
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(!GameClient()->m_aClients[i].m_Active)
+			m_aJoinTime[i] = 0;
+		else if(m_aJoinTime[i] == 0)
+			m_aJoinTime[i] = JoinTime;
+	}
+	m_HadSnapshot = true;
 }
 
 bool CChat::LineShouldHighlight(const char *pLine, const char *pName)
@@ -818,6 +1109,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 
 	// If it's a client message, m_aText will have ": " prepended so we have to work around it.
 	if(PreviousLine.m_Initialized &&
+		!PreviousLine.m_Hidden &&
 		PreviousLine.m_TeamNumber == Team &&
 		PreviousLine.m_ClientId == ClientId &&
 		str_comp(PreviousLine.m_aText, pLine) == 0 &&
@@ -849,6 +1141,8 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 	CurrentLine.m_Whisper = Team >= 2;
 	CurrentLine.m_NameColor = -2;
 	CurrentLine.m_CustomColor = CustomColor;
+	if(ClientId >= 0)
+		str_copy(CurrentLine.m_aAuthor, GameClient()->m_aClients[ClientId].m_aName);
 
 	// check for highlighted name
 	if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
@@ -1752,6 +2046,8 @@ void CChat::OnPrepareLines(float y)
 			break;
 		if(Now > Line.m_Time + 16 * time_freq() && !m_PrevShowChat)
 			break;
+		if(Line.m_Hidden)
+			continue;
 
 		if(Line.m_TextContainerIndex.Valid() && !ForceRecreate)
 			continue;
@@ -1976,6 +2272,8 @@ void CChat::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
+	UpdateHeldMessages();
+
 	// send pending chat messages
 	if(m_PendingChatCounter > 0 && m_LastChatSend + time_freq() < time())
 	{
@@ -2103,6 +2401,8 @@ void CChat::OnRender()
 			break;
 		if(Now > Line.m_Time + 16 * time_freq() && !m_PrevShowChat)
 			break;
+		if(Line.m_Hidden)
+			continue;
 
 		y -= Line.m_aYOffset[OffsetType];
 
@@ -2178,7 +2478,7 @@ bool CChat::ServerHasCommand(const char *pName) const
 	});
 }
 
-void CChat::SendChat(int Team, const char *pLine)
+void CChat::SendChat(int Team, const char *pLine, int Conn)
 {
 	// don't send empty messages
 	if(*str_utf8_skip_whitespaces(pLine) == '\0')
@@ -2201,7 +2501,10 @@ void CChat::SendChat(int Team, const char *pLine)
 		Msg7.m_Mode = Team == 1 ? protocol7::CHAT_TEAM : protocol7::CHAT_ALL;
 		Msg7.m_Target = -1;
 		Msg7.m_pMessage = pLine;
-		Client()->SendPackMsgActive(&Msg7, MSGFLAG_VITAL, true);
+		if(Conn < 0)
+			Client()->SendPackMsgActive(&Msg7, MSGFLAG_VITAL, true);
+		else
+			Client()->SendPackMsg(Conn, &Msg7, MSGFLAG_VITAL, true);
 		return;
 	}
 
@@ -2209,7 +2512,10 @@ void CChat::SendChat(int Team, const char *pLine)
 	CNetMsg_Cl_Say Msg;
 	Msg.m_Team = Team;
 	Msg.m_pMessage = pLine;
-	Client()->SendPackMsgActive(&Msg, MSGFLAG_VITAL);
+	if(Conn < 0)
+		Client()->SendPackMsgActive(&Msg, MSGFLAG_VITAL);
+	else
+		Client()->SendPackMsg(Conn, &Msg, MSGFLAG_VITAL);
 }
 
 void CChat::SendChatQueued(const char *pLine)

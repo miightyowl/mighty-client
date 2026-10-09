@@ -102,6 +102,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMiniGamesHold, Localize("Mini Game: Make the game key holdable"), &g_Config.m_ClMClientMiniGamesHold, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientHideProtocolEmotes, Localize("Hide emoticons that appear during communication"), &g_Config.m_ClMClientHideProtocolEmotes, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientHideProtocolWhispers, Localize("Hide protocol whispers"), &g_Config.m_ClMClientHideProtocolWhispers, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatSpamFilter, Localize("Hide spam bots in chat"), &g_Config.m_ClChatSpamFilter, &LeftView, LineSize);
 
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFastInput, Localize("Fast input (lower input delay)"), &g_Config.m_ClMClientFastInput, &LeftView, LineSize);
 		if(g_Config.m_ClMClientFastInput)

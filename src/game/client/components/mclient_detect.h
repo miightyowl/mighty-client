@@ -1,6 +1,7 @@
 #ifndef GAME_CLIENT_COMPONENTS_MCLIENT_DETECT_H
 #define GAME_CLIENT_COMPONENTS_MCLIENT_DETECT_H
 
+#include <engine/client/enums.h>
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
@@ -75,7 +76,7 @@ private:
 		bool m_Answered;
 		bool m_ColorBeaconVisible;
 		float m_LastColorBeaconReplyTime;
-		bool m_PetTold;
+		bool m_aPetTold[NUM_DUMMIES];
 		bool m_PetOn;
 		char m_aPetSkin[MAX_SKIN_LENGTH];
 		bool m_PetUseCustomColor;
@@ -119,12 +120,16 @@ private:
 	float m_ReplyTime = 0.0f;
 
 	// the pet state the other M-Client players around us know about
-	bool m_PetOnSent = false;
-	char m_aPetSkinSent[MAX_SKIN_LENGTH] = "";
-	bool m_PetUseCustomColorSent = false;
-	int m_PetColorBodySent = 0;
-	int m_PetColorFeetSent = 0;
-	int m_PetLocalId = -1;
+	struct CLocalPet
+	{
+		bool m_On = false;
+		char m_aSkin[MAX_SKIN_LENGTH] = "";
+		bool m_UseCustomColor = false;
+		int m_ColorBody = 0;
+		int m_ColorFeet = 0;
+		int m_LocalId = -1;
+	};
+	CLocalPet m_aLocalPets[NUM_DUMMIES];
 
 	char m_aLocalName[MAX_NAME_LENGTH] = "";
 	float m_BeaconHeardUntil = 0.0f;
@@ -147,8 +152,8 @@ private:
 	void RestoreColorBeacon();
 	void SendInfoColors(int Conn, int ColorBody, int ColorFeet) const;
 	void UpdatePet();
-	bool PetAudience() const;
-	void ForgetPetTold();
+	bool PetAudience(int Conn) const;
+	void ForgetPetTold(int Conn);
 	void LocalPet(bool *pOn, char *pSkin, int SkinSize, bool *pUseCustomColor, int *pColorBody, int *pColorFeet) const;
 	void SendPetWhisper(int ClientId, bool On, const char *pSkin, bool UseCustomColor, int ColorBody, int ColorFeet);
 	void SendBeacon(int Kind);

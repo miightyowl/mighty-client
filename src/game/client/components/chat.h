@@ -69,6 +69,9 @@ class CChat : public CComponent
 		float m_TextYOffset;
 
 		int m_TimesRepeated;
+
+		bool m_Hidden;
+		char m_aAuthor[MAX_NAME_LENGTH];
 	};
 
 	bool m_PrevScoreBoardShowed;
@@ -223,6 +226,35 @@ class CChat : public CComponent
 	static void ConchainChatFontSize(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainChatWidth(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
+	enum
+	{
+		SPAM_SCORE_HOLD = 2,
+	};
+	struct CHeldMessage
+	{
+		int m_ClientId;
+		int m_Team;
+		int64_t m_ReleaseTime;
+		char m_aName[MAX_NAME_LENGTH];
+		std::string m_Text;
+	};
+	std::vector<CHeldMessage> m_vHeldMessages;
+	std::vector<std::string> m_vSpamNames;
+	int64_t m_aJoinTime[MAX_CLIENTS] = {};
+	bool m_HadSnapshot = false;
+	static int SpamScore(const char *pName, const char *pText);
+	static bool ParseJoinLeave(const char *pText, char *pName, int NameSize, bool &Join);
+	bool IsNewPlayer(int ClientId);
+	bool IsSpamName(const char *pName) const;
+	bool HasSpamHandle(const char *pText) const;
+	bool FilterSpam(int ClientId, int Team, const char *pRawText, const char *pText);
+	void ConfirmSpammer(const char *pName);
+	void UpdateHeldMessages();
+	void LoadSpamNames();
+	void SaveSpamNames();
+	static void ConSpamNames(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpamUnmute(IConsole::IResult *pResult, void *pUserData);
+
 	bool LineShouldHighlight(const char *pLine, const char *pName);
 	void StoreSave(const char *pText);
 
@@ -243,6 +275,7 @@ public:
 	void OnWindowResize() override;
 	void OnConsoleInit() override;
 	void OnStateChange(int NewState, int OldState) override;
+	void OnNewSnapshot() override;
 	void OnRender() override;
 	void OnPrepareLines(float y);
 	void Reset();
@@ -270,7 +303,8 @@ public:
 	//
 	// @param Team MODE_ALL=0 MODE_TEAM=1
 	// @param pLine the chat message
-	void SendChat(int Team, const char *pLine);
+	// @param Conn the sender connection, or -1 for the active tee
+	void SendChat(int Team, const char *pLine, int Conn = -1);
 
 	// checks whether the server offers a chat command
 	bool ServerHasCommand(const char *pName) const;

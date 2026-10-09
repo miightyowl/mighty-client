@@ -211,12 +211,8 @@ void CMClientDetect::OnReset()
 	m_ReplyWithEmotes = false;
 	m_ReplyTime = 0.0f;
 
-	m_PetOnSent = false;
-	m_aPetSkinSent[0] = '\0';
-	m_PetUseCustomColorSent = false;
-	m_PetColorBodySent = 0;
-	m_PetColorFeetSent = 0;
-	m_PetLocalId = -1;
+	for(CLocalPet &Pet : m_aLocalPets)
+		Pet = CLocalPet{};
 
 	m_aLocalName[0] = '\0';
 	m_BeaconHeardUntil = 0.0f;
@@ -563,31 +559,52 @@ void CMClientDetect::LocalPet(bool *pOn, char *pSkin, int SkinSize, bool *pUseCu
 {
 	const bool Dummy = g_Config.m_ClDummy != 0;
 	*pOn = Dummy ? g_Config.m_ClMClientDummyPetTee != 0 : g_Config.m_ClMClientPetTee != 0;
+	pSkin[0] = '\0';
+	*pUseCustomColor = false;
+	*pColorBody = 0;
+	*pColorFeet = 0;
+	if(!*pOn)
+		return;
+
 	const char *pConfiguredSkin = Dummy ? g_Config.m_ClMClientDummyPetTeeSkin : g_Config.m_ClMClientPetTeeSkin;
 	str_copy(pSkin, g_Config.m_ClMClientForceSkin ? "maodie" : pConfiguredSkin, SkinSize);
 	*pUseCustomColor = Dummy ? g_Config.m_ClMClientDummyPetTeeUseCustomColor != 0 : g_Config.m_ClMClientPetTeeUseCustomColor != 0;
-	*pColorBody = Dummy ? g_Config.m_ClMClientDummyPetTeeColorBody : g_Config.m_ClMClientPetTeeColorBody;
-	*pColorFeet = Dummy ? g_Config.m_ClMClientDummyPetTeeColorFeet : g_Config.m_ClMClientPetTeeColorFeet;
+	if(*pUseCustomColor)
+	{
+		*pColorBody = Dummy ? g_Config.m_ClMClientDummyPetTeeColorBody : g_Config.m_ClMClientPetTeeColorBody;
+		*pColorFeet = Dummy ? g_Config.m_ClMClientDummyPetTeeColorFeet : g_Config.m_ClMClientPetTeeColorFeet;
+	}
 }
 
-bool CMClientDetect::PetAudience() const
+bool CMClientDetect::PetAudience(int Conn) const
 {
-	return std::any_of(std::begin(m_aPeers), std::end(m_aPeers), [](const CPeer &Peer) { return Peer.m_Detected && !Peer.m_PetTold; });
+	return std::any_of(std::begin(m_aPeers), std::end(m_aPeers), [Conn](const CPeer &Peer) { return Peer.m_Detected && !Peer.m_aPetTold[Conn]; });
 }
 
-void CMClientDetect::ForgetPetTold()
+void CMClientDetect::ForgetPetTold(int Conn)
 {
 	for(CPeer &Peer : m_aPeers)
-		Peer.m_PetTold = false;
+		Peer.m_aPetTold[Conn] = false;
 }
 
 void CMClientDetect::UpdatePet()
 {
-	const int LocalId = GameClient()->m_aLocalIds[g_Config.m_ClDummy];
-	if(LocalId != m_PetLocalId)
+	for(int Conn = 0; Conn < NUM_DUMMIES; Conn++)
 	{
-		m_PetLocalId = LocalId;
-		ForgetPetTold();
+		if(GameClient()->m_aLocalIds[Conn] < 0)
+			m_aLocalPets[Conn] = CLocalPet{};
+	}
+
+	const int Conn = g_Config.m_ClDummy;
+	const int LocalId = GameClient()->m_aLocalIds[Conn];
+	if(LocalId < 0)
+		return;
+	CLocalPet &Pet = m_aLocalPets[Conn];
+
+	if(LocalId != Pet.m_LocalId)
+	{
+		Pet.m_LocalId = LocalId;
+		ForgetPetTold(Conn);
 	}
 
 	bool On;
@@ -596,18 +613,18 @@ void CMClientDetect::UpdatePet()
 	int ColorBody, ColorFeet;
 	LocalPet(&On, aSkin, sizeof(aSkin), &UseCustomColor, &ColorBody, &ColorFeet);
 
-	if(On != m_PetOnSent || str_comp(aSkin, m_aPetSkinSent) != 0 ||
-		UseCustomColor != m_PetUseCustomColorSent || ColorBody != m_PetColorBodySent || ColorFeet != m_PetColorFeetSent)
+	if(On != Pet.m_On || str_comp(aSkin, Pet.m_aSkin) != 0 ||
+		UseCustomColor != Pet.m_UseCustomColor || ColorBody != Pet.m_ColorBody || ColorFeet != Pet.m_ColorFeet)
 	{
-		ForgetPetTold();
-		m_PetOnSent = On;
-		str_copy(m_aPetSkinSent, aSkin);
-		m_PetUseCustomColorSent = UseCustomColor;
-		m_PetColorBodySent = ColorBody;
-		m_PetColorFeetSent = ColorFeet;
+		ForgetPetTold(Conn);
+		Pet.m_On = On;
+		str_copy(Pet.m_aSkin, aSkin);
+		Pet.m_UseCustomColor = UseCustomColor;
+		Pet.m_ColorBody = ColorBody;
+		Pet.m_ColorFeet = ColorFeet;
 	}
 
-	if(!PetAudience())
+	if(!PetAudience(Conn))
 		return;
 	if(!GameClient()->m_Chat.ServerHasCommand("w"))
 		return;
@@ -615,10 +632,10 @@ void CMClientDetect::UpdatePet()
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
 	{
 		CPeer &Peer = m_aPeers[ClientId];
-		if(!Peer.m_Detected || Peer.m_PetTold)
+		if(!Peer.m_Detected || Peer.m_aPetTold[Conn])
 			continue;
 		SendPetWhisper(ClientId, On, aSkin, UseCustomColor, ColorBody, ColorFeet);
-		Peer.m_PetTold = true;
+		Peer.m_aPetTold[Conn] = true;
 	}
 }
 
@@ -638,7 +655,7 @@ void CMClientDetect::SendPetWhisper(int ClientId, bool On, const char *pSkin, bo
 		str_format(aMessage, sizeof(aMessage), "%s%s 1 %08x %08x", PET_WHISPER_PREFIX, aEncodedSkin, (unsigned)ColorBody, (unsigned)ColorFeet);
 	else
 		str_format(aMessage, sizeof(aMessage), "%s%s 0", PET_WHISPER_PREFIX, aEncodedSkin);
-	GameClient()->m_MiniGames.QueueWhisper(ClientId, aMessage);
+	GameClient()->m_MiniGames.QueueWhisper(ClientId, aMessage, false, CMiniGames::WHISPER_REPLACE_PET, g_Config.m_ClDummy);
 }
 
 void CMClientDetect::SendBeacon(int Kind)

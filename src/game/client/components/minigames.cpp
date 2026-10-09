@@ -905,7 +905,7 @@ void CMiniGames::StartGame(int OpponentId, bool Challenger)
 	ResetEmoteChannel();
 }
 
-void CMiniGames::QueueWhisper(int ClientId, const char *pMessage, bool Priority, int ReplaceKey)
+void CMiniGames::QueueWhisper(int ClientId, const char *pMessage, bool Priority, int ReplaceKey, int Conn)
 {
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !GameClient()->m_aClients[ClientId].m_Active)
 		return;
@@ -925,12 +925,12 @@ void CMiniGames::QueueWhisper(int ClientId, const char *pMessage, bool Priority,
 	str_format(aLine, sizeof(aLine), "/w \"%s\" %s", aName, pMessage);
 	if(ReplaceKey != 0)
 	{
-		m_vSendQueue.erase(std::remove_if(m_vSendQueue.begin(), m_vSendQueue.end(), [ClientId, ReplaceKey](const CQueuedWhisper &Queued) {
-			return Queued.m_ClientId == ClientId && Queued.m_ReplaceKey == ReplaceKey;
+		m_vSendQueue.erase(std::remove_if(m_vSendQueue.begin(), m_vSendQueue.end(), [ClientId, ReplaceKey, Conn](const CQueuedWhisper &Queued) {
+			return Queued.m_ClientId == ClientId && Queued.m_ReplaceKey == ReplaceKey && Queued.m_Conn == Conn;
 		}),
 			m_vSendQueue.end());
 	}
-	CQueuedWhisper Queued{ClientId, ReplaceKey, aLine};
+	CQueuedWhisper Queued{ClientId, ReplaceKey, aLine, Conn, Conn < 0 ? -1 : GameClient()->m_aLocalIds[Conn]};
 	if(Priority)
 		m_vSendQueue.insert(m_vSendQueue.begin(), std::move(Queued));
 	else
@@ -976,13 +976,23 @@ void CMiniGames::FlushSendQueue()
 		return;
 	}
 
+	// Pet updates belong to the tee that queued them, even after a dummy switch.
+	m_vSendQueue.erase(std::remove_if(m_vSendQueue.begin(), m_vSendQueue.end(), [this](const CQueuedWhisper &Queued) {
+		return Queued.m_Conn >= 0 &&
+		       (GameClient()->m_aLocalIds[Queued.m_Conn] != Queued.m_SenderId ||
+			       (Queued.m_ReplaceKey == WHISPER_REPLACE_PET && !g_Config.m_ClMClientUserDetection));
+	}),
+		m_vSendQueue.end());
+	if(m_vSendQueue.empty())
+		return;
+
 	if(Now < m_NextSendTime)
 		return;
 
 	if(m_ChatScore + CHAT_SCORE_PENALTY > CHAT_SCORE_BUDGET)
 		return;
 
-	GameClient()->m_Chat.SendChat(0, m_vSendQueue.front().m_Command.c_str());
+	GameClient()->m_Chat.SendChat(0, m_vSendQueue.front().m_Command.c_str(), m_vSendQueue.front().m_Conn);
 	m_vSendQueue.erase(m_vSendQueue.begin());
 	m_ChatScore += CHAT_SCORE_PENALTY;
 	m_NextSendTime = Now + SEND_INTERVAL;
