@@ -1225,6 +1225,11 @@ endif()
 
 set(EXPECTED_DATA
   # tidy-alphabetical-start
+  accessories/devilwing_left.png
+  accessories/devilwing_right.png
+  accessories/golden_halo.png
+  accessories/wing_left.png
+  accessories/wing_right.png
   ads/apfeltee.png
   ads/doubledipp.png
   ads/ilak.png
@@ -2675,6 +2680,8 @@ if(CLIENT)
     animstate.h
     component.cpp
     component.h
+    components/accessories.cpp
+    components/accessories.h
     components/ads.cpp
     components/ads.h
     components/background.cpp

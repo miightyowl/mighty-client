@@ -729,6 +729,14 @@ void CPlayers::RenderPlayer(
 		Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
 	};
 
+	const bool HasAccessories = ClientId >= 0 && IsLocalTee;
+	CAccessories::SSettings AccessorySettings{};
+	if(HasAccessories)
+	{
+		AccessorySettings = CAccessories::Settings(ClientId == GameClient()->m_aLocalIds[1]);
+		GameClient()->m_Accessories.RenderBack(&State, &RenderInfo, Position, Alpha, AccessorySettings);
+	}
+
 	// draw gun
 	if(Player.m_Weapon >= 0)
 	{
@@ -923,6 +931,8 @@ void CPlayers::RenderPlayer(
 		Graphics()->BlendNormal();
 	}
 	RenderTools()->RenderTee(&State, &RenderInfo, Emote, Direction, Position, Alpha);
+	if(HasAccessories)
+		GameClient()->m_Accessories.RenderFront(&State, &RenderInfo, Position, Alpha, AccessorySettings);
 
 	float TeeAnimScale, TeeBaseSize;
 	CRenderTools::GetRenderTeeAnimScaleAndBaseSize(&RenderInfo, TeeAnimScale, TeeBaseSize);

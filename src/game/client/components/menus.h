@@ -689,6 +689,8 @@ protected:
 	void RenderSettingsWidgetBar(CUIRect MainView);
 	void RenderSettingsTeeCompanion(CUIRect MainView);
 	bool m_CompanionTeeTab = false;
+	void RenderSettingsTeeAccessories(CUIRect MainView);
+	bool m_AccessoriesTab = false;
 
 	// found in menus_settings_player.cpp
 	void RenderSettingsPlayer(CUIRect MainView);
