@@ -26,34 +26,52 @@
 
 void CMenus::RenderSettingsTee(CUIRect MainView)
 {
-	CUIRect TabBar, PlayerTab, DummyTab, CompanionTab, ChangeInfo;
+	CUIRect TabBar, PlayerTab, DummyTab, CompanionTab, AccessoriesTab, ChangeInfo;
 	MainView.HSplitTop(20.0f, &TabBar, &MainView);
 	TabBar.VSplitMid(&TabBar, &ChangeInfo, 20.f);
-	TabBar.VSplitLeft(TabBar.w / 3.0f, &PlayerTab, &TabBar);
-	TabBar.VSplitMid(&DummyTab, &CompanionTab);
+	TabBar.VSplitMid(&PlayerTab, &CompanionTab);
+	PlayerTab.VSplitMid(&PlayerTab, &DummyTab);
+	CompanionTab.VSplitMid(&CompanionTab, &AccessoriesTab);
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
 	static CButtonContainer s_PlayerTabButton;
-	if(DoButton_MenuTab(&s_PlayerTabButton, Localize("Player"), !m_Dummy && !m_CompanionTeeTab, &PlayerTab, IGraphics::CORNER_L, nullptr, nullptr, nullptr, nullptr, 4.0f))
+	if(DoButton_MenuTab(&s_PlayerTabButton, Localize("Player"), !m_Dummy && !m_CompanionTeeTab && !m_AccessoriesTab, &PlayerTab, IGraphics::CORNER_L, nullptr, nullptr, nullptr, nullptr, 4.0f))
 	{
 		m_Dummy = false;
 		m_CompanionTeeTab = false;
+		m_AccessoriesTab = false;
 		m_SkinListScrollToSelected = true;
 	}
 
 	static CButtonContainer s_DummyTabButton;
-	if(DoButton_MenuTab(&s_DummyTabButton, Localize("Dummy"), m_Dummy && !m_CompanionTeeTab, &DummyTab, IGraphics::CORNER_NONE, nullptr, nullptr, nullptr, nullptr, 4.0f))
+	if(DoButton_MenuTab(&s_DummyTabButton, Localize("Dummy"), m_Dummy && !m_CompanionTeeTab && !m_AccessoriesTab, &DummyTab, IGraphics::CORNER_NONE, nullptr, nullptr, nullptr, nullptr, 4.0f))
 	{
 		m_Dummy = true;
 		m_CompanionTeeTab = false;
+		m_AccessoriesTab = false;
 		m_SkinListScrollToSelected = true;
 	}
 
 	static CButtonContainer s_CompanionTabButton;
-	if(DoButton_MenuTab(&s_CompanionTabButton, Localize("Companion"), m_CompanionTeeTab, &CompanionTab, IGraphics::CORNER_R, nullptr, nullptr, nullptr, nullptr, 4.0f))
+	if(DoButton_MenuTab(&s_CompanionTabButton, Localize("Companion"), m_CompanionTeeTab, &CompanionTab, IGraphics::CORNER_NONE, nullptr, nullptr, nullptr, nullptr, 4.0f))
 	{
 		m_CompanionTeeTab = true;
+		m_AccessoriesTab = false;
 		m_SkinListScrollToSelected = true;
+	}
+
+	static CButtonContainer s_AccessoriesTabButton;
+	if(DoButton_MenuTab(&s_AccessoriesTabButton, Localize("Accessories"), m_AccessoriesTab, &AccessoriesTab, IGraphics::CORNER_R, nullptr, nullptr, nullptr, nullptr, 4.0f))
+	{
+		m_AccessoriesTab = true;
+		m_CompanionTeeTab = false;
+	}
+
+	// accessories tab
+	if(m_AccessoriesTab)
+	{
+		RenderSettingsTeeAccessories(MainView);
+		return;
 	}
 
 	// companion tab

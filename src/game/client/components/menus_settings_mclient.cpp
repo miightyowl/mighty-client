@@ -580,6 +580,136 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 	TextRender()->SetRenderFlags(0);
 	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 }
+
+void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
+{
+	CUIRect Label, Button;
+
+	CUIRect TargetBar, TargetLabel, PlayerButton, DummyButton;
+	MainView.HSplitTop(20.0f, &TargetBar, &MainView);
+	TargetBar.VSplitLeft(130.0f, &TargetLabel, &TargetBar);
+	Ui()->DoLabel(&TargetLabel, Localize("Accessories for"), 14.0f, TEXTALIGN_ML);
+	TargetBar.VSplitLeft(100.0f, &PlayerButton, &TargetBar);
+	TargetBar.VSplitLeft(100.0f, &DummyButton, &TargetBar);
+	static CButtonContainer s_PlayerAccessoriesButton;
+	static CButtonContainer s_DummyAccessoriesButton;
+	if(DoButton_MenuTab(&s_PlayerAccessoriesButton, Localize("Player"), !m_Dummy, &PlayerButton, IGraphics::CORNER_L, nullptr, nullptr, nullptr, nullptr, 4.0f))
+		m_Dummy = false;
+	if(DoButton_MenuTab(&s_DummyAccessoriesButton, Localize("Dummy"), m_Dummy, &DummyButton, IGraphics::CORNER_R, nullptr, nullptr, nullptr, nullptr, 4.0f))
+		m_Dummy = true;
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+
+	int *pHead = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryHead : &g_Config.m_ClMClientAccessoryHead;
+	int *pHeadSize = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryHeadSize : &g_Config.m_ClMClientAccessoryHeadSize;
+	int *pHeadX = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryHeadX : &g_Config.m_ClMClientAccessoryHeadX;
+	int *pHeadY = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryHeadY : &g_Config.m_ClMClientAccessoryHeadY;
+	int *pWings = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryWings : &g_Config.m_ClMClientAccessoryWings;
+	int *pWingsSize = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryWingsSize : &g_Config.m_ClMClientAccessoryWingsSize;
+	int *pWingsSpread = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryWingsSpread : &g_Config.m_ClMClientAccessoryWingsSpread;
+	int *pWingsY = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryWingsY : &g_Config.m_ClMClientAccessoryWingsY;
+
+	CUIRect Preview, Options;
+	MainView.VSplitLeft(std::min(MainView.w * 0.4f, 320.0f), &Preview, &Options);
+	Options.VSplitLeft(20.0f, nullptr, &Options);
+
+	// preview with the skin of the selected tee
+	{
+		Preview.HSplitTop(std::min(Preview.w, Preview.h), &Preview, nullptr);
+		Preview.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_ALL, 5.0f);
+
+		const char *pSkinName = g_Config.m_ClMClientForceSkin ? "maodie" : (m_Dummy ? g_Config.m_ClDummySkin : g_Config.m_ClPlayerSkin);
+		const bool UseCustomColor = m_Dummy ? g_Config.m_ClDummyUseCustomColor : g_Config.m_ClPlayerUseCustomColor;
+		const unsigned ColorBody = m_Dummy ? g_Config.m_ClDummyColorBody : g_Config.m_ClPlayerColorBody;
+		const unsigned ColorFeet = m_Dummy ? g_Config.m_ClDummyColorFeet : g_Config.m_ClPlayerColorFeet;
+
+		CTeeRenderInfo TeeInfo;
+		TeeInfo.Apply(GameClient()->m_Skins.Find(pSkinName));
+		TeeInfo.ApplyColors(UseCustomColor, ColorBody, ColorFeet);
+		TeeInfo.m_Size = Preview.w * 0.4f;
+
+		vec2 OffsetToMid;
+		CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &TeeInfo, OffsetToMid);
+		const vec2 TeeRenderPos = vec2(Preview.x + Preview.w / 2.0f, Preview.y + Preview.h * 0.55f + OffsetToMid.y);
+		const vec2 DeltaPosition = Ui()->MousePos() - TeeRenderPos;
+		const float Distance = length(DeltaPosition);
+		const vec2 TeeDirection = Distance < 20.0f ? vec2(1.0f, 0.0f) : normalize(DeltaPosition);
+
+		const CAccessories::SSettings Settings = CAccessories::Settings(m_Dummy);
+		GameClient()->m_Accessories.RenderBack(CAnimState::GetIdle(), &TeeInfo, TeeRenderPos, 1.0f, Settings);
+		RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeInfo, EMOTE_NORMAL, TeeDirection, TeeRenderPos);
+		GameClient()->m_Accessories.RenderFront(CAnimState::GetIdle(), &TeeInfo, TeeRenderPos, 1.0f, Settings);
+	}
+
+	const auto &&DoSelector = [&](CButtonContainer *pButtons, int *pValue, const char **ppNames, int Num) {
+		CUIRect Row;
+		Options.HSplitTop(20.0f, &Row, &Options);
+		const float ButtonWidth = Row.w / Num;
+		for(int i = 0; i < Num; i++)
+		{
+			CUIRect Tab;
+			Row.VSplitLeft(ButtonWidth, &Tab, &Row);
+			const int Corners = i == 0 ? IGraphics::CORNER_L : (i == Num - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
+			if(DoButton_MenuTab(&pButtons[i], ppNames[i], *pValue == i, &Tab, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
+				*pValue = i;
+		}
+		Options.HSplitTop(5.0f, nullptr, &Options);
+	};
+
+	// head
+	Options.HSplitTop(20.0f, &Label, &Options);
+	Ui()->DoLabel(&Label, Localize("Head"), 16.0f, TEXTALIGN_ML);
+	Options.HSplitTop(5.0f, nullptr, &Options);
+	{
+		const char *apNames[CAccessories::NUM_HEADS] = {Localize("None"), Localize("Halo"), Localize("Horns")};
+		static CButtonContainer s_aHeadButtons[CAccessories::NUM_HEADS];
+		DoSelector(s_aHeadButtons, pHead, apNames, CAccessories::NUM_HEADS);
+	}
+	if(*pHead != CAccessories::HEAD_NONE)
+	{
+		Options.HSplitTop(20.0f, &Button, &Options);
+		Ui()->DoScrollbarOption(pHeadSize, pHeadSize, &Button, Localize("Size"), 25, 300, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		Options.HSplitTop(20.0f, &Button, &Options);
+		Ui()->DoScrollbarOption(pHeadX, pHeadX, &Button, Localize("Horizontal offset"), -40, 40);
+		Options.HSplitTop(20.0f, &Button, &Options);
+		Ui()->DoScrollbarOption(pHeadY, pHeadY, &Button, Localize("Vertical offset"), -40, 40);
+	}
+	Options.HSplitTop(15.0f, nullptr, &Options);
+
+	// wings
+	Options.HSplitTop(20.0f, &Label, &Options);
+	Ui()->DoLabel(&Label, Localize("Wings"), 16.0f, TEXTALIGN_ML);
+	Options.HSplitTop(5.0f, nullptr, &Options);
+	{
+		const char *apNames[CAccessories::NUM_WINGS] = {Localize("None"), Localize("Angel"), Localize("Devil")};
+		static CButtonContainer s_aWingButtons[CAccessories::NUM_WINGS];
+		DoSelector(s_aWingButtons, pWings, apNames, CAccessories::NUM_WINGS);
+	}
+	if(*pWings != CAccessories::WINGS_NONE)
+	{
+		Options.HSplitTop(20.0f, &Button, &Options);
+		Ui()->DoScrollbarOption(pWingsSize, pWingsSize, &Button, Localize("Size"), 25, 300, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		Options.HSplitTop(20.0f, &Button, &Options);
+		Ui()->DoScrollbarOption(pWingsSpread, pWingsSpread, &Button, Localize("Spread"), -30, 40);
+		Options.HSplitTop(20.0f, &Button, &Options);
+		Ui()->DoScrollbarOption(pWingsY, pWingsY, &Button, Localize("Vertical offset"), -40, 40);
+	}
+	Options.HSplitTop(15.0f, nullptr, &Options);
+
+	// back to the automatic fit
+	Options.HSplitTop(20.0f, &Button, &Options);
+	Button.VSplitLeft(std::min(Button.w, 200.0f), &Button, nullptr);
+	static CButtonContainer s_ResetButton;
+	if(DoButton_Menu(&s_ResetButton, Localize("Reset to skin fit"), 0, &Button))
+	{
+		*pHeadSize = 100;
+		*pHeadX = 0;
+		*pHeadY = 0;
+		*pWingsSize = 100;
+		*pWingsSpread = 0;
+		*pWingsY = 0;
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_ResetButton, &Button, Localize("Accessories are fitted to the width of your skin, this resets all adjustments"));
+}
 void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 {
 	CBindWheel &BindWheel = GameClient()->m_BindWheel;

@@ -28,6 +28,7 @@
 #include <game/teamscore.h>
 
 // components
+#include "components/accessories.h"
 #include "components/ads.h"
 #include "components/background.h"
 #include "components/binds.h"
@@ -204,6 +205,7 @@ public:
 	CSaveNotice m_SaveNotice;
 	CPetting m_Petting;
 	CPetTee m_PetTee;
+	CAccessories m_Accessories;
 	CFastPractice m_FastPractice;
 	CAds m_Ads;
 	CMaodieWalk m_MaodieWalk;
