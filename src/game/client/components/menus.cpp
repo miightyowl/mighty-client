@@ -1410,6 +1410,18 @@ void CMenus::RenderPopupMClientSetup(CUIRect Box)
 
 	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
 	LeftView.HSplitTop(RowH, &Row, &LeftView);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientAccessoriesOthers, Localize("Show accessories of other M-Client players"), g_Config.m_ClMClientAccessoriesOthers, &Row))
+		g_Config.m_ClMClientAccessoriesOthers ^= 1;
+	Hint(&LeftView, Localize("Your own accessories stay visible either way"));
+
+	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
+	LeftView.HSplitTop(RowH, &Row, &LeftView);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientAccessoriesHideFrozen, Localize("Hide accessories while frozen"), g_Config.m_ClMClientAccessoriesHideFrozen, &Row))
+		g_Config.m_ClMClientAccessoriesHideFrozen ^= 1;
+	Hint(&LeftView, Localize("Hides accessories on every tee that is frozen"));
+
+	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
+	LeftView.HSplitTop(RowH, &Row, &LeftView);
 	if(DoButton_CheckBox(&g_Config.m_ClMClientFastInput, Localize("Fast input (lower input delay)"), g_Config.m_ClMClientFastInput, &Row))
 		g_Config.m_ClMClientFastInput ^= 1;
 	Hint(&LeftView, Localize("Reduces input delay by predicting your input early"));

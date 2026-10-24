@@ -20,6 +20,7 @@ class CPlayers : public CComponent
 	 * M-Client: whether a frozen tee counts as trying to interact, which decides both whether its
 	 * weapon is shown and whether it is recolored.
 	 */
+	bool IsFrozen(int ClientId) const;
 	bool IsFrozenInteracting(int ClientId, int Weapon) const;
 	void RenderPlayer(
 		const CScreenRect &ScreenRect,

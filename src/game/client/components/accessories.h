@@ -1,6 +1,7 @@
 #ifndef GAME_CLIENT_COMPONENTS_ACCESSORIES_H
 #define GAME_CLIENT_COMPONENTS_ACCESSORIES_H
 
+#include <base/color.h>
 #include <base/vmath.h>
 
 #include <engine/graphics.h>
@@ -15,52 +16,135 @@ class CAccessories : public CComponent
 public:
 	enum
 	{
+		SLOT_HEAD = 0,
+		SLOT_BODY,
+		SLOT_FEET,
+		SLOT_FACE,
+		NUM_SLOTS,
+	};
+
+	enum
+	{
 		HEAD_NONE = 0,
-		HEAD_HALO,
+		HEAD_CHRISTMAS_HAT,
+		HEAD_CROWN,
+		HEAD_WITCH_HAT,
+		HEAD_SPROUT,
+		HEAD_PARTY_HAT,
+		HEAD_ANTLERS,
+		HEAD_FROG,
+		HEAD_FLOWER,
+		HEAD_SNOWFLAKE,
+		HEAD_TOP_HAT,
+		HEAD_PIRATE_HAT,
+		HEAD_GOLDEN_HALO,
+		HEAD_HEART,
+		HEAD_GHOST,
+		HEAD_BOW,
+		HEAD_CHERRY_BLOSSOM,
 		NUM_HEADS,
 	};
 
 	enum
 	{
-		WINGS_NONE = 0,
-		WINGS_ANGEL,
-		WINGS_DEVIL,
-		NUM_WINGS,
+		BODY_NONE = 0,
+		BODY_ANGEL_WINGS,
+		BODY_DEVIL_WINGS,
+		BODY_BAT_WINGS,
+		NUM_BODIES,
+	};
+
+	enum
+	{
+		FEET_NONE = 0,
+		NUM_FEET,
+	};
+
+	enum
+	{
+		FACE_NONE = 0,
+		FACE_GLASSES,
+		FACE_SUNGLASSES,
+		FACE_ROUND_GLASSES,
+		NUM_FACES,
+	};
+
+	enum
+	{
+		MAX_ITEMS = 32,
+	};
+
+	struct SSlotSettings
+	{
+		int m_Item;
+		int m_Size;
+		int m_X;
+		int m_Y;
+		unsigned m_Color;
+
+		bool operator==(const SSlotSettings &Other) const = default;
 	};
 
 	struct SSettings
 	{
-		int m_Head;
-		int m_HeadSize;
-		int m_HeadX;
-		int m_HeadY;
-		int m_Wings;
-		int m_WingsSize;
-		int m_WingsSpread;
-		int m_WingsY;
+		SSlotSettings m_aSlots[NUM_SLOTS];
+		bool m_UseCustomColor;
+
+		bool operator==(const SSettings &Other) const = default;
 	};
 
+	struct SSlotConfig
+	{
+		int *m_pItem;
+		int *m_pSize;
+		int *m_pX;
+		int *m_pY;
+		unsigned *m_pColor;
+	};
+
+	struct SConfig
+	{
+		SSlotConfig m_aSlots[NUM_SLOTS];
+		int *m_pUseCustomColor;
+	};
+
+	static SConfig Config(bool Dummy);
 	static SSettings Settings(bool Dummy);
+	static void Serialize(const SSettings &Settings, char *pBuf, int BufSize);
+	static bool Deserialize(const char *pText, SSettings *pSettings);
+	static bool AnyEquipped(const SSettings &Settings);
+
+	static bool LoadAdjustment(bool Dummy, int Slot, int Item, int *pSize, int *pX, int *pY);
+	static void SaveAdjustment(bool Dummy, int Slot, int Item, int Size, int X, int Y);
+	static void Equip(bool Dummy, int Slot, int Item);
+	static void ItemKey(int Slot, int Item, char *pBuf, int BufSize);
+
+	static int NumItems(int Slot);
+	static const char *ItemName(int Slot, int Item);
+	static const char *SlotName(int Slot);
+	static bool IsPaired(int Slot, int Item);
 
 	int Sizeof() const override { return sizeof(*this); }
 	void OnInit() override;
 
 	void RenderBack(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 Pos, float Alpha, const SSettings &Settings);
-	void RenderFront(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 Pos, float Alpha, const SSettings &Settings);
+	void RenderFront(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 Pos, vec2 Direction, float Alpha, const SSettings &Settings);
 
 private:
-	IGraphics::CTextureHandle m_aHeadTextures[NUM_HEADS];
-	IGraphics::CTextureHandle m_aaWingTextures[NUM_WINGS][2];
+	IGraphics::CTextureHandle m_aaaTextures[NUM_SLOTS][MAX_ITEMS][2];
+	IGraphics::CTextureHandle m_aaaGrayTextures[NUM_SLOTS][MAX_ITEMS][2];
 
 	struct SFit
 	{
 		vec2 m_Center;
+		vec2 m_BodyPos;
 		float m_CanvasSize;
 		float m_Scale;
 		float m_Angle;
 	};
 	static SFit FitToTee(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 Pos);
-	void RenderCanvas(IGraphics::CTextureHandle Texture, vec2 Center, float Size, float Angle, float Alpha);
+	void RenderSlot(int Slot, const SFit &Fit, vec2 Direction, float Alpha, const SSettings &Settings);
+	void RenderCanvas(IGraphics::CTextureHandle Texture, vec2 Center, float Size, float Angle, ColorRGBA Color);
 };
 
 #endif
