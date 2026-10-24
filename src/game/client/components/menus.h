@@ -691,6 +691,7 @@ protected:
 	bool m_CompanionTeeTab = false;
 	void RenderSettingsTeeAccessories(CUIRect MainView);
 	bool m_AccessoriesTab = false;
+	int m_AccessorySlot = 0;
 
 	// found in menus_settings_player.cpp
 	void RenderSettingsPlayer(CUIRect MainView);

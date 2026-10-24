@@ -5,6 +5,7 @@
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
+#include <game/client/components/accessories.h>
 
 #include <vector>
 
@@ -36,6 +37,8 @@ public:
 		int m_ColorFeet = 0;
 	};
 	SPetAppearance PetAppearance(int ClientId) const;
+	// false if the player did not tell us about any accessories
+	bool Accessories(int ClientId, CAccessories::SSettings *pSettings) const;
 
 	bool EmoteChannelBusy() const { return !m_vEmoteQueue.empty(); }
 	bool QueueManualEmote(int Emoticon);
@@ -82,6 +85,8 @@ private:
 		bool m_PetUseCustomColor;
 		int m_PetColorBody;
 		int m_PetColorFeet;
+		bool m_HasAccessories;
+		CAccessories::SSettings m_Accessories;
 	};
 
 	CPeer m_aPeers[MAX_CLIENTS] = {};
@@ -127,6 +132,7 @@ private:
 		bool m_UseCustomColor = false;
 		int m_ColorBody = 0;
 		int m_ColorFeet = 0;
+		CAccessories::SSettings m_Accessories{};
 		int m_LocalId = -1;
 	};
 	CLocalPet m_aLocalPets[NUM_DUMMIES];
@@ -155,7 +161,7 @@ private:
 	bool PetAudience(int Conn) const;
 	void ForgetPetTold(int Conn);
 	void LocalPet(bool *pOn, char *pSkin, int SkinSize, bool *pUseCustomColor, int *pColorBody, int *pColorFeet) const;
-	void SendPetWhisper(int ClientId, bool On, const char *pSkin, bool UseCustomColor, int ColorBody, int ColorFeet);
+	void SendPetWhisper(int ClientId, bool On, const char *pSkin, bool UseCustomColor, int ColorBody, int ColorFeet, const CAccessories::SSettings &Accessories);
 	void SendBeacon(int Kind);
 	void AbortBeacon();
 	void FlushEmoteQueue();

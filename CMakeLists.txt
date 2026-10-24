@@ -1225,12 +1225,33 @@ endif()
 
 set(EXPECTED_DATA
   # tidy-alphabetical-start
-  accessories/angel.png
-  accessories/demon_horns.png
+  accessories/antlers.png
+  accessories/bat_wings.png
+  accessories/bow.png
+  accessories/cherry_blossom.png
+  accessories/chick.png
+  accessories/christmas_hat.png
+  accessories/crown.png
   accessories/devilwing_left.png
   accessories/devilwing_right.png
+  accessories/fire.png
+  accessories/flower.png
+  accessories/frog.png
+  accessories/ghost.png
+  accessories/glasses.png
+  accessories/golden_halo.png
+  accessories/heart.png
+  accessories/party_hat.png
+  accessories/pirate_hat.png
+  accessories/pizza.png
+  accessories/round_glasses.png
+  accessories/snowflake.png
+  accessories/sprout.png
+  accessories/sunglasses.png
+  accessories/top_hat.png
   accessories/wing_left.png
   accessories/wing_right.png
+  accessories/witch_hat.png
   ads/apfeltee.png
   ads/doubledipp.png
   ads/ilak.png

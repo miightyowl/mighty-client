@@ -562,6 +562,15 @@ void CPlayers::RenderHook(
 	RenderHand(&RenderInfo, Position, normalize(HookPos - Pos), -pi / 2, vec2(20, 0), Alpha);
 }
 
+bool CPlayers::IsFrozen(int ClientId) const
+{
+	// predict freeze only for local players
+	const CGameClient::CClientData &Client = GameClient()->m_aClients[ClientId];
+	if(ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1])
+		return g_Config.m_ClMClientFastInput ? Client.m_RegularPredicted.m_FreezeEnd != 0 : Client.m_Predicted.m_FreezeEnd != 0;
+	return GameClient()->m_Snap.m_aCharacters[ClientId].m_HasExtendedData && GameClient()->m_Snap.m_aCharacters[ClientId].m_ExtendedData.m_FreezeEnd != 0;
+}
+
 bool CPlayers::IsFrozenInteracting(int ClientId, int Weapon) const
 {
 	if(ClientId < 0)
@@ -729,14 +738,23 @@ void CPlayers::RenderPlayer(
 		Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
 	};
 
-	// accessories of the own tee and dummy, wings go behind the weapon and the tee
-	const bool HasAccessories = ClientId >= 0 && IsLocalTee;
+	// accessories of the own tee and dummy, and the ones other M-Client players told us about
+	// wings go behind the weapon and the tee
 	CAccessories::SSettings AccessorySettings{};
-	if(HasAccessories)
+	bool HasAccessories = false;
+	if(ClientId >= 0 && IsLocalTee)
 	{
 		AccessorySettings = CAccessories::Settings(ClientId == GameClient()->m_aLocalIds[1]);
-		GameClient()->m_Accessories.RenderBack(&State, &RenderInfo, Position, Alpha, AccessorySettings);
+		HasAccessories = true;
 	}
+	else if(ClientId >= 0 && g_Config.m_ClMClientAccessoriesOthers)
+	{
+		HasAccessories = GameClient()->m_MClientDetect.Accessories(ClientId, &AccessorySettings);
+	}
+	if(HasAccessories && g_Config.m_ClMClientAccessoriesHideFrozen && in_range(ClientId, MAX_CLIENTS - 1) && IsFrozen(ClientId))
+		HasAccessories = false;
+	if(HasAccessories)
+		GameClient()->m_Accessories.RenderBack(&State, &RenderInfo, Position, Alpha, AccessorySettings);
 
 	// draw gun
 	if(Player.m_Weapon >= 0)
@@ -933,7 +951,7 @@ void CPlayers::RenderPlayer(
 	}
 	RenderTools()->RenderTee(&State, &RenderInfo, Emote, Direction, Position, Alpha);
 	if(HasAccessories)
-		GameClient()->m_Accessories.RenderFront(&State, &RenderInfo, Position, Alpha, AccessorySettings);
+		GameClient()->m_Accessories.RenderFront(&State, &RenderInfo, Position, Direction, Alpha, AccessorySettings);
 
 	float TeeAnimScale, TeeBaseSize;
 	CRenderTools::GetRenderTeeAnimScaleAndBaseSize(&RenderInfo, TeeAnimScale, TeeBaseSize);
@@ -1044,8 +1062,7 @@ void CPlayers::OnRender()
 		aRenderInfo[i] = GameClient()->m_aClients[i].m_RenderInfo;
 		aRenderInfo[i].m_TeeRenderFlags = 0;
 
-		// predict freeze skin only for local players
-		bool Frozen = false;
+		const bool Frozen = IsFrozen(i);
 		if(i == GameClient()->m_aLocalIds[0] || i == GameClient()->m_aLocalIds[1])
 		{
 			if(GameClient()->m_aClients[i].m_Predicted.m_FreezeEnd != 0)
@@ -1054,10 +1071,6 @@ void CPlayers::OnRender()
 				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 			if(GameClient()->m_aClients[i].m_Predicted.m_Invincible)
 				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_SPARKLE;
-
-			Frozen = GameClient()->m_aClients[i].m_Predicted.m_FreezeEnd != 0;
-			if(g_Config.m_ClMClientFastInput)
-				Frozen = GameClient()->m_aClients[i].m_RegularPredicted.m_FreezeEnd != 0;
 		}
 		else
 		{
@@ -1067,8 +1080,6 @@ void CPlayers::OnRender()
 				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 			if(GameClient()->m_aClients[i].m_Invincible)
 				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_SPARKLE;
-
-			Frozen = GameClient()->m_Snap.m_aCharacters[i].m_HasExtendedData && GameClient()->m_Snap.m_aCharacters[i].m_ExtendedData.m_FreezeEnd != 0;
 		}
 
 		if((GameClient()->m_aClients[i].m_RenderCur.m_Weapon == WEAPON_NINJA || (Frozen && !GameClient()->m_GameInfo.m_NoSkinChangeForFrozen)) && g_Config.m_ClShowNinja)

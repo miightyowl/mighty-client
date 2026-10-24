@@ -20,6 +20,8 @@ namespace
 	const unsigned COLOR_BEACON_BODY = 0x4du;
 	const unsigned COLOR_BEACON_FEET = 0x43u;
 	const char *PET_WHISPER_PREFIX = "MCPET1 ";
+	// optional token at the end of the pet whisper, older clients ignore it
+	const char *ACCESSORIES_TOKEN_PREFIX = "acc=";
 
 	const float MIN_EMOTE_GAP = 0.0f;
 	const float MAX_EMOTE_GAP = 3.5f;
@@ -612,9 +614,11 @@ void CMClientDetect::UpdatePet()
 	bool UseCustomColor;
 	int ColorBody, ColorFeet;
 	LocalPet(&On, aSkin, sizeof(aSkin), &UseCustomColor, &ColorBody, &ColorFeet);
+	const CAccessories::SSettings Accessories = CAccessories::Settings(Conn == IClient::CONN_DUMMY);
 
 	if(On != Pet.m_On || str_comp(aSkin, Pet.m_aSkin) != 0 ||
-		UseCustomColor != Pet.m_UseCustomColor || ColorBody != Pet.m_ColorBody || ColorFeet != Pet.m_ColorFeet)
+		UseCustomColor != Pet.m_UseCustomColor || ColorBody != Pet.m_ColorBody || ColorFeet != Pet.m_ColorFeet ||
+		!(Accessories == Pet.m_Accessories))
 	{
 		ForgetPetTold(Conn);
 		Pet.m_On = On;
@@ -622,6 +626,7 @@ void CMClientDetect::UpdatePet()
 		Pet.m_UseCustomColor = UseCustomColor;
 		Pet.m_ColorBody = ColorBody;
 		Pet.m_ColorFeet = ColorFeet;
+		Pet.m_Accessories = Accessories;
 	}
 
 	if(!PetAudience(Conn))
@@ -634,12 +639,12 @@ void CMClientDetect::UpdatePet()
 		CPeer &Peer = m_aPeers[ClientId];
 		if(!Peer.m_Detected || Peer.m_aPetTold[Conn])
 			continue;
-		SendPetWhisper(ClientId, On, aSkin, UseCustomColor, ColorBody, ColorFeet);
+		SendPetWhisper(ClientId, On, aSkin, UseCustomColor, ColorBody, ColorFeet, Accessories);
 		Peer.m_aPetTold[Conn] = true;
 	}
 }
 
-void CMClientDetect::SendPetWhisper(int ClientId, bool On, const char *pSkin, bool UseCustomColor, int ColorBody, int ColorFeet)
+void CMClientDetect::SendPetWhisper(int ClientId, bool On, const char *pSkin, bool UseCustomColor, int ColorBody, int ColorFeet, const CAccessories::SSettings &Accessories)
 {
 	char aEncodedSkin[2 * MAX_SKIN_LENGTH];
 	if(!On)
@@ -649,7 +654,16 @@ void CMClientDetect::SendPetWhisper(int ClientId, bool On, const char *pSkin, bo
 	if(On && aEncodedSkin[0] == '\0')
 		str_copy(aEncodedSkin, "-");
 	char aMessage[192];
-	if(!On)
+	if(CAccessories::AnyEquipped(Accessories))
+	{
+		// the accessories go after all pet fields, so they always are the fifth token
+		char aAccessories[96];
+		CAccessories::Serialize(Accessories, aAccessories, sizeof(aAccessories));
+		const bool PetColors = On && UseCustomColor;
+		str_format(aMessage, sizeof(aMessage), "%s%s %d %08x %08x %s%s", PET_WHISPER_PREFIX, aEncodedSkin, PetColors ? 1 : 0,
+			PetColors ? (unsigned)ColorBody : 0u, PetColors ? (unsigned)ColorFeet : 0u, ACCESSORIES_TOKEN_PREFIX, aAccessories);
+	}
+	else if(!On)
 		str_format(aMessage, sizeof(aMessage), "%s%s", PET_WHISPER_PREFIX, aEncodedSkin);
 	else if(UseCustomColor)
 		str_format(aMessage, sizeof(aMessage), "%s%s 1 %08x %08x", PET_WHISPER_PREFIX, aEncodedSkin, (unsigned)ColorBody, (unsigned)ColorFeet);
@@ -926,6 +940,18 @@ CMClientDetect::SPetAppearance CMClientDetect::PetAppearance(int ClientId) const
 	return Appearance;
 }
 
+bool CMClientDetect::Accessories(int ClientId, CAccessories::SSettings *pSettings) const
+{
+	if(!Enabled() || ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return false;
+
+	const CPeer &Peer = m_aPeers[ClientId];
+	if(!Peer.m_Detected || !Peer.m_HasAccessories)
+		return false;
+	*pSettings = Peer.m_Accessories;
+	return true;
+}
+
 bool CMClientDetect::OnWhisper(int ClientId, int Team, const char *pMessage)
 {
 	const char *pArgs = str_startswith(pMessage, PET_WHISPER_PREFIX);
@@ -942,6 +968,7 @@ bool CMClientDetect::OnWhisper(int ClientId, int Team, const char *pMessage)
 	char aUseCustomColor[12] = "";
 	char aColorBody[16] = "";
 	char aColorFeet[16] = "";
+	char aAccessories[96] = "";
 	const char *pRest = str_next_token(pArgs, " ", aEncodedSkin, sizeof(aEncodedSkin));
 	if(!pRest)
 		return true;
@@ -949,7 +976,9 @@ bool CMClientDetect::OnWhisper(int ClientId, int Team, const char *pMessage)
 	if(pRest)
 		pRest = str_next_token(pRest, " ", aColorBody, sizeof(aColorBody));
 	if(pRest)
-		str_next_token(pRest, " ", aColorFeet, sizeof(aColorFeet));
+		pRest = str_next_token(pRest, " ", aColorFeet, sizeof(aColorFeet));
+	if(pRest)
+		str_next_token(pRest, " ", aAccessories, sizeof(aAccessories));
 
 	char aSkin[MAX_SKIN_LENGTH];
 	const bool On = str_comp(aEncodedSkin, "!") != 0;
@@ -978,6 +1007,10 @@ bool CMClientDetect::OnWhisper(int ClientId, int Team, const char *pMessage)
 		Peer.m_PetColorBody = ColorBody;
 		Peer.m_PetColorFeet = ColorFeet;
 	}
+
+	// a whisper without accessories means none are equipped
+	const char *pAccessories = str_startswith(aAccessories, ACCESSORIES_TOKEN_PREFIX);
+	Peer.m_HasAccessories = pAccessories && CAccessories::Deserialize(pAccessories, &Peer.m_Accessories);
 	return true;
 }
 

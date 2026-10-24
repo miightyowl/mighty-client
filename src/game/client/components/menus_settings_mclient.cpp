@@ -599,116 +599,165 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 		m_Dummy = true;
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
-	int *pHead = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryHead : &g_Config.m_ClMClientAccessoryHead;
-	int *pHeadSize = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryHeadSize : &g_Config.m_ClMClientAccessoryHeadSize;
-	int *pHeadX = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryHeadX : &g_Config.m_ClMClientAccessoryHeadX;
-	int *pHeadY = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryHeadY : &g_Config.m_ClMClientAccessoryHeadY;
-	int *pWings = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryWings : &g_Config.m_ClMClientAccessoryWings;
-	int *pWingsSize = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryWingsSize : &g_Config.m_ClMClientAccessoryWingsSize;
-	int *pWingsSpread = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryWingsSpread : &g_Config.m_ClMClientAccessoryWingsSpread;
-	int *pWingsY = m_Dummy ? &g_Config.m_ClMClientDummyAccessoryWingsY : &g_Config.m_ClMClientAccessoryWingsY;
+	m_AccessorySlot = std::clamp(m_AccessorySlot, 0, (int)CAccessories::NUM_SLOTS - 1);
+	// order of the categories from top to bottom of the tee
+	static const int s_aSlotOrder[CAccessories::NUM_SLOTS] = {CAccessories::SLOT_HEAD, CAccessories::SLOT_FACE, CAccessories::SLOT_BODY, CAccessories::SLOT_FEET};
+	const CAccessories::SConfig Config = CAccessories::Config(m_Dummy);
+	const CAccessories::SSlotConfig &SlotConfig = Config.m_aSlots[m_AccessorySlot];
+	const CAccessories::SSettings Settings = CAccessories::Settings(m_Dummy);
 
-	CUIRect Preview, Options;
-	MainView.VSplitLeft(std::min(MainView.w * 0.4f, 320.0f), &Preview, &Options);
-	Options.VSplitLeft(20.0f, nullptr, &Options);
+	// tee with the skin of the selected target, used by the big preview and the list
+	const char *pSkinName = g_Config.m_ClMClientForceSkin ? "maodie" : (m_Dummy ? g_Config.m_ClDummySkin : g_Config.m_ClPlayerSkin);
+	const bool UseCustomColor = m_Dummy ? g_Config.m_ClDummyUseCustomColor : g_Config.m_ClPlayerUseCustomColor;
+	const unsigned ColorBody = m_Dummy ? g_Config.m_ClDummyColorBody : g_Config.m_ClPlayerColorBody;
+	const unsigned ColorFeet = m_Dummy ? g_Config.m_ClDummyColorFeet : g_Config.m_ClPlayerColorFeet;
+	CTeeRenderInfo OwnTeeInfo;
+	OwnTeeInfo.Apply(GameClient()->m_Skins.Find(pSkinName));
+	OwnTeeInfo.ApplyColors(UseCustomColor, ColorBody, ColorFeet);
 
-	// preview with the skin of the selected tee
-	{
-		Preview.HSplitTop(std::min(Preview.w, Preview.h), &Preview, nullptr);
-		Preview.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_ALL, 5.0f);
-
-		const char *pSkinName = g_Config.m_ClMClientForceSkin ? "maodie" : (m_Dummy ? g_Config.m_ClDummySkin : g_Config.m_ClPlayerSkin);
-		const bool UseCustomColor = m_Dummy ? g_Config.m_ClDummyUseCustomColor : g_Config.m_ClPlayerUseCustomColor;
-		const unsigned ColorBody = m_Dummy ? g_Config.m_ClDummyColorBody : g_Config.m_ClPlayerColorBody;
-		const unsigned ColorFeet = m_Dummy ? g_Config.m_ClDummyColorFeet : g_Config.m_ClPlayerColorFeet;
-
-		CTeeRenderInfo TeeInfo;
-		TeeInfo.Apply(GameClient()->m_Skins.Find(pSkinName));
-		TeeInfo.ApplyColors(UseCustomColor, ColorBody, ColorFeet);
-		TeeInfo.m_Size = Preview.w * 0.4f;
-
+	const auto &&RenderAccessoryTee = [&](const CUIRect &Rect, float TeeSize, const CAccessories::SSettings &TeeSettings, vec2 Direction) {
+		CTeeRenderInfo TeeInfo = OwnTeeInfo;
+		TeeInfo.m_Size = TeeSize;
 		vec2 OffsetToMid;
 		CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &TeeInfo, OffsetToMid);
-		const vec2 TeeRenderPos = vec2(Preview.x + Preview.w / 2.0f, Preview.y + Preview.h * 0.55f + OffsetToMid.y);
-		const vec2 DeltaPosition = Ui()->MousePos() - TeeRenderPos;
-		const float Distance = length(DeltaPosition);
-		const vec2 TeeDirection = Distance < 20.0f ? vec2(1.0f, 0.0f) : normalize(DeltaPosition);
-
-		const CAccessories::SSettings Settings = CAccessories::Settings(m_Dummy);
-		GameClient()->m_Accessories.RenderBack(CAnimState::GetIdle(), &TeeInfo, TeeRenderPos, 1.0f, Settings);
-		RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeInfo, EMOTE_NORMAL, TeeDirection, TeeRenderPos);
-		GameClient()->m_Accessories.RenderFront(CAnimState::GetIdle(), &TeeInfo, TeeRenderPos, 1.0f, Settings);
-	}
-
-	const auto &&DoSelector = [&](CButtonContainer *pButtons, int *pValue, const char **ppNames, int Num) {
-		CUIRect Row;
-		Options.HSplitTop(20.0f, &Row, &Options);
-		const float ButtonWidth = Row.w / Num;
-		for(int i = 0; i < Num; i++)
-		{
-			CUIRect Tab;
-			Row.VSplitLeft(ButtonWidth, &Tab, &Row);
-			const int Corners = i == 0 ? IGraphics::CORNER_L : (i == Num - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
-			if(DoButton_MenuTab(&pButtons[i], ppNames[i], *pValue == i, &Tab, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
-				*pValue = i;
-		}
-		Options.HSplitTop(5.0f, nullptr, &Options);
+		const vec2 TeeRenderPos = vec2(Rect.x + Rect.w / 2.0f, Rect.y + Rect.h * 0.55f + OffsetToMid.y);
+		GameClient()->m_Accessories.RenderBack(CAnimState::GetIdle(), &TeeInfo, TeeRenderPos, 1.0f, TeeSettings);
+		RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeInfo, EMOTE_NORMAL, Direction, TeeRenderPos);
+		GameClient()->m_Accessories.RenderFront(CAnimState::GetIdle(), &TeeInfo, TeeRenderPos, Direction, 1.0f, TeeSettings);
 	};
 
-	// head
-	Options.HSplitTop(20.0f, &Label, &Options);
-	Ui()->DoLabel(&Label, Localize("Head"), 16.0f, TEXTALIGN_ML);
-	Options.HSplitTop(5.0f, nullptr, &Options);
+	// preview with all equipped accessories, options of the selected category next to it
+	CUIRect TopArea, Preview, Options;
+	MainView.HSplitTop(160.0f, &TopArea, &MainView);
+	CUIRect Toggles;
+	TopArea.VSplitLeft(TopArea.h, &Preview, &Options);
+	Options.VSplitLeft(20.0f, nullptr, &Options);
+	Options.VSplitRight(std::max(Options.w * 0.4f, 260.0f), &Options, &Toggles);
+	Options.VSplitRight(20.0f, &Options, nullptr);
 	{
-		const char *apNames[CAccessories::NUM_HEADS] = {Localize("None"), Localize("Halo"), Localize("Horns")};
-		static CButtonContainer s_aHeadButtons[CAccessories::NUM_HEADS];
-		DoSelector(s_aHeadButtons, pHead, apNames, CAccessories::NUM_HEADS);
+		Preview.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_ALL, 5.0f);
+		const vec2 Center = vec2(Preview.x + Preview.w / 2.0f, Preview.y + Preview.h * 0.55f);
+		const vec2 DeltaPosition = Ui()->MousePos() - Center;
+		const vec2 TeeDirection = length(DeltaPosition) < 20.0f ? vec2(1.0f, 0.0f) : normalize(DeltaPosition);
+		RenderAccessoryTee(Preview, Preview.w * 0.4f, Settings, TeeDirection);
 	}
-	if(*pHead != CAccessories::HEAD_NONE)
-	{
-		Options.HSplitTop(20.0f, &Button, &Options);
-		Ui()->DoScrollbarOption(pHeadSize, pHeadSize, &Button, Localize("Size"), 25, 300, &CUi::ms_LinearScrollbarScale, 0u, "%");
-		Options.HSplitTop(20.0f, &Button, &Options);
-		Ui()->DoScrollbarOption(pHeadX, pHeadX, &Button, Localize("Horizontal offset"), -40, 40);
-		Options.HSplitTop(20.0f, &Button, &Options);
-		Ui()->DoScrollbarOption(pHeadY, pHeadY, &Button, Localize("Vertical offset"), -40, 40);
-	}
-	Options.HSplitTop(15.0f, nullptr, &Options);
 
-	// wings
-	Options.HSplitTop(20.0f, &Label, &Options);
-	Ui()->DoLabel(&Label, Localize("Wings"), 16.0f, TEXTALIGN_ML);
-	Options.HSplitTop(5.0f, nullptr, &Options);
+	// adjustments of the selected category
 	{
-		const char *apNames[CAccessories::NUM_WINGS] = {Localize("None"), Localize("Angel"), Localize("Devil")};
-		static CButtonContainer s_aWingButtons[CAccessories::NUM_WINGS];
-		DoSelector(s_aWingButtons, pWings, apNames, CAccessories::NUM_WINGS);
+		char aBuf[128];
+		str_format(aBuf, sizeof(aBuf), "%s: %s", CAccessories::SlotName(m_AccessorySlot), CAccessories::ItemName(m_AccessorySlot, *SlotConfig.m_pItem));
+		Options.HSplitTop(20.0f, &Label, &Options);
+		Ui()->DoLabel(&Label, aBuf, 16.0f, TEXTALIGN_ML);
+		Options.HSplitTop(5.0f, nullptr, &Options);
 	}
-	if(*pWings != CAccessories::WINGS_NONE)
+	// the sliders keep their space when nothing is equipped, so the custom colors button does not jump
+	CUIRect Sliders;
+	Options.HSplitTop(3 * 20.0f, &Sliders, &Options);
+	if(*SlotConfig.m_pItem != 0)
 	{
-		Options.HSplitTop(20.0f, &Button, &Options);
-		Ui()->DoScrollbarOption(pWingsSize, pWingsSize, &Button, Localize("Size"), 25, 300, &CUi::ms_LinearScrollbarScale, 0u, "%");
-		Options.HSplitTop(20.0f, &Button, &Options);
-		Ui()->DoScrollbarOption(pWingsSpread, pWingsSpread, &Button, Localize("Spread"), -30, 40);
-		Options.HSplitTop(20.0f, &Button, &Options);
-		Ui()->DoScrollbarOption(pWingsY, pWingsY, &Button, Localize("Vertical offset"), -40, 40);
+		const int OldSize = *SlotConfig.m_pSize, OldX = *SlotConfig.m_pX, OldY = *SlotConfig.m_pY;
+		Sliders.HSplitTop(20.0f, &Button, &Sliders);
+		Ui()->DoScrollbarOption(SlotConfig.m_pSize, SlotConfig.m_pSize, &Button, Localize("Size"), 25, 300, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		Sliders.HSplitTop(20.0f, &Button, &Sliders);
+		if(CAccessories::IsPaired(m_AccessorySlot, *SlotConfig.m_pItem))
+			Ui()->DoScrollbarOption(SlotConfig.m_pX, SlotConfig.m_pX, &Button, Localize("Spread"), -30, 40);
+		else
+			Ui()->DoScrollbarOption(SlotConfig.m_pX, SlotConfig.m_pX, &Button, Localize("Horizontal offset"), -40, 40);
+		Sliders.HSplitTop(20.0f, &Button, &Sliders);
+		Ui()->DoScrollbarOption(SlotConfig.m_pY, SlotConfig.m_pY, &Button, Localize("Vertical offset"), -40, 40);
+		if(*SlotConfig.m_pSize != OldSize || *SlotConfig.m_pX != OldX || *SlotConfig.m_pY != OldY)
+			CAccessories::SaveAdjustment(m_Dummy, m_AccessorySlot, *SlotConfig.m_pItem, *SlotConfig.m_pSize, *SlotConfig.m_pX, *SlotConfig.m_pY);
 	}
-	Options.HSplitTop(15.0f, nullptr, &Options);
 
-	// back to the automatic fit
+	// custom colors button, same as for the tee
+	Options.HSplitTop(10.0f, nullptr, &Options);
 	Options.HSplitTop(20.0f, &Button, &Options);
-	Button.VSplitLeft(std::min(Button.w, 200.0f), &Button, nullptr);
-	static CButtonContainer s_ResetButton;
-	if(DoButton_Menu(&s_ResetButton, Localize("Reset to skin fit"), 0, &Button))
+	if(DoButton_CheckBox(Config.m_pUseCustomColor, Localize("Custom colors"), *Config.m_pUseCustomColor, &Button))
+		*Config.m_pUseCustomColor = *Config.m_pUseCustomColor ? 0 : 1;
+
+	// toggles next to the adjustments
+	Toggles.HSplitTop(20.0f, &Button, &Toggles);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientAccessoriesOthers, Localize("Show accessories of other M-Client players"), g_Config.m_ClMClientAccessoriesOthers, &Button))
+		g_Config.m_ClMClientAccessoriesOthers ^= 1;
+	GameClient()->m_Tooltips.DoToolTip(&g_Config.m_ClMClientAccessoriesOthers, &Button, Localize("Turn this off to only see your own accessories"));
+	Toggles.HSplitTop(5.0f, nullptr, &Toggles);
+	Toggles.HSplitTop(20.0f, &Button, &Toggles);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientAccessoriesHideFrozen, Localize("Hide accessories while frozen"), g_Config.m_ClMClientAccessoriesHideFrozen, &Button))
+		g_Config.m_ClMClientAccessoriesHideFrozen ^= 1;
+
+	// custom color pickers
+	MainView.HSplitTop(5.0f, nullptr, &MainView);
+	if(*Config.m_pUseCustomColor)
 	{
-		*pHeadSize = 100;
-		*pHeadX = 0;
-		*pHeadY = 0;
-		*pWingsSize = 100;
-		*pWingsSpread = 0;
-		*pWingsY = 0;
+		CUIRect CustomColors;
+		MainView.HSplitTop(95.0f, &CustomColors, &MainView);
+		CUIRect aRects[CAccessories::NUM_SLOTS];
+		const float PickerWidth = (CustomColors.w - 20.0f * (float)(CAccessories::NUM_SLOTS - 1)) / (float)CAccessories::NUM_SLOTS;
+		for(const int Slot : s_aSlotOrder)
+		{
+			CustomColors.VSplitLeft(PickerWidth, &aRects[Slot], &CustomColors);
+			CustomColors.VSplitLeft(20.0f, nullptr, &CustomColors);
+			aRects[Slot].HSplitTop(20.0f, &Label, &aRects[Slot]);
+			Ui()->DoLabel(&Label, CAccessories::SlotName(Slot), 14.0f, TEXTALIGN_ML);
+			RenderHslaScrollbars(&aRects[Slot], Config.m_aSlots[Slot].m_pColor, false, ColorHSLA::DARKEST_LGT);
+		}
 	}
-	GameClient()->m_Tooltips.DoToolTip(&s_ResetButton, &Button, Localize("Accessories are fitted to the width of your skin, this resets all adjustments"));
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+
+	// category tabs
+	CUIRect CategoryTabs;
+	MainView.HSplitTop(20.0f, &CategoryTabs, &MainView);
+	MainView.HSplitTop(5.0f, nullptr, &MainView);
+	{
+		static CButtonContainer s_aCategoryButtons[CAccessories::NUM_SLOTS];
+		const float TabWidth = CategoryTabs.w / (float)CAccessories::NUM_SLOTS;
+		for(int i = 0; i < CAccessories::NUM_SLOTS; i++)
+		{
+			const int Slot = s_aSlotOrder[i];
+			CUIRect Tab;
+			CategoryTabs.VSplitLeft(TabWidth, &Tab, &CategoryTabs);
+			const int Corners = i == 0 ? IGraphics::CORNER_L : (i == CAccessories::NUM_SLOTS - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
+			if(DoButton_MenuTab(&s_aCategoryButtons[Slot], CAccessories::SlotName(Slot), m_AccessorySlot == Slot, &Tab, Corners, nullptr, nullptr, nullptr, nullptr, 5.0f))
+				m_AccessorySlot = Slot;
+		}
+	}
+
+	// accessory selector of the selected category, one item can be equipped per category
+	static CListBox s_ListBox;
+	static char s_aaItemIds[CAccessories::NUM_SLOTS][CAccessories::MAX_ITEMS];
+	const int NumItems = CAccessories::NumItems(m_AccessorySlot);
+	const int OldSelected = std::clamp(*SlotConfig.m_pItem, 0, NumItems - 1);
+	s_ListBox.DoStart(100.0f, NumItems, 6, 1, OldSelected, &MainView);
+	for(int Item = 0; Item < NumItems; Item++)
+	{
+		const CListboxItem ListItem = s_ListBox.DoNextItem(&s_aaItemIds[m_AccessorySlot][Item], Item == OldSelected);
+		if(!ListItem.m_Visible)
+			continue;
+
+		CUIRect ItemPreview;
+		ListItem.m_Rect.HSplitBottom(20.0f, &ItemPreview, &Label);
+
+		// only show this item on the tee
+		CAccessories::SSettings ItemSettings = Settings;
+		for(int Slot = 0; Slot < CAccessories::NUM_SLOTS; Slot++)
+		{
+			if(Slot != m_AccessorySlot)
+				ItemSettings.m_aSlots[Slot].m_Item = 0;
+		}
+		CAccessories::SSlotSettings &ItemSlot = ItemSettings.m_aSlots[m_AccessorySlot];
+		ItemSlot.m_Item = Item;
+		// the other items are shown with the adjustment they will get when equipped
+		if(Item != OldSelected)
+			CAccessories::LoadAdjustment(m_Dummy, m_AccessorySlot, Item, &ItemSlot.m_Size, &ItemSlot.m_X, &ItemSlot.m_Y);
+		RenderAccessoryTee(ItemPreview, std::min(ItemPreview.w, ItemPreview.h) * 0.5f, ItemSettings, vec2(1.0f, 0.0f));
+
+		SLabelProperties Props;
+		Props.m_MaxWidth = Label.w - 5.0f;
+		Ui()->DoLabel(&Label, CAccessories::ItemName(m_AccessorySlot, Item), 12.0f, TEXTALIGN_MC, Props);
+	}
+	const int NewSelected = s_ListBox.DoEnd();
+	if(NewSelected != OldSelected && NewSelected >= 0)
+		CAccessories::Equip(m_Dummy, m_AccessorySlot, NewSelected);
 }
 void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 {
