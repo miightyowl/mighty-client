@@ -53,7 +53,6 @@ void CFinishRename::ResetMapState()
 	m_MapScanned = false;
 	m_vFinishTilePositions.clear();
 	m_Armed = true;
-	m_JustFinished = false;
 	m_Decided = false;
 	m_aTargetName[0] = '\0';
 	m_aDecisionName[0] = '\0';
@@ -232,19 +231,17 @@ void CFinishRename::OnRender()
 	if(m_vFinishTilePositions.empty())
 		return;
 
-	if(!GameClient()->m_Snap.m_pLocalCharacter)
-		return;
-	const float TriggerDistance = g_Config.m_ClFinishRenameDistance * 32.0f;
-	const float TriggerDistanceSquared = TriggerDistance * TriggerDistance;
-	const float RearmDistance = 1.5f * TriggerDistance;
-	const float DistanceSquared = DistanceToFinishSquared(GameClient()->m_LocalCharacterPos);
-	if(DistanceSquared > RearmDistance * RearmDistance)
+	const auto &Snap = GameClient()->m_Snap;
+	if(!Snap.m_pGameInfoObj || Snap.m_SpecInfo.m_Active || !(Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_RACETIME))
 	{
 		m_Armed = true;
-		m_JustFinished = false;
 		return;
 	}
-	if(DistanceSquared > TriggerDistanceSquared || !m_Armed)
+
+	if(!Snap.m_pLocalCharacter || !m_Armed)
+		return;
+	const float TriggerDistance = g_Config.m_ClFinishRenameDistance * 32.0f;
+	if(DistanceToFinishSquared(GameClient()->m_LocalCharacterPos) > TriggerDistance * TriggerDistance)
 		return;
 	if(!m_Decided || m_aTargetName[0] == '\0')
 		return;
@@ -332,23 +329,6 @@ void CFinishRename::OnMessage(int MsgType, void *pRawMsg)
 	if(Client()->State() != IClient::STATE_ONLINE)
 		return;
 
-	if(MsgType == NETMSGTYPE_SV_KILLMSG)
-	{
-		const CNetMsg_Sv_KillMsg *pMsg = (CNetMsg_Sv_KillMsg *)pRawMsg;
-		for(const int LocalId : GameClient()->m_aLocalIds)
-			if(LocalId >= 0 && pMsg->m_Victim == LocalId && !m_JustFinished)
-				m_Armed = true;
-		return;
-	}
-	if(MsgType == NETMSGTYPE_SV_KILLMSGTEAM)
-	{
-		const CNetMsg_Sv_KillMsgTeam *pMsg = (CNetMsg_Sv_KillMsgTeam *)pRawMsg;
-		for(const int LocalId : GameClient()->m_aLocalIds)
-			if(LocalId >= 0 && !m_JustFinished && GameClient()->m_Teams.Team(LocalId) == pMsg->m_Team)
-				m_Armed = true;
-		return;
-	}
-
 	int FinishedClientId = -1;
 	if(MsgType == NETMSGTYPE_SV_RACEFINISH)
 	{
@@ -371,8 +351,8 @@ void CFinishRename::OnMessage(int MsgType, void *pRawMsg)
 	if(FinishedClientId < 0)
 		return;
 
-	m_Armed = false;
-	m_JustFinished = true;
+	if(FinishedClientId == GameClient()->m_aLocalIds[g_Config.m_ClDummy])
+		m_Armed = false;
 
 	const char *pFinishedName = GameClient()->m_aClients[FinishedClientId].m_aName;
 	const auto Lookup = m_Lookups.find(pFinishedName);
