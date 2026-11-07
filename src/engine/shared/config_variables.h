@@ -190,6 +190,7 @@ MACRO_CONFIG_COL(ClMClientColor, cl_mclient_color, 10518912, CFGFLAG_CLIENT | CF
 MACRO_CONFIG_INT(ClMClientIntro, cl_mclient_intro, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show the M-Client welcome/intro popups on the next launch")
 MACRO_CONFIG_INT(ClMClientTextBrightness, cl_mclient_text_brightness, 100, 30, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: brightness of default white UI text in percent")
 MACRO_CONFIG_INT(ClMClientMenuAnimation, cl_mclient_menu_animation, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: animate drifting light streaks behind the menu background")
+MACRO_CONFIG_INT(ClMClientVoteMenu, cl_mclient_vote_menu, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: use the redesigned vote menu (0 - use the default vote list)")
 MACRO_CONFIG_INT(ClMClientMenuCursorSize, cl_mclient_menu_cursor_size, 100, 50, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: size of the menu mouse cursor in percent")
 MACRO_CONFIG_INT(ClMClientIngameCursorSize, cl_mclient_ingame_cursor_size, 100, 50, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: size of the ingame weapon cursor in percent")
 MACRO_CONFIG_INT(ClMClientForceSkin, cl_mclient_force_skin, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: force every tee to render as the maodie skin")

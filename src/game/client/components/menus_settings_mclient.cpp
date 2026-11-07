@@ -280,6 +280,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		static CButtonContainer s_MClientColorResetId;
 		DoLine_ColorPicker(&s_MClientColorResetId, 25.0f, 13.0f, 2.0f, &LeftView, Localize("Menu accent color"), &g_Config.m_ClMClientColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientColor, false)), false, nullptr, false);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMenuAnimation, Localize("Animated menu background"), &g_Config.m_ClMClientMenuAnimation, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientVoteMenu, Localize("Use redesigned vote menu"), &g_Config.m_ClMClientVoteMenu, &LeftView, LineSize);
 
 		LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
 		Ui()->DoScrollbarOption(&g_Config.m_ClMClientMenuCursorSize, &g_Config.m_ClMClientMenuCursorSize, &Button, Localize("Menu cursor size"), 50, 300, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");

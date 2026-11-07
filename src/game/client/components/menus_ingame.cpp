@@ -1532,10 +1532,10 @@ bool CMenus::RenderServerControlServer(CUIRect MainView, bool UpdateScroll)
 {
 	const bool IsDDNetCommunity = str_comp(Client()->ServerInfo().m_aCommunityId, IServerBrowser::COMMUNITY_DDNET) == 0;
 	CUnfinishedMapVote &UnfinishedVote = GameClient()->m_UnfinishedMapVote;
-	if(IsDDNetCommunity)
+	if(g_Config.m_ClMClientVoteMenu && IsDDNetCommunity)
 		UnfinishedVote.UpdateMapReleases();
 
-	const EVoteMenuMode Mode = SelectVoteMenuMode(IsDDNetCommunity, !UnfinishedVote.MapReleases().empty(), UnfinishedVote.MapReleasesFailed());
+	const EVoteMenuMode Mode = SelectVoteMenuMode(g_Config.m_ClMClientVoteMenu, IsDDNetCommunity, !UnfinishedVote.MapReleases().empty(), UnfinishedVote.MapReleasesFailed());
 	switch(Mode)
 	{
 	case EVoteMenuMode::DDNET_CATALOG:
@@ -2445,7 +2445,7 @@ void CMenus::RenderServerControl(CUIRect MainView)
 		Call = RenderServerControlKick(MainView, true, Searching);
 	const bool IsDDNetCommunity = str_comp(Client()->ServerInfo().m_aCommunityId, IServerBrowser::COMMUNITY_DDNET) == 0;
 	const CUnfinishedMapVote &UnfinishedVote = GameClient()->m_UnfinishedMapVote;
-	const EVoteMenuMode VoteMenuMode = SelectVoteMenuMode(IsDDNetCommunity, !UnfinishedVote.MapReleases().empty(), UnfinishedVote.MapReleasesFailed());
+	const EVoteMenuMode VoteMenuMode = SelectVoteMenuMode(g_Config.m_ClMClientVoteMenu, IsDDNetCommunity, !UnfinishedVote.MapReleases().empty(), UnfinishedVote.MapReleasesFailed());
 	const bool RandomUnfinishedSelected = s_ControlPage == EServerControlTab::SETTINGS && VoteMenuMode == EVoteMenuMode::DDNET_CATALOG &&
 					      (m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_ALL || m_CallvoteSelectedOption == CALLVOTE_OPTION_RANDOM_UNFINISHED_BY_SELECTED);
 

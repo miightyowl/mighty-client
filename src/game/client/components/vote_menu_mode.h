@@ -8,9 +8,9 @@ enum class EVoteMenuMode
 	DDNET_SERVER_VOTES,
 };
 
-constexpr EVoteMenuMode SelectVoteMenuMode(bool IsDDNetCommunity, bool MapCatalogAvailable, bool MapCatalogFailed)
+constexpr EVoteMenuMode SelectVoteMenuMode(bool RedesignEnabled, bool IsDDNetCommunity, bool MapCatalogAvailable, bool MapCatalogFailed)
 {
-	if(!IsDDNetCommunity)
+	if(!RedesignEnabled || !IsDDNetCommunity)
 		return EVoteMenuMode::LEGACY;
 	if(MapCatalogAvailable || !MapCatalogFailed)
 		return EVoteMenuMode::DDNET_CATALOG;
