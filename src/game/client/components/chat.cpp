@@ -32,6 +32,8 @@
 #include <game/localization.h>
 
 #include <algorithm>
+#include <string_view>
+#include <unordered_set>
 
 static constexpr const char *SPAM_NAMES_FILE = "mclient-spam-names.txt";
 
@@ -1294,6 +1296,8 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 }
 
 // chat translation
+static constexpr double TRANSLATE_SHORT_MIN_CONFIDENCE = 0.6;
+
 static bool IsNonLatinLetter(int Codepoint)
 {
 	return (Codepoint >= 0x0370 && Codepoint <= 0x03FF) || // greek
@@ -1327,6 +1331,11 @@ static bool IsEmojiCodepoint(int Cp)
 	return (Cp >= 0x2190 && Cp <= 0x2BFF) || (Cp >= 0x1F000 && Cp <= 0x1FFFF) || (Cp >= 0xFE00 && Cp <= 0xFE0F) || Cp == 0x200D || Cp == 0x20E3;
 }
 
+static bool IsAccentedLatinLetter(int Cp)
+{
+	return Cp >= 0x00C0 && Cp <= 0x024F && Cp != 0x00D7 && Cp != 0x00F7;
+}
+
 static int CountLetters(const char *pText)
 {
 	int NumLetters = 0;
@@ -1336,7 +1345,7 @@ static int CountLetters(const char *pText)
 		const int Cp = str_utf8_decode(&pCur);
 		if(Cp <= 0)
 			break;
-		if((Cp >= 'a' && Cp <= 'z') || (Cp >= 'A' && Cp <= 'Z') || IsNonLatinLetter(Cp))
+		if((Cp >= 'a' && Cp <= 'z') || (Cp >= 'A' && Cp <= 'Z') || IsAccentedLatinLetter(Cp) || IsNonLatinLetter(Cp))
 			NumLetters++;
 	}
 	return NumLetters;
@@ -1388,7 +1397,7 @@ static bool IsTranslatableWord(const char *pWord)
 	static const char *s_apEmoteWords[] = {
 		"xd", "xdd", "xddd", "lol", "lmao", "rofl", "gg", "ggs", "gl", "hf",
 		"glhf", "wp", "ez", "nt", "ns", "ok", "kk", "o7", "uwu", "owo", "afk",
-		"brb", "wtf", "omg"};
+		"brb", "wtf", "omg", "frz"};
 	for(const char *pEmote : s_apEmoteWords)
 	{
 		if(str_comp(aAscii, pEmote) == 0)
@@ -1442,6 +1451,98 @@ bool CChat::IsTranslatableText(const char *pText)
 		}
 	}
 	return false;
+}
+
+static bool IsKnownEnglishWord(const char *pWord)
+{
+	static const std::unordered_set<std::string_view> s_KnownWords = {
+		"a", "about", "after", "again", "all", "alive", "almost", "already", "always", "am", "an", "and", "any",
+		"anyone", "anything", "are", "around", "as", "ask", "at", "away", "back", "bad", "be", "because", "been",
+		"before", "behind", "being", "best", "better", "big", "bit", "bot", "bots", "bottom", "boy", "bro", "bruh",
+		"btw", "but", "by", "bye", "call", "came", "can", "cant", "cmon", "come", "coming", "cool", "could",
+		"couldnt", "cya", "damn", "day", "dead", "did", "didnt", "different", "dm", "do", "does", "doesnt", "doing",
+		"done", "dont", "down", "dude", "dummy", "each", "easy", "else", "end", "enough", "even", "ever", "every",
+		"everyone", "everything", "fail", "failed", "far", "feel", "few", "find", "fine", "finish", "finished",
+		"first", "fix", "follow", "for", "found", "fr", "free", "freeze", "friend", "friends", "from", "frozen",
+		"fuck", "fun", "funny", "game", "games", "get", "gets", "getting", "girl", "give", "gm", "gn", "go", "goes",
+		"gogo", "going", "gone", "gonna", "good", "got", "gotta", "great", "guess", "guy", "guys", "had", "hammer",
+		"happy", "hard", "has", "have", "he", "hello", "help", "her", "here", "hey", "hi", "him", "his", "hold",
+		"hook", "how", "i", "idc", "idk", "if", "ikr", "im", "imo", "in", "into", "irl", "is", "isnt", "it", "its",
+		"ive", "jump", "just", "keep", "kek", "kill", "kind", "know", "last", "late", "later", "lel", "left", "let",
+		"lets", "level", "like", "little", "lmk", "long", "look", "lose", "lost", "lot", "love", "made", "make",
+		"many", "map", "maps", "mate", "maybe", "me", "mean", "mine", "more", "morning", "most", "move", "much",
+		"must", "my", "need", "never", "new", "next", "ngl", "nice", "night", "no", "noob", "noobs", "nope", "not",
+		"nothing", "now", "np", "nub", "of", "off", "oh", "okay", "okey", "old", "on", "once", "one", "only", "or",
+		"other", "our", "out", "over", "part", "people", "pls", "play", "played", "player", "players", "playing",
+		"please", "plz", "point", "pro", "pull", "put", "race", "rank", "rdy", "ready", "real", "really", "right",
+		"rly", "rn", "run", "said", "same", "save", "say", "see", "server", "she", "should", "show", "skill",
+		"skip", "slow", "smh", "so", "some", "someone", "something", "soon", "sorry", "spawn", "spec", "start",
+		"stay", "still", "stop", "stuck", "sup", "sure", "sry", "take", "talk", "tbh", "team", "tell", "than",
+		"thank", "thanks", "that", "thats", "the", "their", "them", "then", "there", "these", "they", "thing",
+		"things", "think", "this", "those", "though", "thx", "time", "to", "today", "together", "too", "top", "tried",
+		"troll", "try", "trying", "turn", "two", "ty", "tysm", "u", "under", "unfreeze", "until", "up", "ur", "us",
+		"use", "very", "wait", "waiting", "wanna", "want", "wants", "way", "we", "well", "went", "were",
+		"what", "whats", "when", "where", "which", "while", "who", "why", "win", "with", "without", "wont", "work",
+		"works", "would", "wow", "wrong", "ya", "yea", "yeah", "year", "yep", "yes", "yo", "you", "youre", "your",
+		"yup"};
+	return s_KnownWords.contains(pWord);
+}
+
+static void CollapseRepeats(const char *pIn, char *pOut, int OutSize, int MaxRun)
+{
+	int OutLen = 0;
+	int Run = 0;
+	for(const char *pCur = pIn; *pCur != '\0' && OutLen < OutSize - 1; pCur++)
+	{
+		Run = (pCur != pIn && *pCur == pCur[-1]) ? Run + 1 : 1;
+		if(Run <= MaxRun)
+			pOut[OutLen++] = *pCur;
+	}
+	pOut[OutLen] = '\0';
+}
+
+static bool IsLikelyEnglishText(const char *pText)
+{
+	const char *pCur = pText;
+	while(*pCur != '\0')
+	{
+		while(*pCur == ' ')
+			pCur++;
+		const char *pStart = pCur;
+		while(*pCur != '\0' && *pCur != ' ')
+			pCur++;
+		if(pCur == pStart)
+			continue;
+
+		char aToken[MAX_CHAT_LENGTH];
+		str_copy(aToken, pStart, std::min((int)sizeof(aToken), (int)(pCur - pStart) + 1));
+		if(!IsTranslatableWord(aToken))
+			continue;
+
+		char aWord[32];
+		int WordLen = 0;
+		for(const char *pChar = aToken; *pChar != '\0'; pChar++)
+		{
+			const unsigned char c = (unsigned char)*pChar;
+			if(c >= 0x80)
+				return false;
+			if(!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')))
+				continue;
+			if(WordLen >= (int)sizeof(aWord) - 1)
+				return false;
+			aWord[WordLen++] = (char)(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
+		}
+		aWord[WordLen] = '\0';
+		if(WordLen == 0)
+			continue;
+
+		char aTwo[32], aOne[32];
+		CollapseRepeats(aWord, aTwo, sizeof(aTwo), 2);
+		CollapseRepeats(aWord, aOne, sizeof(aOne), 1);
+		if(!IsKnownEnglishWord(aWord) && !IsKnownEnglishWord(aTwo) && !IsKnownEnglishWord(aOne))
+			return false;
+	}
+	return true;
 }
 
 // messages with usernames get replaced with numbers for translating
@@ -1580,7 +1681,7 @@ static bool IsCommonLanguage(const char *pCode)
 	static const char *const s_apCommon[] = {
 		"en", "de", "es", "fr", "pt", "it", "nl", "pl", "ru", "uk", "tr", "ar",
 		"zh-CN", "zh", "zh-TW", "ja", "ko", "vi", "id", "th", "sv", "cs", "el",
-		"hu", "ro", "fi", "da", "no", "sl", "sk", "hr", "sr", "bg"};
+		"hu", "ro", "fi", "da", "no", "sl", "sk", "hr", "sr", "bg", "ca"};
 	return std::ranges::any_of(s_apCommon, [&](const char *pCommon) {
 		return str_comp_nocase(pCode, pCommon) == 0;
 	});
@@ -1657,6 +1758,11 @@ void CChat::MaybeTranslateLine(CLine &Line)
 	if(!IsTranslatableText(aProtected))
 		return;
 
+	const char *pInTarget = g_Config.m_ClChatTranslateInTarget[0] != '\0' && str_comp(g_Config.m_ClChatTranslateInTarget, "cat") != 0 ? g_Config.m_ClChatTranslateInTarget : "en";
+
+	if((str_comp_nocase(pInTarget, "en") == 0 || IsIgnoredLanguage("en")) && IsLikelyEnglishText(aProtected))
+		return;
+
 	const auto CacheHit = m_TranslationCache.find(pBody);
 	if(CacheHit != m_TranslationCache.end())
 	{
@@ -1668,9 +1774,6 @@ void CChat::MaybeTranslateLine(CLine &Line)
 		}
 		return;
 	}
-
-	// Language incoming chat is translated to (empty/legacy values fall back to English).
-	const char *pInTarget = g_Config.m_ClChatTranslateInTarget[0] != '\0' && str_comp(g_Config.m_ClChatTranslateInTarget, "cat") != 0 ? g_Config.m_ClChatTranslateInTarget : "en";
 
 	CPendingTranslation Pending;
 	Pending.m_Outgoing = false;
@@ -1926,12 +2029,19 @@ void CChat::PollTranslations()
 			char aTranslated[MAX_CHAT_LENGTH];
 			aTranslated[0] = '\0';
 			const char *pDetectedLang = "";
+			double Confidence = 1.0;
 
 			if(pJson != nullptr && pJson->type == json_array)
 			{
 				const json_value *pLang = json_array_get(pJson, 2);
 				if(pLang->type == json_string)
 					pDetectedLang = json_string_get(pLang);
+
+				const json_value *pConfidence = json_array_get(pJson, 6);
+				if(pConfidence->type == json_double)
+					Confidence = pConfidence->u.dbl;
+				else if(pConfidence->type == json_integer)
+					Confidence = (double)pConfidence->u.integer;
 
 				const json_value *pSegments = json_array_get(pJson, 0);
 				if(pSegments->type == json_array)
@@ -1944,6 +2054,13 @@ void CChat::PollTranslations()
 							str_append(aTranslated, json_string_get(pChunk), sizeof(aTranslated));
 					}
 				}
+			}
+
+			if(aTranslated[0] != '\0')
+			{
+				char aLower[MAX_CHAT_LENGTH];
+				str_utf8_tolower(aTranslated, aLower, sizeof(aLower));
+				str_copy(aTranslated, aLower);
 			}
 
 			// swap the numeric placeholders back for the usernames
@@ -1969,12 +2086,12 @@ void CChat::PollTranslations()
 				const bool ForeignScript = StrHasNonLatinScript(pOriginalBody);
 				const bool Misdetected = ForeignScript && (pDetectedLang[0] == '\0' || str_comp_nocase(pDetectedLang, "en") == 0 || !IsCommonLanguage(pDetectedLang));
 				// short latin-script messages are frequently misdetected into obscure/wrong languages
-				const bool ShortLatin = !ForeignScript && CountLetters(pOriginalBody) < 6;
+				const bool UnsureShortLatin = !ForeignScript && CountLetters(pOriginalBody) < 6 && Confidence < TRANSLATE_SHORT_MIN_CONFIDENCE;
 
 				const bool KeepOriginal =
 					aTranslated[0] == '\0' ||
-					str_comp(aTranslated, pOriginalBody) == 0 ||
-					ShortLatin ||
+					str_utf8_comp_nocase(aTranslated, pOriginalBody) == 0 ||
+					UnsureShortLatin ||
 					(!Misdetected && (pDetectedLang[0] == '\0' || IsIgnoredLanguage(pDetectedLang) || !IsCommonLanguage(pDetectedLang)));
 
 				const char *pLangName = !KeepOriginal && !Misdetected && pDetectedLang[0] != '\0' ? LanguageName(pDetectedLang) : "";
