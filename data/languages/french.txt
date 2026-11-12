@@ -1306,9 +1306,6 @@ Initializing map logic
 Sending initial client info
 == Envoi des informations initiales du client
 
-Uploading map data to GPU
-== Transfert des données de la map vers le GPU
-
 Loading menu images
 == Chargement des images de menu
 
@@ -2016,6 +2013,9 @@ Team successfully saved by %s. The database connection failed, using generated s
 Save failed!
 == 
 
+Hold Shift to be more precise.
+== 
+
 Auto-sync player camera
 == 
 
@@ -2042,12 +2042,19 @@ Active
 Loading maps…
 == 
 
+Dummy is not connected
+== 
+
 [Spectating]
 Following %d: %s
 == 
 
 [Spectating Camera Mode Icon]
 AUTO
+== 
+
+[Important alert message]
+Tap to dismiss…
 == 
 
 [Important alert message]
@@ -2067,6 +2074,9 @@ Server could not be started
 == 
 
 Loading map
+== 
+
+Initializing layers
 == 
 
 Joining Tutorial server
@@ -2513,6 +2523,9 @@ Demo player is currently active.
 The extra menu with the given number is activated.
 == 
 
+Credits
+== 
+
 Show spectator cursor
 == 
 
@@ -2618,7 +2631,16 @@ Dragger Outline Color
 Dragger Inner Color
 == 
 
+Teleport to cursor
+== 
+
+Teleport dummy to cursor
+== 
+
 Scoreboard cursor
+== 
+
+Practice
 == 
 
 Show background quads
@@ -2678,7 +2700,16 @@ Skin could not be found.
 No skins match your filter criteria
 == 
 
+Join
+== 
+
 Download
+== 
+
+not bound
+== 
+
+Show cursor
 == 
 
 Unmute

@@ -87,6 +87,11 @@ void SIntConfigVariable::Serialize(char *pOut, size_t Size) const
 	Serialize(pOut, Size, *m_pVariable);
 }
 
+void SIntConfigVariable::SerializeHumanReadable(char *pOut, size_t Size) const
+{
+	Serialize(pOut, Size);
+}
+
 void SIntConfigVariable::SetValue(int Value)
 {
 	if(CheckReadOnly())
@@ -158,6 +163,12 @@ void SColorConfigVariable::Serialize(char *pOut, size_t Size, unsigned Value) co
 void SColorConfigVariable::Serialize(char *pOut, size_t Size) const
 {
 	Serialize(pOut, Size, *m_pVariable);
+}
+
+void SColorConfigVariable::SerializeHumanReadable(char *pOut, size_t Size) const
+{
+	const ColorRGBA Rgba = color_cast<ColorRGBA>(ColorHSLA(*m_pVariable, m_Alpha).UnclampLighting(m_DarkestLighting));
+	str_format(pOut, Size, "%s $%0*X", m_pScriptName, m_Alpha ? 8 : 6, Rgba.PackAlphaLast(m_Alpha));
 }
 
 void SColorConfigVariable::SetValue(unsigned Value)
@@ -237,6 +248,11 @@ void SStringConfigVariable::Serialize(char *pOut, size_t Size) const
 	Serialize(pOut, Size, m_pStr);
 }
 
+void SStringConfigVariable::SerializeHumanReadable(char *pOut, size_t Size) const
+{
+	Serialize(pOut, Size);
+}
+
 void SStringConfigVariable::SetValue(const char *pValue)
 {
 	if(CheckReadOnly())
@@ -280,6 +296,7 @@ void CConfigManager::Init()
 	const auto &&AddIntVariable = [this, AddVariable](const char *pScriptName, int Flags, const char *pDesc, int *pVariable, int Default, int Min, int Max) {
 		dbg_assert(Min == 0 || Max == 0 || Min < Max, "MACRO_CONFIG_INT(%s): minimum (%d) must be less than maximum (%d)", pScriptName, Min, Max);
 		dbg_assert((Min == 0 || Default >= Min) && (Max == 0 || Default <= Max), "MACRO_CONFIG_INT(%s): default (%d) must be in range of minimum (%d) and maximum (%d)", pScriptName, Default, Min, Max);
+
 		char aHelp[512];
 		size_t HelpSize;
 		if(Min == 0 && Max == 0)
@@ -294,32 +311,33 @@ void CConfigManager::Init()
 			m_pConsole, pScriptName, SConfigVariable::VAR_INT, Flags, m_ConfigHeap.StoreString(aHelp), pVariable, Default, Min, Max));
 	};
 
-#define MACRO_CONFIG_INT(Name, ScriptName, Def, Min, Max, Flags, Desc) \
-	{ \
-		AddIntVariable(#ScriptName, Flags, Desc, &g_Config.m_##Name, Def, Min, Max); \
-	}
+	const auto &&AddColorVariable = [this, AddVariable](const char *pScriptName, int Flags, const char *pDesc, unsigned *pVariable, unsigned Default) {
+		const bool Alpha = (Flags & CFGFLAG_COLALPHA) != 0;
 
-#define MACRO_CONFIG_COL(Name, ScriptName, Def, Flags, Desc) \
-	{ \
-		const char *pScriptName = #ScriptName; \
-		const bool Alpha = ((Flags) & CFGFLAG_COLALPHA) != 0; \
-		char aHelp[512]; \
-		const size_t HelpSize = str_format(aHelp, sizeof(aHelp), "%s (default: $%0*X)", Desc, Alpha ? 8 : 6, color_cast<ColorRGBA>(ColorHSLA(Def, Alpha)).Pack(Alpha)); \
-		dbg_assert(HelpSize < sizeof(aHelp) - UTF8_BYTE_LENGTH - 1, "MACRO_CONFIG_COL(%s): help text possibly truncated. Increase size of aHelp.", pScriptName); \
-		AddVariable(m_ConfigHeap.Allocate<SColorConfigVariable>( \
-			m_pConsole, pScriptName, SConfigVariable::VAR_COLOR, Flags, m_ConfigHeap.StoreString(aHelp), &g_Config.m_##Name, Def)); \
-	}
+		char aHelp[512];
+		const size_t HelpSize = str_format(aHelp, sizeof(aHelp), "%s (default: $%0*X)", pDesc, Alpha ? 8 : 6, color_cast<ColorRGBA>(ColorHSLA(Default, Alpha)).Pack(Alpha));
+		dbg_assert(HelpSize < sizeof(aHelp) - UTF8_BYTE_LENGTH - 1, "MACRO_CONFIG_COL(%s): help text possibly truncated. Increase size of aHelp.", pScriptName);
 
-#define MACRO_CONFIG_STR(Name, ScriptName, Len, Def, Flags, Desc) \
-	{ \
-		const char *pScriptName = #ScriptName; \
-		char aHelp[512]; \
-		const size_t HelpSize = str_format(aHelp, sizeof(aHelp), "%s (default: \"%s\", max length: %d)", Desc, Def, Len - 1); \
-		dbg_assert(HelpSize < sizeof(aHelp) - UTF8_BYTE_LENGTH - 1, "MACRO_CONFIG_STR(%s): help text possibly truncated. Increase size of aHelp.", pScriptName); \
-		char *pOldValue = static_cast<char *>(m_ConfigHeap.Allocate(Len)); \
-		AddVariable(m_ConfigHeap.Allocate<SStringConfigVariable>( \
-			m_pConsole, pScriptName, SConfigVariable::VAR_STRING, Flags, m_ConfigHeap.StoreString(aHelp), g_Config.m_##Name, Def, Len, pOldValue)); \
-	}
+		AddVariable(m_ConfigHeap.Allocate<SColorConfigVariable>(
+			m_pConsole, pScriptName, SConfigVariable::VAR_COLOR, Flags, m_ConfigHeap.StoreString(aHelp), pVariable, Default));
+	};
+
+	const auto &&AddStringVariable = [this, AddVariable](const char *pScriptName, int Flags, const char *pDesc, char *pVariable, size_t Len, const char *pDefault) {
+		dbg_assert(Len > 0 && Len <= 16 * 1024, "MACRO_CONFIG_STR(%s): length (%" PRIzu ") is invalid.", pScriptName, Len);
+
+		char aHelp[512];
+		const size_t HelpSize = str_format(aHelp, sizeof(aHelp), "%s (default: \"%s\", max length: %" PRIzu ")", pDesc, pDefault, Len - 1);
+		dbg_assert(HelpSize < sizeof(aHelp) - UTF8_BYTE_LENGTH - 1, "MACRO_CONFIG_STR(%s): help text possibly truncated. Increase size of aHelp.", pScriptName);
+
+		char *pOldValue = static_cast<char *>(m_ConfigHeap.Allocate(Len));
+
+		AddVariable(m_ConfigHeap.Allocate<SStringConfigVariable>(
+			m_pConsole, pScriptName, SConfigVariable::VAR_STRING, Flags, m_ConfigHeap.StoreString(aHelp), pVariable, pDefault, Len, pOldValue));
+	};
+
+#define MACRO_CONFIG_INT(Name, ScriptName, Def, Min, Max, Flags, Desc) AddIntVariable(#ScriptName, Flags, Desc, &g_Config.m_##Name, Def, Min, Max);
+#define MACRO_CONFIG_COL(Name, ScriptName, Def, Flags, Desc) AddColorVariable(#ScriptName, Flags, Desc, &g_Config.m_##Name, Def);
+#define MACRO_CONFIG_STR(Name, ScriptName, Len, Def, Flags, Desc) AddStringVariable(#ScriptName, Flags, Desc, g_Config.m_##Name, Len, Def);
 
 #include "config_variables.h"
 
@@ -327,9 +345,9 @@ void CConfigManager::Init()
 #undef MACRO_CONFIG_COL
 #undef MACRO_CONFIG_STR
 
-	m_pConsole->Register("reset", "s[config-name]", CFGFLAG_SERVER | CFGFLAG_CLIENT | CFGFLAG_STORE, Con_Reset, this, "Reset a config to its default value");
-	m_pConsole->Register("toggle", "s[config-option] s[value 1] s[value 2]", CFGFLAG_SERVER | CFGFLAG_CLIENT, Con_Toggle, this, "Toggle config value");
-	m_pConsole->Register("+toggle", "s[config-option] s[value 1] s[value 2]", CFGFLAG_CLIENT, Con_ToggleStroke, this, "Toggle config value via keypress");
+	m_pConsole->Register("reset", "s[config]", CFGFLAG_SERVER | CFGFLAG_CLIENT | CFGFLAG_STORE, Con_Reset, this, "Reset a config to its default value");
+	m_pConsole->Register("toggle", "s[config] s[value 1] s[value 2]", CFGFLAG_SERVER | CFGFLAG_CLIENT, Con_Toggle, this, "Toggle config value");
+	m_pConsole->Register("+toggle", "s[config] s[value 1] s[value 2]", CFGFLAG_CLIENT, Con_ToggleStroke, this, "Toggle config value via keypress");
 }
 
 void CConfigManager::Reset(const char *pScriptName)
@@ -343,7 +361,7 @@ void CConfigManager::Reset(const char *pScriptName)
 		}
 	}
 
-	log_error("config", "Invalid command: '%s'.", pScriptName);
+	log_error("config", "Invalid config variable: '%s'", pScriptName);
 }
 
 void CConfigManager::ResetGameSettings()
@@ -364,7 +382,8 @@ void CConfigManager::SetReadOnly(const char *pScriptName, bool ReadOnly)
 			return;
 		}
 	}
-	dbg_assert_failed("Invalid command for SetReadOnly: '%s'", pScriptName);
+
+	dbg_assert_failed("Invalid config variable for SetReadOnly: '%s'", pScriptName);
 }
 
 void CConfigManager::SetGameSettingsReadOnly(bool ReadOnly)
@@ -479,6 +498,16 @@ void CConfigManager::PossibleConfigVariables(const char *pStr, int FlagMask, POS
 	}
 }
 
+const SConfigVariable *CConfigManager::FindVariable(const char *pScriptName) const
+{
+	for(const auto *pVariable : m_vpAllVariables)
+	{
+		if(str_comp(pVariable->m_pScriptName, pScriptName) == 0)
+			return pVariable;
+	}
+	return nullptr;
+}
+
 void CConfigManager::Con_Reset(IConsole::IResult *pResult, void *pUserData)
 {
 	static_cast<CConfigManager *>(pUserData)->Reset(pResult->GetString(0));
@@ -520,7 +549,7 @@ void CConfigManager::Con_Toggle(IConsole::IResult *pResult, void *pUserData)
 		return;
 	}
 
-	log_error("config", "Invalid command: '%s'.", pScriptName);
+	log_error("config", "Invalid config variable: '%s'", pScriptName);
 }
 
 void CConfigManager::Con_ToggleStroke(IConsole::IResult *pResult, void *pUserData)
@@ -543,7 +572,7 @@ void CConfigManager::Con_ToggleStroke(IConsole::IResult *pResult, void *pUserDat
 		return;
 	}
 
-	log_error("config", "Invalid command: '%s'.", pScriptName);
+	log_error("config", "Invalid config variable: '%s'", pScriptName);
 }
 
 IConfigManager *CreateConfigManager() { return new CConfigManager; }

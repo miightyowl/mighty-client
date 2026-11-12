@@ -84,7 +84,6 @@ class CServer : public IServer
 	class CDbConnectionPool *m_pConnectionPool;
 
 	int m_PreviousDebugDummies = 0;
-	void UpdateDebugDummies(bool ForceDisconnect);
 
 public:
 	class IGameServer *GameServer() { return m_pGameServer; }
@@ -236,6 +235,7 @@ public:
 	CServerBan m_ServerBan;
 
 	int64_t m_GameStartTime;
+	int64_t m_StartTime;
 
 	enum
 	{
@@ -354,6 +354,8 @@ public:
 
 	static int ClientRejoinCallback(int ClientId, void *pUser, bool Sixup, bool VanillaAuth);
 
+	void UpdateDebugDummies(bool ForceDisconnect);
+
 	void SendRconType(int ClientId, bool UsernameReq);
 	void SendCapabilities(int ClientId);
 	void SendMap(int ClientId);
@@ -440,6 +442,7 @@ public:
 	void ChangeMap(const char *pMap) override;
 	void ReloadMap() override;
 	int LoadMap(const char *pMapName);
+	void WritePortFile();
 
 	void SaveDemo(int ClientId, float Time) override;
 	void StartRecord(int ClientId) override;
@@ -452,6 +455,7 @@ public:
 	static void ConKick(IConsole::IResult *pResult, void *pUser);
 	static void ConStatus(IConsole::IResult *pResult, void *pUser);
 	static void ConShutdown(IConsole::IResult *pResult, void *pUser);
+	static void ConUptime(IConsole::IResult *pResult, void *pUser);
 	static void ConRecord(IConsole::IResult *pResult, void *pUser);
 	static void ConStopRecord(IConsole::IResult *pResult, void *pUser);
 	static void ConMapReload(IConsole::IResult *pResult, void *pUser);
@@ -485,6 +489,7 @@ public:
 	static void ConchainRconPasswordChange(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainRconModPasswordChange(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainRconHelperPasswordChange(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainReservedSlotsAuthLevel(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainMapUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainSixupUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainRegisterCommunityTokenRedact(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);

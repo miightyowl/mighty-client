@@ -641,7 +641,7 @@ void CPlayer::OnPredictedInput(const CNetObj_PlayerInput *pNewInput)
 
 	m_NumInputs++;
 
-	if(m_pCharacter && !m_Paused && !(pNewInput->m_PlayerFlags & PLAYERFLAG_SPEC_CAM))
+	if(m_pCharacter && !m_Paused)
 		m_pCharacter->OnPredictedInput(pNewInput);
 
 	// Magic number when we can hope that client has successfully identified itself
@@ -686,7 +686,7 @@ void CPlayer::OnPredictedEarlyInput(const CNetObj_PlayerInput *pNewInput)
 	if(m_PlayerFlags & PLAYERFLAG_CHATTING)
 		return;
 
-	if(m_pCharacter && !m_Paused && !(m_PlayerFlags & PLAYERFLAG_SPEC_CAM))
+	if(m_pCharacter && !m_Paused)
 		m_pCharacter->OnDirectInput(pNewInput);
 }
 
@@ -1144,7 +1144,7 @@ void CPlayer::CCameraInfo::Write(const CNetMsg_Cl_CameraInfo *Msg)
 {
 	// Clamp to the ranges a client can configure, these values also affect other clients spectating this player
 	m_HasCameraInfo = true;
-	m_Zoom = Msg->m_Zoom / 1000.0f;
+	m_Zoom = std::clamp(Msg->m_Zoom, 10, 2000000) / 1000.0f; // CCamera::MinZoomLevel, MaxZoomLevel
 	m_Deadzone = std::clamp(Msg->m_Deadzone, 0, 3000); // cl_mouse_deadzone, cl_dyncam_deadzone
 	m_FollowFactor = std::clamp(Msg->m_FollowFactor, 0, 200); // cl_mouse_followfactor, cl_dyncam_follow_factor
 }

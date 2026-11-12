@@ -748,7 +748,7 @@ void CClient::DisconnectWithReason(const char *pReason)
 	m_DemoPlayer.Stop();
 	for(int Recorder = 0; Recorder < RECORDER_MAX; Recorder++)
 	{
-		DemoRecorder(Recorder)->Stop(Recorder == RECORDER_REPLAYS ? IDemoRecorder::EStopMode::REMOVE_FILE : IDemoRecorder::EStopMode::KEEP_FILE);
+		DemoRecorder_Stop(Recorder);
 	}
 
 	m_aRconAuthed[0] = 0;
@@ -1231,9 +1231,9 @@ const char *CClient::LoadMap(const char *pName, const char *pFilename, const std
 	static char s_aErrorMsg[128];
 
 	SetState(IClient::STATE_LOADING);
-	SetLoadingStateDetail(IClient::LOADING_STATE_DETAIL_LOADING_MAP);
+	SetLoadingStateDetail(IClient::ELoadingStateDetail::LOADING_MAP);
 	if((bool)m_LoadingCallback)
-		m_LoadingCallback(IClient::LOADING_CALLBACK_DETAIL_MAP);
+		m_LoadingCallback(IClient::ELoadingCallbackDetail::MAP);
 
 	// Stop demo recording before loading a new map.
 	for(int Recorder = 0; Recorder < RECORDER_MAX; Recorder++)
@@ -1644,9 +1644,8 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket, int Conn, bool Dummy)
 	// unpack msgid and system flag
 	int Msg;
 	bool Sys;
-	CUuid Uuid;
 
-	int Result = UnpackMessageId(&Msg, &Sys, &Uuid, &Unpacker, &Packer);
+	int Result = UnpackMessageId(&Msg, &Sys, &Unpacker, &Packer);
 	if(Result == UNPACKMESSAGE_ERROR)
 	{
 		return;
@@ -1764,7 +1763,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket, int Conn, bool Dummy)
 			if(LoadMapSearch(pMap, MapSha256, MapCrc) == nullptr)
 			{
 				m_pConsole->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "client/network", "loading done");
-				SetLoadingStateDetail(IClient::LOADING_STATE_DETAIL_SENDING_READY);
+				SetLoadingStateDetail(IClient::ELoadingStateDetail::SENDING_READY);
 				SendReady(CONN_MAIN);
 			}
 			else
@@ -2714,7 +2713,7 @@ void CClient::PumpNetwork()
 			// we switched to online
 			m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "client", "connected, sending info", CLIENT_NETWORK_PRINT_COLOR);
 			SetState(IClient::STATE_LOADING);
-			SetLoadingStateDetail(IClient::LOADING_STATE_DETAIL_INITIAL);
+			SetLoadingStateDetail(IClient::ELoadingStateDetail::INITIAL);
 			SendInfo(CONN_MAIN);
 		}
 
@@ -2800,9 +2799,8 @@ void CClient::OnDemoPlayerMessage(void *pData, int Size)
 	// unpack msgid and system flag
 	int Msg;
 	bool Sys;
-	CUuid Uuid;
 
-	int Result = UnpackMessageId(&Msg, &Sys, &Uuid, &Unpacker, &Packer);
+	int Result = UnpackMessageId(&Msg, &Sys, &Unpacker, &Packer);
 	if(Result == UNPACKMESSAGE_ERROR)
 	{
 		return;
@@ -3168,7 +3166,7 @@ void CClient::InitInterfaces()
 	m_pNotifications = Kernel()->RequestInterface<INotifications>();
 	m_pStorage = Kernel()->RequestInterface<IStorage>();
 
-	m_DemoEditor.Init(&m_SnapshotDelta, &m_SnapshotDeltaSixup, m_pConsole, m_pStorage);
+	m_DemoEditor.Init(&m_SnapshotDelta, &m_SnapshotDeltaSixup, m_pStorage);
 
 	m_ServerBrowser.SetBaseInfo(&m_aNetClient[CONN_CONTACT], m_pGameClient->NetVersion());
 
@@ -3498,11 +3496,13 @@ void CClient::Run()
 			// the next prediction tick to send its input without delay, unless the window is inactive or
 			// the loop is not rate limited at all.
 			if(RefreshRate)
+			{
 				WakeTime = NextUpdateTime;
-			if(IsRenderActive && GfxRefreshRate)
-				WakeTime = std::min(WakeTime, NextRenderTime);
-			if(State() == IClient::STATE_ONLINE && m_aPredTick[g_Config.m_ClDummy] > 0 && !Inactive && WakeTime != std::numeric_limits<int64_t>::max())
-				WakeTime = std::min(WakeTime, Now + (m_aPredTick[g_Config.m_ClDummy] * time_freq() / GameTickSpeed() - m_PredictedTime.Get(Now)));
+				if(IsRenderActive && GfxRefreshRate && NextRenderTime > Now)
+					WakeTime = std::min(WakeTime, NextRenderTime);
+				if(State() == IClient::STATE_ONLINE && m_aPredTick[g_Config.m_ClDummy] > 0 && !Inactive)
+					WakeTime = std::min(WakeTime, Now + (m_aPredTick[g_Config.m_ClDummy] * time_freq() / GameTickSpeed() - m_PredictedTime.Get(Now)));
+			}
 		}
 
 		AutoScreenshot_Cleanup();
@@ -3612,7 +3612,7 @@ bool CClient::InitNetworkClientImpl(NETADDR BindAddr, int Conn, char *pError, si
 	}
 	if(m_aNetClient[Conn].State() != NETSTATE_OFFLINE)
 	{
-		str_format(pError, ErrorSize, "Could not open network client %s while already connected.", pName);
+		str_format(pError, ErrorSize, "Could not open network client '%s' while already connected.", pName);
 		return false;
 	}
 	if(*pPort < 1024) // Reject users setting ports that we don't want to use
@@ -3626,13 +3626,16 @@ bool CClient::InitNetworkClientImpl(NETADDR BindAddr, int Conn, char *pError, si
 		if(RemainingAttempts == 0)
 		{
 			if(g_Config.m_Bindaddr[0])
-				str_format(pError, ErrorSize, "Could not open network client %s, try changing or unsetting the bindaddr '%s'.", pName, g_Config.m_Bindaddr);
+				str_format(pError, ErrorSize, "Could not open network client '%s', try changing or unsetting the bindaddr '%s'.", pName, g_Config.m_Bindaddr);
 			else
-				str_format(pError, ErrorSize, "Could not open network client %s.", pName);
+				str_format(pError, ErrorSize, "Could not open network client '%s'.", pName);
 			return false;
 		}
 		if(BindAddr.port != 0)
+		{
+			log_warn("client", "Could not open network client '%s' with port %d, choosing random port instead.", pName, BindAddr.port);
 			BindAddr.port = 0;
+		}
 	}
 	return true;
 }
@@ -3712,7 +3715,10 @@ void CClient::Con_Ping(IConsole::IResult *pResult, void *pUserData)
 void CClient::ConNetReset(IConsole::IResult *pResult, void *pUserData)
 {
 	CClient *pSelf = (CClient *)pUserData;
-	pSelf->ResetSocket();
+	if(pSelf->m_LocalStartTime > 0)
+	{
+		pSelf->ResetSocket();
+	}
 }
 
 void CClient::AutoScreenshot_Start()
@@ -4086,13 +4092,13 @@ const char *CClient::DemoPlayer_Play(const char *pFilename, int StorageType)
 	m_aNetClient[CONN_MAIN].ResetErrorString();
 
 	SetState(IClient::STATE_LOADING);
-	SetLoadingStateDetail(IClient::LOADING_STATE_DETAIL_LOADING_DEMO);
+	SetLoadingStateDetail(IClient::ELoadingStateDetail::LOADING_DEMO);
 	if((bool)m_LoadingCallback)
-		m_LoadingCallback(IClient::LOADING_CALLBACK_DETAIL_DEMO);
+		m_LoadingCallback(IClient::ELoadingCallbackDetail::DEMO);
 
 	// try to start playback
 	m_DemoPlayer.SetListener(this);
-	if(m_DemoPlayer.Load(Storage(), m_pConsole, pFilename, StorageType))
+	if(m_DemoPlayer.Load(Storage(), pFilename, StorageType))
 	{
 		DisconnectWithReason(m_DemoPlayer.ErrorMessage());
 		return m_DemoPlayer.ErrorMessage();
@@ -4194,6 +4200,22 @@ void CClient::Con_DemoSpeed(IConsole::IResult *pResult, void *pUserData)
 	pSelf->m_DemoPlayer.SetSpeed(pResult->GetFloat(0));
 }
 
+void CClient::DemoRecorder_Stop(int Recorder)
+{
+	if(Recorder == RECORDER_AUTO && DemoRecorder(RECORDER_AUTO)->IsRecording() && DemoRecorder(RECORDER_AUTO)->HasMarkers())
+	{
+		char aFilename[IO_MAX_PATH_LENGTH];
+		const char *pBaseName = fs_filename(DemoRecorder(Recorder)->CurrentFilename());
+		str_format(aFilename, sizeof(aFilename), "demos/auto/marked/%s", pBaseName);
+
+		DemoRecorder(Recorder)->Stop(IDemoRecorder::EStopMode::KEEP_FILE, aFilename);
+	}
+	else if(Recorder == RECORDER_REPLAYS)
+		DemoRecorder(Recorder)->Stop(IDemoRecorder::EStopMode::REMOVE_FILE);
+	else
+		DemoRecorder(Recorder)->Stop(IDemoRecorder::EStopMode::KEEP_FILE);
+}
+
 void CClient::DemoRecorder_Start(const char *pFilename, bool WithTimestamp, int Recorder)
 {
 	dbg_assert(State() == IClient::STATE_ONLINE, "Client must be online to record demo");
@@ -4212,7 +4234,6 @@ void CClient::DemoRecorder_Start(const char *pFilename, bool WithTimestamp, int 
 
 	DemoRecorders()[Recorder].Start(
 		Storage(),
-		m_pConsole,
 		aFilename,
 		IsSixup() ? GameClient()->NetVersion7() : GameClient()->NetVersion(),
 		GameClient()->Map()->BaseName(),
@@ -4605,8 +4626,10 @@ void CClient::ConchainNetReset(IConsole::IResult *pResult, void *pUserData, ICon
 {
 	CClient *pSelf = (CClient *)pUserData;
 	pfnCallback(pResult, pCallbackUserData);
-	if(pResult->NumArguments())
+	if(pResult->NumArguments() && pSelf->m_LocalStartTime > 0)
+	{
 		pSelf->ResetSocket();
+	}
 }
 
 void CClient::ConchainLoglevel(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
@@ -5312,7 +5335,6 @@ void CClient::RaceRecord_Start(const char *pFilename)
 
 	DemoRecorders()[RECORDER_RACE].Start(
 		Storage(),
-		m_pConsole,
 		pFilename,
 		IsSixup() ? GameClient()->NetVersion7() : GameClient()->NetVersion(),
 		GameClient()->Map()->BaseName(),
@@ -5442,10 +5464,10 @@ int CClient::PredictionMargin() const
 	return m_ServerCapabilities.m_SyncWeaponInput ? g_Config.m_ClPredictionMargin : 10;
 }
 
-int CClient::UdpConnectivity(int NetType)
+IClient::EConnectivity CClient::UdpConnectivity(int NetType)
 {
 	static const int NETTYPES[2] = {NETTYPE_IPV6, NETTYPE_IPV4};
-	int Connectivity = CONNECTIVITY_UNKNOWN;
+	EConnectivity Connectivity = EConnectivity::UNKNOWN;
 	for(int PossibleNetType : NETTYPES)
 	{
 		if((NetType & PossibleNetType) == 0)
@@ -5453,33 +5475,33 @@ int CClient::UdpConnectivity(int NetType)
 			continue;
 		}
 		NETADDR GlobalUdpAddr;
-		int NewConnectivity;
-		switch(m_aNetClient[CONN_MAIN].GetConnectivity(PossibleNetType, &GlobalUdpAddr))
+		EConnectivity NewConnectivity;
+		const CONNECTIVITY NetworkConnectivity = m_aNetClient[CONN_MAIN].GetConnectivity(PossibleNetType, &GlobalUdpAddr);
+		switch(NetworkConnectivity)
 		{
 		case CONNECTIVITY::UNKNOWN:
-			NewConnectivity = CONNECTIVITY_UNKNOWN;
+			NewConnectivity = EConnectivity::UNKNOWN;
 			break;
 		case CONNECTIVITY::CHECKING:
-			NewConnectivity = CONNECTIVITY_CHECKING;
+			NewConnectivity = EConnectivity::CHECKING;
 			break;
 		case CONNECTIVITY::UNREACHABLE:
-			NewConnectivity = CONNECTIVITY_UNREACHABLE;
+			NewConnectivity = EConnectivity::UNREACHABLE;
 			break;
 		case CONNECTIVITY::REACHABLE:
-			NewConnectivity = CONNECTIVITY_REACHABLE;
+			NewConnectivity = EConnectivity::REACHABLE;
 			break;
 		case CONNECTIVITY::ADDRESS_KNOWN:
 			GlobalUdpAddr.port = 0;
 			if(m_HaveGlobalTcpAddr && NetType == (int)m_GlobalTcpAddr.type && net_addr_comp(&m_GlobalTcpAddr, &GlobalUdpAddr) != 0)
 			{
-				NewConnectivity = CONNECTIVITY_DIFFERING_UDP_TCP_IP_ADDRESSES;
+				NewConnectivity = EConnectivity::DIFFERING_UDP_TCP_IP_ADDRESSES;
 				break;
 			}
-			NewConnectivity = CONNECTIVITY_REACHABLE;
+			NewConnectivity = EConnectivity::REACHABLE;
 			break;
 		default:
-			dbg_assert(0, "invalid connectivity value");
-			return CONNECTIVITY_UNKNOWN;
+			dbg_assert_failed("Invalid connectivity value: %d", (int)NetworkConnectivity);
 		}
 		Connectivity = std::max(Connectivity, NewConnectivity);
 	}

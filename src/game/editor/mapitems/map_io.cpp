@@ -832,8 +832,8 @@ bool CEditorMap::Load(const char *pFilename, int StorageType, const FErrorHandle
 									pTiles->m_pTiles[i].m_Flags = pLayerSwitchTiles[i].m_Flags;
 								}
 							}
-							pMap->UnloadData(pTilemapItem->m_Switch);
 						}
+						pMap->UnloadData(pTilemapItem->m_Switch);
 					}
 					else if(pTiles->m_HasTune)
 					{
@@ -849,8 +849,8 @@ bool CEditorMap::Load(const char *pFilename, int StorageType, const FErrorHandle
 								else
 									pTiles->m_pTiles[i].m_Index = 0;
 							}
-							pMap->UnloadData(pTilemapItem->m_Tune);
 						}
+						pMap->UnloadData(pTilemapItem->m_Tune);
 					}
 					else // regular tile layer or game layer
 					{
@@ -1006,11 +1006,9 @@ bool CEditorMap::Load(const char *pFilename, int StorageType, const FErrorHandle
 	{
 		const CMapBasedEnvelopePointAccess EnvelopePoints(pMap.get());
 
-		int EnvelopeStart, EnvelopeNum;
-		pMap->GetType(MAPITEMTYPE_ENVELOPE, &EnvelopeStart, &EnvelopeNum);
-		for(int EnvelopeIndex = 0; EnvelopeIndex < EnvelopeNum; EnvelopeIndex++)
+		int EnvelopeIndex = 0;
+		for(const CMapItemEnvelope *pItem : EnvelopePoints.Envelopes())
 		{
-			CMapItemEnvelope *pItem = (CMapItemEnvelope *)pMap->GetItem(EnvelopeStart + EnvelopeIndex);
 			int Channels = pItem->m_Channels;
 			if(Channels <= 0 || Channels == 2 || Channels > CEnvPoint::MAX_CHANNELS)
 			{
@@ -1040,6 +1038,7 @@ bool CEditorMap::Load(const char *pFilename, int StorageType, const FErrorHandle
 			m_vpEnvelopes.push_back(pEnvelope);
 			if(pItem->m_Version >= 2)
 				pEnvelope->m_Synchronized = pItem->m_Synchronized;
+			EnvelopeIndex++;
 		}
 	}
 

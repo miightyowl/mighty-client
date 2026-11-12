@@ -1262,9 +1262,6 @@ Initializing map logic
 Sending initial client info
 == Enviando información inicial do cliente
 
-Uploading map data to GPU
-== Cargando datos do mapa á GPU
-
 Getting game info
 == Obtendo información da partida
 
@@ -1572,6 +1569,9 @@ Team successfully saved by %s. The database connection failed, using generated s
 Save failed!
 == 
 
+Hold Shift to be more precise.
+== 
+
 Auto-sync player camera
 == 
 
@@ -1628,6 +1628,9 @@ Loading commands…
 Loading maps…
 == 
 
+Dummy is not connected
+== 
+
 Multi-View
 == 
 
@@ -1641,6 +1644,10 @@ Following %s
 
 [Spectating Camera Mode Icon]
 AUTO
+== 
+
+[Important alert message]
+Tap to dismiss…
 == 
 
 [Important alert message]
@@ -1666,6 +1673,9 @@ Some map images could not be loaded. Check the local console for details.
 == 
 
 Loading map
+== 
+
+Initializing layers
 == 
 
 Some map sounds could not be loaded. Check the local console for details.
@@ -2366,6 +2376,9 @@ The extra menu with the given number is activated.
 Tee
 == 
 
+Credits
+== 
+
 Info Messages
 == 
 
@@ -2525,7 +2538,16 @@ Dragger Outline Color
 Dragger Inner Color
 == 
 
+Teleport to cursor
+== 
+
+Teleport dummy to cursor
+== 
+
 Scoreboard cursor
+== 
+
+Practice
 == 
 
 Custom
@@ -2628,6 +2650,9 @@ Delete skin
 Unable to delete skin
 == 
 
+Join
+== 
+
 Download
 == 
 
@@ -2640,6 +2665,12 @@ Download
 == 
 
 Team %d (%d/%d)
+== 
+
+not bound
+== 
+
+Show cursor
 == 
 
 Unmute

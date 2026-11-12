@@ -514,12 +514,12 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 			{
 				GameClient()->m_Skins.SetHidden(pSkinContainer->Name(), !SkinListEntry.IsHidden());
 			}
-			GameClient()->m_Tooltips.DoToolTip(SkinListEntry.HideButtonId(), &HideIcon, SkinListEntry.IsHidden() ? Localize("Show this skin again") : Localize("Hide this skin from the list"));
+			Ui()->DoToolTip(SkinListEntry.HideButtonId(), &HideIcon, SkinListEntry.IsHidden() ? Localize("Show this skin again") : Localize("Hide this skin from the list"));
 			if(DoButton_SkinListIcon(SkinListEntry.BlockButtonId(), SkinListEntry.ListItemId(), SkinListEntry.IsBlocked(), &BlockIcon, FontIcon::BAN, ColorRGBA(1.0f, 0.4f, 0.4f, 1.0f)))
 			{
 				GameClient()->m_Skins.SetBlocked(pSkinContainer->Name(), !SkinListEntry.IsBlocked());
 			}
-			GameClient()->m_Tooltips.DoToolTip(SkinListEntry.BlockButtonId(), &BlockIcon, SkinListEntry.IsBlocked() ? Localize("Unblock this skin") : Localize("Block this skin, players using it show the default skin"));
+			Ui()->DoToolTip(SkinListEntry.BlockButtonId(), &BlockIcon, SkinListEntry.IsBlocked() ? Localize("Unblock this skin") : Localize("Block this skin, players using it show the default skin"));
 		}
 	}
 	const int NewSelected = s_ListBox.DoEnd();
@@ -569,7 +569,7 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 		Storage()->CreateFolder("skins", IStorage::TYPE_SAVE);
 		Client()->ViewFile(aBuf);
 	}
-	GameClient()->m_Tooltips.DoToolTip(&s_DirectoryButton, &DirectoryButton, Localize("Open the directory to add custom skins"));
+	Ui()->DoToolTip(&s_DirectoryButton, &DirectoryButton, Localize("Open the directory to add custom skins"));
 
 	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 	TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
@@ -673,7 +673,7 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	Toggles.HSplitTop(20.0f, &Button, &Toggles);
 	if(DoButton_CheckBox(&g_Config.m_ClMClientAccessoriesOthers, Localize("Show accessories of other M-Client players"), g_Config.m_ClMClientAccessoriesOthers, &Button))
 		g_Config.m_ClMClientAccessoriesOthers ^= 1;
-	GameClient()->m_Tooltips.DoToolTip(&g_Config.m_ClMClientAccessoriesOthers, &Button, Localize("Turn this off to only see your own accessories"));
+	Ui()->DoToolTip(&g_Config.m_ClMClientAccessoriesOthers, &Button, Localize("Turn this off to only see your own accessories"));
 	Toggles.HSplitTop(5.0f, nullptr, &Toggles);
 	Toggles.HSplitTop(20.0f, &Button, &Toggles);
 	if(DoButton_CheckBox(&g_Config.m_ClMClientAccessoriesHideFrozen, Localize("Hide accessories while frozen"), g_Config.m_ClMClientAccessoriesHideFrozen, &Button))
@@ -1373,7 +1373,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		Ui()->DoLabel(&CmdBox, aLoadCmd, 10.0f, TEXTALIGN_MC, CmdProps);
 		if(Ui()->DoButtonLogic(&Profile.m_ColorBody, 0, &CmdBox, BUTTONFLAG_LEFT))
 			Input()->SetClipboardText(aLoadCmd);
-		GameClient()->m_Tooltips.DoToolTip(&Profile.m_ColorBody, &CmdBox, Localize("Click to copy this console command (F1)"));
+		Ui()->DoToolTip(&Profile.m_ColorBody, &CmdBox, Localize("Click to copy this console command (F1)"));
 
 		// load button
 		LoadButton.HMargin((LoadButton.h - 18.0f) / 2.0f, &LoadButton);

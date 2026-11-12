@@ -25,6 +25,8 @@
 #include <game/server/teams.h>
 #include <game/team_state.h>
 
+#include <limits>
+
 MACRO_ALLOC_POOL_ID_IMPL(CCharacter, MAX_CLIENTS)
 
 // Character, "physical" player's part
@@ -731,8 +733,18 @@ void CCharacter::OnPredictedInput(const CNetObj_PlayerInput *pNewInput)
 	if(mem_comp(&m_SavedInput, pNewInput, sizeof(CNetObj_PlayerInput)) != 0)
 		m_LastAction = Server()->Tick();
 
+	const int PrevTargetX = m_Input.m_TargetX;
+	const int PrevTargetY = m_Input.m_TargetY;
+
 	// copy new input
 	mem_copy(&m_Input, pNewInput, sizeof(m_Input));
+
+	// reset target due to spectator mode input not being in aim space
+	if(pNewInput->m_PlayerFlags & PLAYERFLAG_SPEC_CAM)
+	{
+		m_Input.m_TargetX = PrevTargetX;
+		m_Input.m_TargetY = PrevTargetY;
+	}
 
 	// it is not allowed to aim in the center
 	if(m_Input.m_TargetX == 0 && m_Input.m_TargetY == 0)
@@ -746,6 +758,13 @@ void CCharacter::OnDirectInput(const CNetObj_PlayerInput *pNewInput)
 	mem_copy(&m_LatestPrevInput, &m_LatestInput, sizeof(m_LatestInput));
 	mem_copy(&m_LatestInput, pNewInput, sizeof(m_LatestInput));
 	m_NumInputs++;
+
+	// reset target due to spectator mode input not being in aim space
+	if(pNewInput->m_PlayerFlags & PLAYERFLAG_SPEC_CAM)
+	{
+		m_LatestInput.m_TargetX = m_LatestPrevInput.m_TargetX;
+		m_LatestInput.m_TargetY = m_LatestPrevInput.m_TargetY;
+	}
 
 	// it is not allowed to aim in the center
 	if(m_LatestInput.m_TargetX == 0 && m_LatestInput.m_TargetY == 0)
@@ -1559,9 +1578,13 @@ void CCharacter::HandleSkippableTiles(int Index)
 
 					DiffAngle = SpeederAngle - TeeAngle;
 					SpeedLeft = MaxSpeed / 5.0f - std::cos(DiffAngle) * TeeSpeed;
-					if(absolute((int)SpeedLeft) > Force && SpeedLeft > 0.0000001f)
+					// A tee at rest takes its angle from atan(0/0), leaving SpeedLeft NaN, which
+					// converts to INT_MIN. That has no absolute value, so it does not exceed.
+					const int SpeedLeftInt = round_truncate(SpeedLeft);
+					const bool Exceeds = SpeedLeftInt != std::numeric_limits<int>::min() && absolute(SpeedLeftInt) > Force;
+					if(Exceeds && SpeedLeft > 0.0000001f)
 						TempVel += Direction * Force;
-					else if(absolute((int)SpeedLeft) > Force)
+					else if(Exceeds)
 						TempVel += Direction * -Force;
 					else
 						TempVel += Direction * SpeedLeft;
@@ -1616,17 +1639,15 @@ void CCharacter::SetTimeCheckpoint(int TimeCheckpoint)
 				if(Server()->IsSixup(m_pPlayer->GetCid()))
 				{
 					protocol7::CNetMsg_Sv_Checkpoint Msg;
-					float Diff = (m_aCurrentTimeCp[m_LastTimeCp] - pData->m_aBestTimeCp[m_LastTimeCp]) * 1000;
-					Msg.m_Diff = (int)Diff;
+					Msg.m_Diff = static_cast<int>(time_milliseconds_from_seconds(m_aCurrentTimeCp[m_LastTimeCp]) - time_milliseconds_from_seconds(pData->m_aBestTimeCp[m_LastTimeCp]));
 					Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, m_pPlayer->GetCid());
 				}
 				else
 				{
 					CNetMsg_Sv_DDRaceTime Msg;
-					Msg.m_Time = (int)(m_Time * 100.0f);
+					Msg.m_Time = static_cast<int>(time_even_centiseconds_from_seconds(m_Time));
 					Msg.m_Finish = 0;
-					float Diff = (m_aCurrentTimeCp[m_LastTimeCp] - pData->m_aBestTimeCp[m_LastTimeCp]) * 100;
-					Msg.m_Check = (int)Diff;
+					Msg.m_Check = static_cast<int>(time_even_centiseconds_from_seconds(m_aCurrentTimeCp[m_LastTimeCp]) - time_even_centiseconds_from_seconds(pData->m_aBestTimeCp[m_LastTimeCp]));
 					Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, m_pPlayer->GetCid());
 				}
 			}

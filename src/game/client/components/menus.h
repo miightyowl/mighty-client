@@ -56,8 +56,11 @@ public:
 	void RenderMenuBackgroundAnimation();
 	float MenuPanelBackgroundAlpha() const;
 
+	// Width of the image in DoButton_Menu, relative to the button height
+	static constexpr float BUTTON_IMAGE_WIDTH_FACTOR = 4.0f;
+
 	int DoButton_Toggle(const void *pId, int Checked, const CUIRect *pRect, bool Active, unsigned Flags = BUTTONFLAG_LEFT);
-	int DoButton_Menu(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, unsigned Flags = BUTTONFLAG_LEFT, const char *pImageName = nullptr, int Corners = IGraphics::CORNER_ALL, float Rounding = 5.0f, float FontFactor = 0.0f, ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 0.1f));
+	int DoButton_Menu(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, unsigned Flags = BUTTONFLAG_LEFT, const char *pImageName = nullptr, int Corners = IGraphics::CORNER_ALL, float Rounding = 5.0f, float FontFactor = 0.0f, ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 0.1f), const void *pImageHotId = nullptr);
 	int DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, int Corners, SUIAnimator *pAnimator = nullptr, const ColorRGBA *pDefaultColor = nullptr, const ColorRGBA *pActiveColor = nullptr, const ColorRGBA *pHoverColor = nullptr, float EdgeRounding = 10.0f, const CCommunityIcon *pCommunityIcon = nullptr);
 
 	// M-Client: flat icon tabs shared by the main menu menubar and the ingame browser
@@ -612,9 +615,9 @@ protected:
 	int m_SelectedIndex;
 	bool m_ServerBrowserShouldRevealSelection;
 	std::vector<CUIElement *> m_avpServerBrowserUiElements[IServerBrowser::NUM_TYPES];
+	std::vector<char> m_vServerbrowserElementIds[IServerBrowser::NUM_TYPES];
 	void RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemActivated);
 	void RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItemActivated);
-	void Connect(const char *pAddress);
 	void PopupConfirmSwitchServer();
 	void RenderServerbrowserFilters(CUIRect View);
 	void ResetServerbrowserFilters();
@@ -894,8 +897,6 @@ public:
 		CGhostItem() :
 			m_Slot(-1), m_Own(false) { m_aFilename[0] = 0; }
 
-		bool operator<(const CGhostItem &Other) const { return m_Time < Other.m_Time; }
-
 		bool Active() const { return m_Slot != -1; }
 		bool HasFile() const { return m_aFilename[0]; }
 	};
@@ -963,6 +964,7 @@ public:
 	void SetShowStart(bool ShowStart);
 	void ShowQuitPopup();
 	void JoinTutorial();
+	void Connect(const char *pAddress);
 
 private:
 	CCommunityIcons m_CommunityIcons;

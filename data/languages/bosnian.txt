@@ -1019,6 +1019,9 @@ Team successfully saved by %s. The database connection failed, using generated s
 Save failed!
 == 
 
+Hold Shift to be more precise.
+== 
+
 Auto-sync player camera
 == 
 
@@ -1075,6 +1078,9 @@ Loading commands…
 Loading maps…
 == 
 
+Dummy is not connected
+== 
+
 Debug mode enabled. Press Ctrl+Shift+D to disable debug mode.
 == 
 
@@ -1100,6 +1106,10 @@ Following %s
 
 [Spectating Camera Mode Icon]
 AUTO
+== 
+
+[Important alert message]
+Tap to dismiss…
 == 
 
 [Important alert message]
@@ -1133,7 +1143,7 @@ Some map images could not be loaded. Check the local console for details.
 Loading map
 == 
 
-Uploading map data to GPU
+Initializing layers
 == 
 
 Some map sounds could not be loaded. Check the local console for details.
@@ -2027,6 +2037,9 @@ DDNet
 Assets
 == 
 
+Credits
+== 
+
 HUD
 == 
 
@@ -2297,6 +2310,12 @@ Open the directory to add custom assets
 Chat command
 == 
 
+Teleport to cursor
+== 
+
+Teleport dummy to cursor
+== 
+
 Scoreboard cursor
 == 
 
@@ -2313,6 +2332,9 @@ Controller
 == 
 
 Dummy
+== 
+
+Practice
 == 
 
 Custom
@@ -2588,6 +2610,9 @@ Tutorial
 Website
 == 
 
+Join
+== 
+
 Stop server
 == 
 
@@ -2616,6 +2641,12 @@ Super
 == 
 
 Team %d (%d/%d)
+== 
+
+not bound
+== 
+
+Show cursor
 == 
 
 Manual

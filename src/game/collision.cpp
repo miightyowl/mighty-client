@@ -532,7 +532,7 @@ void CCollision::MoveBox(vec2 *pInoutPos, vec2 *pInoutVel, vec2 Size, vec2 Elast
 	vec2 Vel = *pInoutVel;
 
 	float Distance = length(Vel);
-	int Max = (int)Distance;
+	int Max = round_truncate(Distance);
 
 	if(Distance > 0.00001f)
 	{
@@ -665,9 +665,7 @@ int CCollision::IsTeleport(int Index) const
 
 int CCollision::IsEvilTeleport(int Index) const
 {
-	if(Index < 0)
-		return 0;
-	if(!m_pTele)
+	if(Index < 0 || !m_pTele)
 		return 0;
 
 	if(m_pTele[Index].m_Type == TILE_TELEINEVIL)
@@ -692,10 +690,7 @@ bool CCollision::IsCheckEvilTeleport(int Index) const
 
 int CCollision::IsTeleCheckpoint(int Index) const
 {
-	if(Index < 0)
-		return 0;
-
-	if(!m_pTele)
+	if(Index < 0 || !m_pTele)
 		return 0;
 
 	if(m_pTele[Index].m_Type == TILE_TELECHECK)
@@ -906,10 +901,17 @@ bool CCollision::TileExistsNext(int Index) const
 	return false;
 }
 
+static int TileIndexFromCoord(float Coord, int Size)
+{
+	if(!(Coord > 0.0f))
+		return 0;
+	return (int)std::min((double)Coord / 32.0, (double)(Size - 1));
+}
+
 int CCollision::GetMapIndex(vec2 Pos) const
 {
-	int Nx = std::clamp((int)Pos.x / 32, 0, m_Width - 1);
-	int Ny = std::clamp((int)Pos.y / 32, 0, m_Height - 1);
+	int Nx = TileIndexFromCoord(Pos.x, m_Width);
+	int Ny = TileIndexFromCoord(Pos.y, m_Height);
 	int Index = Ny * m_Width + Nx;
 
 	if(TileExists(Index))

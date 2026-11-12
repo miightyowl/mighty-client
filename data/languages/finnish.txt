@@ -1153,9 +1153,6 @@ Team %d
 Some map images could not be loaded. Check the local console for details.
 == Joitakin kartan kuvia ei voitu ladata. Tarkasta paikallinen konsoli yksityiskohtia varten.
 
-Uploading map data to GPU
-== Ladataan karttatietoja GPU:lle
-
 Some map sounds could not be loaded. Check the local console for details.
 == Joitakin kartan ääniä ei voitu ladata. Tarkasta paikallinen konsoli yksityiskohtia varten.
 
@@ -1806,6 +1803,9 @@ Team successfully saved by %s. The database connection failed, using generated s
 Save failed!
 == 
 
+Hold Shift to be more precise.
+== 
+
 Auto-sync player camera
 == 
 
@@ -1832,6 +1832,9 @@ Active
 Loading maps…
 == 
 
+Dummy is not connected
+== 
+
 [Spectating]
 Following %d: %s
 == 
@@ -1842,6 +1845,10 @@ Following %s
 
 [Spectating Camera Mode Icon]
 AUTO
+== 
+
+[Important alert message]
+Tap to dismiss…
 == 
 
 [Important alert message]
@@ -1861,6 +1868,9 @@ Server could not be started
 == 
 
 Loading map
+== 
+
+Initializing layers
 == 
 
 Joining Tutorial server
@@ -2423,6 +2433,9 @@ The extra menu with the given number is activated.
 Tee
 == 
 
+Credits
+== 
+
 Show spectator cursor
 == 
 
@@ -2546,7 +2559,16 @@ Dragger Inner Color
 Converse
 == 
 
+Teleport to cursor
+== 
+
+Teleport dummy to cursor
+== 
+
 Scoreboard cursor
+== 
+
+Practice
 == 
 
 Custom
@@ -2625,6 +2647,9 @@ Delete skin
 Unable to delete skin
 == 
 
+Join
+== 
+
 Download
 == 
 
@@ -2637,6 +2662,12 @@ Download
 == 
 
 Team %d (%d/%d)
+== 
+
+not bound
+== 
+
+Show cursor
 == 
 
 Unmute

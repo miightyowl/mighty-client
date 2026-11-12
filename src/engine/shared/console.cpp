@@ -224,6 +224,7 @@ int CConsole::ParseArgs(CResult *pResult, const char *pFormat)
 			{
 				if(Command == 'v')
 				{
+					// If the victim argument is optional we default to "me"
 					pResult->AddVictim("me");
 					break;
 				}
@@ -359,16 +360,12 @@ LEVEL IConsole::ToLogLevel(int Level)
 	case IConsole::OUTPUT_LEVEL_DEBUG:
 		return LEVEL_TRACE;
 	}
-	dbg_assert(0, "invalid log level");
-	return LEVEL_INFO;
+	dbg_assert_failed("Invalid log level: %d", Level);
 }
 
 int IConsole::ToLogLevelFilter(int Level)
 {
-	if(!(-3 <= Level && Level <= 2))
-	{
-		dbg_assert(0, "invalid log level filter");
-	}
+	dbg_assert(-3 <= Level && Level <= 2, "Invalid log level filter: %d", Level);
 	return Level + 2;
 }
 
@@ -756,7 +753,10 @@ bool CConsole::ExecuteFile(const char *pFilename, int ClientId, bool LogFailure,
 			return false;
 	}
 	if(!m_pStorage)
+	{
+		log_error("console", "Storage is not initialized");
 		return false;
+	}
 
 	// push this one to the stack
 	CExecFile ThisFile;

@@ -14,7 +14,6 @@
 #include <game/client/components/console.h>
 #include <game/client/components/emoticon.h>
 #include <game/client/components/skins.h>
-#include <game/client/components/tooltips.h>
 #include <game/client/gameclient.h>
 #include <game/client/skin.h>
 #include <game/client/ui.h>
@@ -305,7 +304,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 			{
 				pErrorTooltip = Localize("Skin could not be found.");
 			}
-			GameClient()->m_Tooltips.DoToolTip(pStatusTooltipId, &StatusIcon, pErrorTooltip);
+			Ui()->DoToolTip(pStatusTooltipId, &StatusIcon, pErrorTooltip);
 		}
 	};
 	static char s_StatusTooltipId;
@@ -343,7 +342,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	}
 	TextRender()->SetRenderFlags(0);
 	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-	GameClient()->m_Tooltips.DoToolTip(&s_RandomSkinButton, &RandomSkinButton, MaodieSkin ? Localize("Skin is locked to \"maodie\"") : Localize("Create a random skin"));
+	Ui()->DoToolTip(&s_RandomSkinButton, &RandomSkinButton, MaodieSkin ? Localize("Skin is locked to \"maodie\"") : Localize("Create a random skin"));
 
 	// Custom colors button
 	if(DoButton_CheckBox(pUseCustomColor, Localize("Custom colors"), *pUseCustomColor, &CustomColorsButton))
@@ -376,10 +375,10 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 			if(DoButton_Menu(&s_aEyeButtons[CurrentEyeEmote], "", 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, EyeButtonColor))
 			{
 				*pEmote = CurrentEyeEmote;
-				if((int)m_Dummy == g_Config.m_ClDummy)
+				if(GameClient()->m_GameInfo.m_AllowEyeWheel && (int)m_Dummy == g_Config.m_ClDummy)
 					GameClient()->m_Emoticon.EyeEmote(CurrentEyeEmote);
 			}
-			GameClient()->m_Tooltips.DoToolTip(&s_aEyeButtons[CurrentEyeEmote], &Button, Localize("Choose default eyes when joining a server"));
+			Ui()->DoToolTip(&s_aEyeButtons[CurrentEyeEmote], &Button, Localize("Choose default eyes when joining a server"));
 			RenderTools()->RenderTee(CAnimState::GetIdle(), &EyeSkinInfo, CurrentEyeEmote, vec2(1.0f, 0.0f), vec2(Button.x + Button.w / 2.0f, Button.y + Button.h / 2.0f + OffsetToMid.y));
 		}
 	}
@@ -479,10 +478,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		{
 			CTeeRenderInfo Info = OwnSkinInfo;
 			Info.Apply(pSkin);
-			vec2 OffsetToMid;
-			CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &Info, OffsetToMid);
-			const vec2 TeeRenderPos = vec2(Button.x + Button.w / 2.0f, Button.y + Button.h / 2 + OffsetToMid.y);
-			RenderTools()->RenderTee(CAnimState::GetIdle(), &Info, *pEmote, vec2(1.0f, 0.0f), TeeRenderPos);
+			RenderTools()->RenderIdleTeeAtCenter(&Info, vec2(Button.x + Button.w / 2.0f, Button.y + Button.h / 2), *pEmote);
 		}
 
 		{
@@ -529,12 +525,12 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 			{
 				GameClient()->m_Skins.SetHidden(pSkinContainer->Name(), !SkinListEntry.IsHidden());
 			}
-			GameClient()->m_Tooltips.DoToolTip(SkinListEntry.HideButtonId(), &HideIcon, SkinListEntry.IsHidden() ? Localize("Show this skin again") : Localize("Hide this skin from the list"));
+			Ui()->DoToolTip(SkinListEntry.HideButtonId(), &HideIcon, SkinListEntry.IsHidden() ? Localize("Show this skin again") : Localize("Hide this skin from the list"));
 			if(DoButton_SkinListIcon(SkinListEntry.BlockButtonId(), SkinListEntry.ListItemId(), SkinListEntry.IsBlocked(), &BlockIcon, FontIcon::BAN, ColorRGBA(1.0f, 0.4f, 0.4f, 1.0f)))
 			{
 				GameClient()->m_Skins.SetBlocked(pSkinContainer->Name(), !SkinListEntry.IsBlocked());
 			}
-			GameClient()->m_Tooltips.DoToolTip(SkinListEntry.BlockButtonId(), &BlockIcon, SkinListEntry.IsBlocked() ? Localize("Unblock this skin") : Localize("Block this skin, players using it show the default skin"));
+			Ui()->DoToolTip(SkinListEntry.BlockButtonId(), &BlockIcon, SkinListEntry.IsBlocked() ? Localize("Unblock this skin") : Localize("Block this skin, players using it show the default skin"));
 		}
 
 		if(!SkinListEntry.IsBlocked())
@@ -607,7 +603,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		Storage()->CreateFolder("skins", IStorage::TYPE_SAVE);
 		Client()->ViewFile(aBuf);
 	}
-	GameClient()->m_Tooltips.DoToolTip(&s_DirectoryButton, &DirectoryButton, Localize("Open the directory to add custom skins"));
+	Ui()->DoToolTip(&s_DirectoryButton, &DirectoryButton, Localize("Open the directory to add custom skins"));
 
 	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 	TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);

@@ -1224,6 +1224,9 @@ Team successfully saved by %s. The database connection failed, using generated s
 Save failed!
 == 
 
+Hold Shift to be more precise.
+== 
+
 Auto-sync player camera
 == 
 
@@ -1280,6 +1283,9 @@ Loading commands…
 Loading maps…
 == 
 
+Dummy is not connected
+== 
+
 Position:
 == 
 
@@ -1302,6 +1308,10 @@ Following %s
 
 [Spectating Camera Mode Icon]
 AUTO
+== 
+
+[Important alert message]
+Tap to dismiss…
 == 
 
 [Important alert message]
@@ -1332,7 +1342,7 @@ Some map images could not be loaded. Check the local console for details.
 Loading map
 == 
 
-Uploading map data to GPU
+Initializing layers
 == 
 
 Some map sounds could not be loaded. Check the local console for details.
@@ -2172,6 +2182,9 @@ Tee
 Appearance
 == 
 
+Credits
+== 
+
 Name Plate
 == 
 
@@ -2421,6 +2434,12 @@ Loading assets
 Open the directory to add custom assets
 == 
 
+Teleport to cursor
+== 
+
+Teleport dummy to cursor
+== 
+
 Scoreboard cursor
 == 
 
@@ -2434,6 +2453,9 @@ Mouse
 == 
 
 Controller
+== 
+
+Practice
 == 
 
 Custom
@@ -2643,6 +2665,9 @@ Unable to delete skin
 Tutorial
 == 
 
+Join
+== 
+
 Download
 == 
 
@@ -2661,6 +2686,12 @@ Super
 == 
 
 Team %d (%d/%d)
+== 
+
+not bound
+== 
+
+Show cursor
 == 
 
 Unmute

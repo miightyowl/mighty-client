@@ -1258,9 +1258,6 @@ Initializing map logic
 Sending initial client info
 == Szükséges kliens infó küldése
 
-Uploading map data to GPU
-== Pálya feltöltése a GPU-ra
-
 Getting game info
 == Játék infó beszerzése
 
@@ -1520,9 +1517,6 @@ Error saving settings
 No demo with this filename exists
 == Nem létezik demó ezzel a fájl névvel
 
-The width of texture %s is not divisible by %d, or the height is not divisible by %d, which might cause visual bugs.
-== 
-
 "%s" is not compatible with pnglite and cannot be loaded by old DDNet versions:
 == "%s" nem kompatibilis pnglite-al és régi DDNet verziók nem tudják betölteni:
 
@@ -1550,10 +1544,16 @@ Team successfully saved by %s. The database connection failed, using generated s
 Add friend
 == Barát hozzáadása
 
+The width of texture %s is not divisible by %d, or the height is not divisible by %d, which might cause visual bugs.
+== 
+
 Team successfully saved by %s. The database connection failed, using generated save code instead to avoid collisions. Use '/load %s' on %s to continue
 == 
 
 Save failed!
+== 
+
+Hold Shift to be more precise.
 == 
 
 Auto-sync player camera
@@ -1612,6 +1612,9 @@ Loading commands…
 Loading maps…
 == 
 
+Dummy is not connected
+== 
+
 Multi-View
 == 
 
@@ -1625,6 +1628,10 @@ Following %s
 
 [Spectating Camera Mode Icon]
 AUTO
+== 
+
+[Important alert message]
+Tap to dismiss…
 == 
 
 [Important alert message]
@@ -1650,6 +1657,9 @@ Some map images could not be loaded. Check the local console for details.
 == 
 
 Loading map
+== 
+
+Initializing layers
 == 
 
 Some map sounds could not be loaded. Check the local console for details.
@@ -2369,6 +2379,9 @@ The extra menu with the given number is activated.
 Tee
 == 
 
+Credits
+== 
+
 Info Messages
 == 
 
@@ -2528,7 +2541,16 @@ Dragger Outline Color
 Dragger Inner Color
 == 
 
+Teleport to cursor
+== 
+
+Teleport dummy to cursor
+== 
+
 Scoreboard cursor
+== 
+
+Practice
 == 
 
 Custom
@@ -2628,6 +2650,9 @@ Delete skin
 Unable to delete skin
 == 
 
+Join
+== 
+
 Download
 == 
 
@@ -2640,6 +2665,12 @@ Download
 == 
 
 Team %d (%d/%d)
+== 
+
+not bound
+== 
+
+Show cursor
 == 
 
 Unmute

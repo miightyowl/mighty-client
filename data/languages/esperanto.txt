@@ -1773,10 +1773,20 @@ Initializing map logic
 Sending initial client info
 == 
 
+Hold Shift to be more precise.
+== 
+
 Auto-sync player camera
 == 
 
 Match %d of %d
+== 
+
+Dummy is not connected
+== 
+
+[Important alert message]
+Tap to dismiss…
 == 
 
 Moderator alert
@@ -1791,7 +1801,7 @@ Server executable not found, can't run server
 Some map images could not be loaded. Check the local console for details.
 == 
 
-Uploading map data to GPU
+Initializing layers
 == 
 
 DDraceNetwork is a cooperative online game where the goal is for you and your group of tees to reach the finish line of the map. As a newcomer you should start on Novice servers, which host the easiest maps. Consider the ping to choose a server close to you.
@@ -2265,6 +2275,9 @@ Demo player is currently active.
 The extra menu with the given number is activated.
 == 
 
+Credits
+== 
+
 HUD
 == 
 
@@ -2492,6 +2505,12 @@ Toggle dyncam
 Hammerfly dummy
 == 
 
+Teleport to cursor
+== 
+
+Teleport dummy to cursor
+== 
+
 Scoreboard cursor
 == 
 
@@ -2505,6 +2524,9 @@ Reset controls
 == 
 
 Are you sure that you want to reset the controls to their defaults?
+== 
+
+Practice
 == 
 
 Controller jitter tolerance
@@ -2666,10 +2688,19 @@ No skins match your filter criteria
 Basic
 == 
 
+Join
+== 
+
 Loading race demo files
 == 
 
 Super
+== 
+
+not bound
+== 
+
+Show cursor
 == 
 
 Auto

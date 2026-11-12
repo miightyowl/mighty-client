@@ -644,6 +644,9 @@ Save failed!
 Search
 == 
 
+Hold Shift to be more precise.
+== 
+
 Auto-sync player camera
 == 
 
@@ -700,6 +703,9 @@ Loading commands…
 Loading maps…
 == 
 
+Dummy is not connected
+== 
+
 Debug mode enabled. Press Ctrl+Shift+D to disable debug mode.
 == 
 
@@ -737,6 +743,10 @@ Personal best:
 == 
 
 [Important alert message]
+Tap to dismiss…
+== 
+
+[Important alert message]
 Press Esc or Tab to dismiss…
 == 
 
@@ -767,7 +777,7 @@ Some map images could not be loaded. Check the local console for details.
 Loading map
 == 
 
-Uploading map data to GPU
+Initializing layers
 == 
 
 Some map sounds could not be loaded. Check the local console for details.
@@ -1781,6 +1791,9 @@ DDNet
 Assets
 == 
 
+Credits
+== 
+
 DDNet Client needs to be restarted to complete update!
 == 
 
@@ -2135,6 +2148,12 @@ Dummy copy
 Hammerfly dummy
 == 
 
+Teleport to cursor
+== 
+
+Teleport dummy to cursor
+== 
+
 Scoreboard cursor
 == 
 
@@ -2163,6 +2182,9 @@ Controller
 == 
 
 Dummy
+== 
+
+Practice
 == 
 
 Custom
@@ -2549,6 +2571,9 @@ Tutorial
 Website
 == 
 
+Join
+== 
+
 Stop server
 == 
 
@@ -2586,6 +2611,12 @@ Super
 == 
 
 Team %d (%d/%d)
+== 
+
+not bound
+== 
+
+Show cursor
 == 
 
 Manual

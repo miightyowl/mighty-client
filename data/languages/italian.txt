@@ -1058,9 +1058,6 @@ Multi-View
 Team %d
 == Squadra %d
 
-Uploading map data to GPU
-== Caricando dati mappa alla GPU
-
 Trying to determine UDP connectivity…
 == Provando a determinare l'UDP connectivity…
 
@@ -1393,6 +1390,9 @@ Team successfully saved by %s. The database connection failed, using generated s
 Save failed!
 == 
 
+Hold Shift to be more precise.
+== 
+
 Auto-sync player camera
 == 
 
@@ -1449,6 +1449,9 @@ Loading commands…
 Loading maps…
 == 
 
+Dummy is not connected
+== 
+
 [Spectating]
 Following %d: %s
 == 
@@ -1459,6 +1462,10 @@ Following %s
 
 [Spectating Camera Mode Icon]
 AUTO
+== 
+
+[Important alert message]
+Tap to dismiss…
 == 
 
 [Important alert message]
@@ -1484,6 +1491,9 @@ Some map images could not be loaded. Check the local console for details.
 == 
 
 Loading map
+== 
+
+Initializing layers
 == 
 
 Some map sounds could not be loaded. Check the local console for details.
@@ -2257,6 +2267,9 @@ Tee
 Appearance
 == 
 
+Credits
+== 
+
 Name Plate
 == 
 
@@ -2464,6 +2477,12 @@ Converse
 Chat command
 == 
 
+Teleport to cursor
+== 
+
+Teleport dummy to cursor
+== 
+
 Scoreboard cursor
 == 
 
@@ -2474,6 +2493,9 @@ Controller
 == 
 
 Dummy
+== 
+
+Practice
 == 
 
 Custom
@@ -2625,6 +2647,9 @@ https://ddnet.org/discord
 Tutorial
 == 
 
+Join
+== 
+
 Download
 == 
 
@@ -2640,6 +2665,12 @@ Super
 == 
 
 Team %d (%d/%d)
+== 
+
+not bound
+== 
+
+Show cursor
 == 
 
 Unmute
