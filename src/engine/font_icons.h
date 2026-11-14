@@ -77,6 +77,7 @@ namespace FontIcon
 	inline const char *const REDO = "\uF2F9";
 	inline const char *const RIGHT_FROM_BRACKET = "\uF2F5";
 	inline const char *const RIGHT_TO_BRACKET = "\uF2F6";
+	inline const char *const SHIELD_HALVED = "\uF3ED";
 	inline const char *const SLASH = "\uF715";
 	inline const char *const SORT_DOWN = "\uF0DD";
 	inline const char *const SORT_UP = "\uF0DE";

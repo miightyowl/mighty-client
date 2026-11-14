@@ -2746,6 +2746,8 @@ if(CLIENT)
     components/countryflags.h
     components/damageind.cpp
     components/damageind.h
+    components/ddnet_staff.cpp
+    components/ddnet_staff.h
     components/debughud.cpp
     components/debughud.h
     components/effects.cpp

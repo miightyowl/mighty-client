@@ -1656,6 +1656,15 @@ void CMenus::SaveMClient()
 	}
 	Writer.EndArray();
 
+	if(GameClient()->m_DDNetStaff.HasFetchedNames())
+	{
+		Writer.WriteAttribute("ddnet_staff");
+		Writer.BeginArray();
+		for(const std::string &Name : GameClient()->m_DDNetStaff.Names())
+			Writer.WriteStrValue(Name.c_str());
+		Writer.EndArray();
+	}
+
 	Writer.EndObject();
 }
 void CMenus::SortProfiles()

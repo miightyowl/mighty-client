@@ -41,6 +41,7 @@
 #include "components/controls.h"
 #include "components/countryflags.h"
 #include "components/damageind.h"
+#include "components/ddnet_staff.h"
 #include "components/debughud.h"
 #include "components/effects.h"
 #include "components/emoticon.h"
@@ -201,6 +202,7 @@ public:
 	CPlayers m_Players;
 	CMiniGames m_MiniGames;
 	CMClientDetect m_MClientDetect;
+	CDDNetStaff m_DDNetStaff;
 	CSaveNotice m_SaveNotice;
 	CPetting m_Petting;
 	CPetTee m_PetTee;

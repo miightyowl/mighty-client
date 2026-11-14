@@ -600,8 +600,6 @@ protected:
 	std::vector<CProfile> m_vProfiles;
 	bool m_ProfilesLoaded = false;
 	void LoadProfiles();
-	// writes the combined mclient.json (profiles + bind wheel); loads profiles first if needed
-	void SaveMClient();
 	void SaveProfile(bool Dummy);
 	void SavePetProfile(bool Dummy);
 	void SortProfiles();
@@ -769,6 +767,8 @@ protected:
 
 public:
 	void RenderBackground();
+	// writes the combined mclient.json (profiles + bind wheel); loads profiles first if needed
+	void SaveMClient();
 
 	CMenus();
 	int Sizeof() const override { return sizeof(*this); }

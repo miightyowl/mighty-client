@@ -176,6 +176,7 @@ void CGameClient::OnConsoleInit()
 					      &m_MaodieWalk,
 					      &m_MiniGames,
 					      &m_MClientDetect,
+					      &m_DDNetStaff,
 					      &m_SaveNotice,
 					      &m_Menus,
 					      &m_KeyBinder,
