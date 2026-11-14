@@ -42,6 +42,16 @@ public:
 		HEAD_GHOST,
 		HEAD_BOW,
 		HEAD_CHERRY_BLOSSOM,
+		HEAD_MOHAWK,
+		HEAD_TRAFFIC_CONE,
+		HEAD_RUBBER_DUCK,
+		HEAD_PROPELLER_CAP,
+		HEAD_PLUNGER,
+		HEAD_GOLDEN_CHRISTMAS_HAT,
+		HEAD_HOLLY_HAT,
+		HEAD_CHRISTMAS_HAT_LEFT,
+		HEAD_CHRISTMAS_HAT_LONG,
+		HEAD_CHRISTMAS_HAT_BLACK,
 		NUM_HEADS,
 	};
 
@@ -51,6 +61,8 @@ public:
 		BODY_ANGEL_WINGS,
 		BODY_DEVIL_WINGS,
 		BODY_BAT_WINGS,
+		BODY_GOLDEN_CHAIN,
+		BODY_BOW_TIE,
 		NUM_BODIES,
 	};
 
@@ -66,12 +78,26 @@ public:
 		FACE_GLASSES,
 		FACE_SUNGLASSES,
 		FACE_ROUND_GLASSES,
+		FACE_DISGUISE,
+		FACE_MOUSTACHE,
+		FACE_CLOWN_NOSE,
 		NUM_FACES,
 	};
 
 	enum
 	{
 		MAX_ITEMS = 32,
+	};
+
+	enum
+	{
+		LIST_FAVORITE = 0,
+	};
+
+	enum
+	{
+		CUSTOM_COLOR_ALL_SLOTS = (1 << NUM_SLOTS) - 1,
+		CUSTOM_COLOR_PARTIAL = 1 << NUM_SLOTS,
 	};
 
 	struct SSlotSettings
@@ -89,6 +115,7 @@ public:
 	{
 		SSlotSettings m_aSlots[NUM_SLOTS];
 		bool m_UseCustomColor;
+		int m_CustomColorSlots;
 
 		bool operator==(const SSettings &Other) const = default;
 	};
@@ -106,6 +133,7 @@ public:
 	{
 		SSlotConfig m_aSlots[NUM_SLOTS];
 		int *m_pUseCustomColor;
+		int *m_pCustomColorSlots;
 	};
 
 	static SConfig Config(bool Dummy);
@@ -118,6 +146,9 @@ public:
 	static void SaveAdjustment(bool Dummy, int Slot, int Item, int Size, int X, int Y);
 	static void Equip(bool Dummy, int Slot, int Item);
 	static void ItemKey(int Slot, int Item, char *pBuf, int BufSize);
+
+	static bool IsInList(int List, int Slot, int Item);
+	static void SetInList(int List, int Slot, int Item, bool Listed);
 
 	static int NumItems(int Slot);
 	static const char *ItemName(int Slot, int Item);
@@ -133,6 +164,7 @@ public:
 private:
 	IGraphics::CTextureHandle m_aaaTextures[NUM_SLOTS][MAX_ITEMS][2];
 	IGraphics::CTextureHandle m_aaaGrayTextures[NUM_SLOTS][MAX_ITEMS][2];
+	IGraphics::CTextureHandle m_aaKeepWhiteTextures[NUM_SLOTS][MAX_ITEMS];
 
 	struct SFit
 	{

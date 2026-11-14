@@ -49,17 +49,17 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 	enum
 	{
 		MCLIENT_TAB_GAMEPLAY = 0,
+		MCLIENT_TAB_TRANSLATION,
 		MCLIENT_TAB_FROZEN,
 		MCLIENT_TAB_APPEARANCE,
-		MCLIENT_TAB_EXPERIMENTAL,
 		NUM_MCLIENT_TABS,
 	};
 	static int s_CurTab = MCLIENT_TAB_GAMEPLAY;
 	const char *apTabNames[NUM_MCLIENT_TABS] = {
 		Localize("Gameplay"),
+		Localize("Translation"),
 		Localize("Frozen"),
-		Localize("Appearance"),
-		Localize("Experimental")};
+		Localize("Appearance")};
 	static CButtonContainer s_aTabButtons[NUM_MCLIENT_TABS];
 	CUIRect TabRow = TabBar;
 	for(int Tab = 0; Tab < NUM_MCLIENT_TABS; ++Tab)
@@ -139,17 +139,35 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		Ui()->DoLabel(&Label, Localize("Pick the companion skin in the Tee settings tab."), 11.0f, TEXTALIGN_ML);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 
-		// chat translation
 		RightView.HSplitTop(MarginBetweenViews, nullptr, &RightView);
-		Ui()->DoLabel_AutoLineSize(Localize("Chat translation"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
+		Ui()->DoLabel_AutoLineSize(Localize("Experimental"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
 		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFinishRename, Localize("Rename near finish if name has finished"), &g_Config.m_ClFinishRename, &RightView, LineSize);
+		if(g_Config.m_ClFinishRename)
+		{
+			CUIRect NamesLabel;
+			RightView.HSplitTop(LineSize, &Button, &RightView);
+			Button.VSplitLeft(140.0f, &NamesLabel, &Button);
+			Ui()->DoLabel(&NamesLabel, Localize("Alternative names:"), ColorPickerLabelSize, TEXTALIGN_ML);
+			static CLineInput s_FinishRenameNamesInput;
+			s_FinishRenameNamesInput.SetBuffer(g_Config.m_ClFinishRenameNames, sizeof(g_Config.m_ClFinishRenameNames));
+			s_FinishRenameNamesInput.SetEmptyText("name1, name2, \xe2\x80\xa6");
+			Ui()->DoEditBox(&s_FinishRenameNamesInput, &Button, 12.0f);
+		}
+	}
+	else if(s_CurTab == MCLIENT_TAB_TRANSLATION)
+	{
+		MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
 
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslate, Localize("Translate incoming chat"), &g_Config.m_ClChatTranslate, &RightView, LineSize);
-		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslateShowLang, Localize("Show detected language after translated messages"), &g_Config.m_ClChatTranslateShowLang, &RightView, LineSize))
+		Ui()->DoLabel_AutoLineSize(Localize("Incoming chat"), HeadlineFontSize, TEXTALIGN_ML, &LeftView, HeadlineHeight);
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslate, Localize("Translate incoming chat"), &g_Config.m_ClChatTranslate, &LeftView, LineSize);
+		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslateShowLang, Localize("Show detected language after translated messages"), &g_Config.m_ClChatTranslateShowLang, &LeftView, LineSize))
 			GameClient()->m_Chat.RebuildChat();
-		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslateShortWords, Localize("Also translate short words"), &g_Config.m_ClChatTranslateShortWords, &RightView, LineSize))
+		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslateShortWords, Localize("Also translate short words"), &g_Config.m_ClChatTranslateShortWords, &LeftView, LineSize))
 			GameClient()->m_Chat.ClearTranslationCache();
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMightyRead, Localize("Read Mighty-language chat"), &g_Config.m_ClMClientMightyRead, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMightyRead, Localize("Read Mighty-language chat"), &g_Config.m_ClMClientMightyRead, &LeftView, LineSize);
 
 		static const char *s_apTranslateLangCodes[] = {
 			"en", "de", "es", "fr", "pt", "it", "nl", "pl", "ru", "uk", "tr", "ar",
@@ -185,8 +203,8 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 
 		CUIRect TranslateRow, TranslateLabel, TranslateDropDown;
 
-		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-		RightView.HSplitTop(LineSize, &TranslateRow, &RightView);
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+		LeftView.HSplitTop(LineSize, &TranslateRow, &LeftView);
 		TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
 		Ui()->DoLabel(&TranslateLabel, Localize("Translate incoming to"), ColorPickerLabelSize, TEXTALIGN_ML);
 		static CUi::SDropDownState s_InTargetDropDownState;
@@ -202,8 +220,8 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 
 		{
 			CUIRect IgnoreRow, IgnoreLabel, IgnoreEditBox;
-			RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-			RightView.HSplitTop(LineSize, &IgnoreRow, &RightView);
+			LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+			LeftView.HSplitTop(LineSize, &IgnoreRow, &LeftView);
 			IgnoreRow.VSplitMid(&IgnoreLabel, &IgnoreEditBox, MarginSmall);
 			Ui()->DoLabel(&IgnoreLabel, Localize("Ignored languages (e.g. \"en,de\")"), ColorPickerLabelSize, TEXTALIGN_ML);
 			static CLineInput s_IgnoreInput(g_Config.m_ClChatTranslateIgnore, sizeof(g_Config.m_ClChatTranslateIgnore));
@@ -211,10 +229,11 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 				GameClient()->m_Chat.ClearTranslationCache();
 		}
 
+		Ui()->DoLabel_AutoLineSize(Localize("Outgoing chat (your messages)"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
 		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 		RightView.HSplitTop(LineSize, &TranslateRow, &RightView);
 		TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
-		Ui()->DoLabel(&TranslateLabel, Localize("Translate chat: your language"), ColorPickerLabelSize, TEXTALIGN_ML);
+		Ui()->DoLabel(&TranslateLabel, Localize("Your language"), ColorPickerLabelSize, TEXTALIGN_ML);
 		static CUi::SDropDownState s_SourceLangDropDownState;
 		static CScrollRegion s_SourceLangScrollRegion;
 		s_SourceLangDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_SourceLangScrollRegion;
@@ -227,7 +246,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
 		RightView.HSplitTop(LineSize, &TranslateRow, &RightView);
 		TranslateRow.VSplitMid(&TranslateLabel, &TranslateDropDown, MarginSmall);
-		Ui()->DoLabel(&TranslateLabel, Localize("Translate chat: send as"), ColorPickerLabelSize, TEXTALIGN_ML);
+		Ui()->DoLabel(&TranslateLabel, Localize("Send as"), ColorPickerLabelSize, TEXTALIGN_ML);
 		static CUi::SDropDownState s_TargetLangDropDownState;
 		static CScrollRegion s_TargetLangScrollRegion;
 		s_TargetLangDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_TargetLangScrollRegion;
@@ -301,25 +320,6 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		RightView.HSplitTop(LineSize * 2.0f, &Button, &RightView);
 		if(Ui()->DoScrollbarOption(&s_ChatBackgroundDarkness, &s_ChatBackgroundDarkness, &Button, Localize("Chat background darkness"), 0, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%"))
 			g_Config.m_ClChatBackgroundColor = ColorHSLA(0.0f, 0.0f, 0.0f, s_ChatBackgroundDarkness / 100.0f).Pack(true);
-	}
-	else if(s_CurTab == MCLIENT_TAB_EXPERIMENTAL)
-	{
-		MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
-
-		Ui()->DoLabel_AutoLineSize(Localize("Experimental"), HeadlineFontSize, TEXTALIGN_ML, &LeftView, HeadlineHeight);
-		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFinishRename, Localize("Rename near finish if name has finished"), &g_Config.m_ClFinishRename, &LeftView, LineSize);
-		if(g_Config.m_ClFinishRename)
-		{
-			CUIRect NamesLabel;
-			LeftView.HSplitTop(LineSize, &Button, &LeftView);
-			Button.VSplitLeft(140.0f, &NamesLabel, &Button);
-			Ui()->DoLabel(&NamesLabel, Localize("Alternative names:"), ColorPickerLabelSize, TEXTALIGN_ML);
-			static CLineInput s_FinishRenameNamesInput;
-			s_FinishRenameNamesInput.SetBuffer(g_Config.m_ClFinishRenameNames, sizeof(g_Config.m_ClFinishRenameNames));
-			s_FinishRenameNamesInput.SetEmptyText("name1, name2, \xe2\x80\xa6");
-			Ui()->DoEditBox(&s_FinishRenameNamesInput, &Button, 12.0f);
-		}
 	}
 }
 void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
@@ -601,7 +601,8 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
 	m_AccessorySlot = std::clamp(m_AccessorySlot, 0, (int)CAccessories::NUM_SLOTS - 1);
-	static const int s_aSlotOrder[CAccessories::NUM_SLOTS] = {CAccessories::SLOT_HEAD, CAccessories::SLOT_FACE, CAccessories::SLOT_BODY, CAccessories::SLOT_FEET};
+	static const int s_aSlotOrder[] = {CAccessories::SLOT_HEAD, CAccessories::SLOT_FACE, CAccessories::SLOT_BODY};
+	const int NumSlotTabs = (int)std::size(s_aSlotOrder);
 	const CAccessories::SConfig Config = CAccessories::Config(m_Dummy);
 	const CAccessories::SSlotConfig &SlotConfig = Config.m_aSlots[m_AccessorySlot];
 	const CAccessories::SSettings Settings = CAccessories::Settings(m_Dummy);
@@ -668,7 +669,11 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	Options.HSplitTop(10.0f, nullptr, &Options);
 	Options.HSplitTop(20.0f, &Button, &Options);
 	if(DoButton_CheckBox(Config.m_pUseCustomColor, Localize("Custom colors"), *Config.m_pUseCustomColor, &Button))
+	{
 		*Config.m_pUseCustomColor = *Config.m_pUseCustomColor ? 0 : 1;
+		if(*Config.m_pUseCustomColor)
+			*Config.m_pCustomColorSlots = 1 << m_AccessorySlot;
+	}
 
 	Toggles.HSplitTop(20.0f, &Button, &Toggles);
 	if(DoButton_CheckBox(&g_Config.m_ClMClientAccessoriesOthers, Localize("Show accessories of other M-Client players"), g_Config.m_ClMClientAccessoriesOthers, &Button))
@@ -685,14 +690,18 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 		CUIRect CustomColors;
 		MainView.HSplitTop(95.0f, &CustomColors, &MainView);
 		CUIRect aRects[CAccessories::NUM_SLOTS];
-		const float PickerWidth = (CustomColors.w - 20.0f * (float)(CAccessories::NUM_SLOTS - 1)) / (float)CAccessories::NUM_SLOTS;
+		const float PickerWidth = (CustomColors.w - 20.0f * (float)(NumSlotTabs - 1)) / (float)NumSlotTabs;
+		static char s_aCustomColorSlotIds[CAccessories::NUM_SLOTS];
 		for(const int Slot : s_aSlotOrder)
 		{
 			CustomColors.VSplitLeft(PickerWidth, &aRects[Slot], &CustomColors);
 			CustomColors.VSplitLeft(20.0f, nullptr, &CustomColors);
 			aRects[Slot].HSplitTop(20.0f, &Label, &aRects[Slot]);
-			Ui()->DoLabel(&Label, CAccessories::SlotName(Slot), 14.0f, TEXTALIGN_ML);
-			RenderHslaScrollbars(&aRects[Slot], Config.m_aSlots[Slot].m_pColor, false, ColorHSLA::DARKEST_LGT);
+			const int SlotBit = 1 << Slot;
+			if(DoButton_CheckBox(&s_aCustomColorSlotIds[Slot], CAccessories::SlotName(Slot), (*Config.m_pCustomColorSlots & SlotBit) != 0, &Label))
+				*Config.m_pCustomColorSlots ^= SlotBit;
+			if(*Config.m_pCustomColorSlots & SlotBit)
+				RenderHslaScrollbars(&aRects[Slot], Config.m_aSlots[Slot].m_pColor, false, ColorHSLA::DARKEST_LGT);
 		}
 	}
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
@@ -702,26 +711,57 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	MainView.HSplitTop(5.0f, nullptr, &MainView);
 	{
 		static CButtonContainer s_aCategoryButtons[CAccessories::NUM_SLOTS];
-		const float TabWidth = CategoryTabs.w / (float)CAccessories::NUM_SLOTS;
-		for(int i = 0; i < CAccessories::NUM_SLOTS; i++)
+		const float TabWidth = CategoryTabs.w / (float)NumSlotTabs;
+		for(int i = 0; i < NumSlotTabs; i++)
 		{
 			const int Slot = s_aSlotOrder[i];
 			CUIRect Tab;
 			CategoryTabs.VSplitLeft(TabWidth, &Tab, &CategoryTabs);
-			const int Corners = i == 0 ? IGraphics::CORNER_L : (i == CAccessories::NUM_SLOTS - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
+			const int Corners = i == 0 ? IGraphics::CORNER_L : (i == NumSlotTabs - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
 			if(DoButton_MenuTab(&s_aCategoryButtons[Slot], CAccessories::SlotName(Slot), m_AccessorySlot == Slot, &Tab, Corners, nullptr, nullptr, nullptr, nullptr, 5.0f))
 				m_AccessorySlot = Slot;
 		}
 	}
 
+	CUIRect BottomBar, QuickSearch, SortDropDown;
+	MainView.HSplitBottom(20.0f, &MainView, &BottomBar);
+	MainView.HSplitBottom(5.0f, &MainView, nullptr);
+	BottomBar.VSplitLeft(220.0f, &QuickSearch, &BottomBar);
+	BottomBar.VSplitLeft(10.0f, nullptr, &BottomBar);
+	BottomBar.VSplitLeft(150.0f, &SortDropDown, &BottomBar);
+
+	const int NumItems = CAccessories::NumItems(m_AccessorySlot);
+	const int ListSort = std::clamp(g_Config.m_ClMClientAccessoryListSort, 0, 1);
+	const char *pFilter = g_Config.m_ClMClientAccessoryFilterString;
+	std::vector<int> vItems;
+	for(int Item = 1; Item < NumItems; Item++)
+	{
+		if(pFilter[0] != '\0' && !str_utf8_find_nocase(CAccessories::ItemName(m_AccessorySlot, Item), pFilter))
+			continue;
+		vItems.push_back(Item);
+	}
+	const int AccessorySlot = m_AccessorySlot;
+	std::sort(vItems.begin(), vItems.end(), [AccessorySlot, ListSort](int Left, int Right) {
+		const bool LeftFavorite = CAccessories::IsInList(CAccessories::LIST_FAVORITE, AccessorySlot, Left);
+		if(LeftFavorite != CAccessories::IsInList(CAccessories::LIST_FAVORITE, AccessorySlot, Right))
+			return LeftFavorite;
+		const int NameCompare = str_comp_nocase(CAccessories::ItemName(AccessorySlot, Left), CAccessories::ItemName(AccessorySlot, Right));
+		return ListSort == 1 ? NameCompare > 0 : NameCompare < 0;
+	});
+	if(pFilter[0] == '\0')
+		vItems.insert(vItems.begin(), 0);
+
 	static CListBox s_ListBox;
 	static char s_aaItemIds[CAccessories::NUM_SLOTS][CAccessories::MAX_ITEMS];
-	const int NumItems = CAccessories::NumItems(m_AccessorySlot);
-	const int OldSelected = std::clamp(*SlotConfig.m_pItem, 0, NumItems - 1);
-	s_ListBox.DoStart(100.0f, NumItems, 6, 1, OldSelected, &MainView);
-	for(int Item = 0; Item < NumItems; Item++)
+	static char s_aaFavoriteIds[CAccessories::NUM_SLOTS][CAccessories::MAX_ITEMS];
+	const int Equipped = std::clamp(*SlotConfig.m_pItem, 0, NumItems - 1);
+	const auto EquippedIt = std::find(vItems.begin(), vItems.end(), Equipped);
+	const int OldSelected = EquippedIt == vItems.end() ? -1 : (int)(EquippedIt - vItems.begin());
+	s_ListBox.DoStart(100.0f, vItems.size(), 6, 1, OldSelected, &MainView);
+	for(size_t Index = 0; Index < vItems.size(); Index++)
 	{
-		const CListboxItem ListItem = s_ListBox.DoNextItem(&s_aaItemIds[m_AccessorySlot][Item], Item == OldSelected);
+		const int Item = vItems[Index];
+		const CListboxItem ListItem = s_ListBox.DoNextItem(&s_aaItemIds[m_AccessorySlot][Item], Item == Equipped);
 		if(!ListItem.m_Visible)
 			continue;
 
@@ -736,18 +776,62 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 		}
 		CAccessories::SSlotSettings &ItemSlot = ItemSettings.m_aSlots[m_AccessorySlot];
 		ItemSlot.m_Item = Item;
-		if(Item != OldSelected)
+		if(Item != Equipped)
 			CAccessories::LoadAdjustment(m_Dummy, m_AccessorySlot, Item, &ItemSlot.m_Size, &ItemSlot.m_X, &ItemSlot.m_Y);
 		RenderAccessoryTee(ItemPreview, std::min(ItemPreview.w, ItemPreview.h) * 0.5f, ItemSettings, vec2(1.0f, 0.0f));
 
+		const char *pItemName = CAccessories::ItemName(m_AccessorySlot, Item);
 		SLabelProperties Props;
 		Props.m_MaxWidth = Label.w - 5.0f;
-		Ui()->DoLabel(&Label, CAccessories::ItemName(m_AccessorySlot, Item), 12.0f, TEXTALIGN_MC, Props);
+		if(pFilter[0] != '\0')
+		{
+			const char *pMatchEnd;
+			const char *pMatchStart = str_utf8_find_nocase(pItemName, pFilter, &pMatchEnd);
+			if(pMatchStart)
+				Props.m_vColorSplits.emplace_back(pMatchStart - pItemName, pMatchEnd - pMatchStart, ColorRGBA(0.4f, 0.4f, 1.0f, 1.0f));
+		}
+		Ui()->DoLabel(&Label, pItemName, 12.0f, TEXTALIGN_MC, Props);
+
+		if(Item != 0)
+		{
+			const bool Favorite = CAccessories::IsInList(CAccessories::LIST_FAVORITE, m_AccessorySlot, Item);
+			const char *pFavoriteId = &s_aaFavoriteIds[m_AccessorySlot][Item];
+			const char *pItemId = &s_aaItemIds[m_AccessorySlot][Item];
+			CUIRect FavIcon;
+			ListItem.m_Rect.HSplitTop(20.0f, &FavIcon, nullptr);
+			FavIcon.VSplitRight(20.0f, nullptr, &FavIcon);
+			if(DoButton_Favorite(pFavoriteId, pItemId, Favorite, &FavIcon))
+				CAccessories::SetInList(CAccessories::LIST_FAVORITE, m_AccessorySlot, Item, !Favorite);
+		}
 	}
 	const int NewSelected = s_ListBox.DoEnd();
-	if(NewSelected != OldSelected && NewSelected >= 0)
-		CAccessories::Equip(m_Dummy, m_AccessorySlot, NewSelected);
+	if(NewSelected != OldSelected && NewSelected >= 0 && NewSelected < (int)vItems.size())
+		CAccessories::Equip(m_Dummy, m_AccessorySlot, vItems[NewSelected]);
+
+	static CLineInput s_FilterInput(g_Config.m_ClMClientAccessoryFilterString, sizeof(g_Config.m_ClMClientAccessoryFilterString));
+	if(vItems.empty() && pFilter[0] != '\0')
+	{
+		CUIRect FilterLabel, ResetButton;
+		MainView.HMargin((MainView.h - (16.0f + 18.0f + 8.0f)) / 2.0f, &FilterLabel);
+		FilterLabel.HSplitTop(16.0f, &FilterLabel, &ResetButton);
+		ResetButton.HSplitTop(8.0f, nullptr, &ResetButton);
+		ResetButton.VMargin((ResetButton.w - 200.0f) / 2.0f, &ResetButton);
+		Ui()->DoLabel(&FilterLabel, Localize("No accessories match your filter criteria"), 16.0f, TEXTALIGN_MC);
+		static CButtonContainer s_ResetButton;
+		if(DoButton_Menu(&s_ResetButton, Localize("Reset filter"), 0, &ResetButton))
+			s_FilterInput.Clear();
+	}
+	Ui()->DoEditBox_Search(&s_FilterInput, &QuickSearch, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive());
+
+	{
+		const char *apSortNames[] = {Localize("Name (A-Z)"), Localize("Name (Z-A)")};
+		static CUi::SDropDownState s_SortDropDownState;
+		static CScrollRegion s_SortScrollRegion;
+		s_SortDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_SortScrollRegion;
+		g_Config.m_ClMClientAccessoryListSort = Ui()->DoDropDown(&SortDropDown, ListSort, apSortNames, std::size(apSortNames), s_SortDropDownState);
+	}
 }
+
 void CMenus::RenderSettingsBindWheel(CUIRect MainView)
 {
 	CBindWheel &BindWheel = GameClient()->m_BindWheel;

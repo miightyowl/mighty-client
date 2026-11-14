@@ -16,45 +16,69 @@ namespace
 {
 	constexpr float REF_BODY_FRACTION = 0.6f;
 	constexpr float REF_BODY_HALF = REF_BODY_FRACTION / 2.0f;
+	constexpr uint8_t OUTLINE_SHADE = 30;
 
 	struct SItemInfo
 	{
 		const char *m_apFiles[2];
 		float m_Size;
 		vec2 m_Pos;
+		bool m_Front = false;
+		bool m_KeepWhite = false;
 	};
 
 	const SItemInfo s_aHeadItems[CAccessories::NUM_HEADS] = {
 		{{nullptr, nullptr}, 0.0f, vec2(0.0f, 0.0f)},
-		{{"accessories/christmas_hat.png", nullptr}, 1.5f, vec2(0.14f, 0.17f)},
-		{{"accessories/crown.png", nullptr}, 0.738f, vec2(0.002f, -0.158f)},
-		{{"accessories/witch_hat.png", nullptr}, 1.299f, vec2(-0.003f, -0.343f)},
-		{{"accessories/sprout.png", nullptr}, 0.446f, vec2(0.001f, -0.12f)},
-		{{"accessories/party_hat.png", nullptr}, 0.763f, vec2(0.084f, -0.259f)},
-		{{"accessories/antlers.png", nullptr}, 1.352f, vec2(0.0f, -0.123f)},
-		{{"accessories/frog.png", nullptr}, 0.591f, vec2(-0.002f, -0.159f)},
-		{{"accessories/flower.png", nullptr}, 0.424f, vec2(0.28f, -0.01f)},
-		{{"accessories/snowflake.png", nullptr}, 0.427f, vec2(-0.28f, -0.024f)},
-		{{"accessories/top_hat.png", nullptr}, 0.907f, vec2(-0.003f, -0.2f)},
-		{{"accessories/pirate_hat.png", nullptr}, 1.27f, vec2(0.0f, -0.21f)},
-		{{"accessories/golden_halo.png", nullptr}, 0.699f, vec2(-0.002f, -0.239f)},
-		{{"accessories/heart.png", nullptr}, 0.427f, vec2(0.302f, 0.051f)},
-		{{"accessories/ghost.png", nullptr}, 0.479f, vec2(0.0f, -0.161f)},
-		{{"accessories/bow.png", nullptr}, 0.536f, vec2(0.246f, -0.068f)},
-		{{"accessories/cherry_blossom.png", nullptr}, 0.458f, vec2(-0.278f, -0.045f)},
+		{{"accessories/christmas_hat.png", nullptr}, 1.22f, vec2(0.085f, -0.205f), false, true},
+		{{"accessories/crown.png", nullptr}, 0.94f, vec2(0.0f, -0.13f)},
+		{{"accessories/witch_hat.png", nullptr}, 1.38f, vec2(0.0f, -0.34f)},
+		{{"accessories/sprout.png", nullptr}, 0.86f, vec2(0.0f, -0.135f)},
+		{{"accessories/party_hat.png", nullptr}, 0.85f, vec2(0.06f, -0.245f)},
+		{{"accessories/antlers.png", nullptr}, 1.45f, vec2(0.0f, -0.17f)},
+		{{"accessories/frog.png", nullptr}, 0.72f, vec2(0.0f, -0.145f)},
+		{{"accessories/flower.png", nullptr}, 0.54f, vec2(0.29f, -0.01f)},
+		{{"accessories/snowflake.png", nullptr}, 0.51f, vec2(-0.29f, -0.02f)},
+		{{"accessories/top_hat.png", nullptr}, 1.03f, vec2(0.0f, -0.19f)},
+		{{"accessories/pirate_hat.png", nullptr}, 1.34f, vec2(0.0f, -0.155f)},
+		{{"accessories/golden_halo.png", nullptr}, 0.94f, vec2(0.0f, -0.24f)},
+		{{"accessories/heart.png", nullptr}, 0.57f, vec2(0.295f, 0.06f)},
+		{{"accessories/ghost.png", nullptr}, 0.62f, vec2(0.0f, -0.145f)},
+		{{"accessories/bow.png", nullptr}, 0.7f, vec2(0.25f, 0.01f)},
+		{{"accessories/cherry_blossom.png", nullptr}, 0.55f, vec2(-0.3f, -0.035f)},
+		{{"accessories/mohawk.png", nullptr}, 0.86f, vec2(0.0f, -0.18f)},
+		{{"accessories/traffic_cone.png", nullptr}, 0.87f, vec2(0.035f, -0.205f)},
+		{{"accessories/rubber_duck.png", nullptr}, 0.86f, vec2(0.03f, -0.19f)},
+		{{"accessories/propeller_cap.png", nullptr}, 0.98f, vec2(0.1f, -0.125f)},
+		{{"accessories/plunger.png", nullptr}, 1.12f, vec2(0.005f, -0.385f)},
+		{{"accessories/golden_christmas_hat.png", nullptr}, 1.24f, vec2(0.1f, -0.205f), false, true},
+		{{"accessories/holly_hat.png", nullptr}, 1.22f, vec2(0.085f, -0.205f), false, true},
+		{{"accessories/christmas_hat_left.png", nullptr}, 1.22f, vec2(-0.09f, -0.205f), false, true},
+		{{"accessories/christmas_hat_long.png", nullptr}, 1.3f, vec2(0.125f, -0.02f), false, true},
+		{{"accessories/christmas_hat_black.png", nullptr}, 1.22f, vec2(0.085f, -0.205f), false, true},
 	};
 	const SItemInfo s_aBodyItems[CAccessories::NUM_BODIES] = {
 		{{nullptr, nullptr}, 0.0f, vec2(0.0f, 0.0f)},
 		{{"accessories/wing_left.png", "accessories/wing_right.png"}, 0.0f, vec2(0.0f, 0.0f)},
 		{{"accessories/devilwing_left.png", "accessories/devilwing_right.png"}, 0.0f, vec2(0.0f, 0.0f)},
-		{{"accessories/bat_wings.png", nullptr}, 1.997f, vec2(0.004f, -0.104f)},
+		{{"accessories/bat_wings.png", nullptr}, 2.08f, vec2(0.0f, -0.17f)},
+		{{"accessories/golden_chain.png", nullptr}, 0.89f, vec2(-0.015f, 0.22f), true},
+		{{"accessories/bow_tie.png", nullptr}, 0.67f, vec2(0.0f, 0.16f), true},
 	};
 	const SItemInfo s_aFaceItems[CAccessories::NUM_FACES] = {
 		{{nullptr, nullptr}, 0.0f, vec2(0.0f, 0.0f)},
-		{{"accessories/glasses.png", nullptr}, 1.05f, vec2(0.0f, 0.0f)},
-		{{"accessories/sunglasses.png", nullptr}, 0.994f, vec2(0.004f, 0.002f)},
-		{{"accessories/round_glasses.png", nullptr}, 0.994f, vec2(0.0f, 0.0f)},
+		{{"accessories/glasses.png", nullptr}, 0.94f, vec2(0.0f, 0.005f)},
+		{{"accessories/sunglasses.png", nullptr}, 1.04f, vec2(0.0f, -0.005f)},
+		{{"accessories/round_glasses.png", nullptr}, 0.94f, vec2(0.0f, 0.0f)},
+		{{"accessories/disguise.png", nullptr}, 0.9f, vec2(0.0f, 0.035f)},
+		{{"accessories/moustache.png", nullptr}, 1.02f, vec2(0.0f, 0.25f)},
+		{{"accessories/clown_nose.png", nullptr}, 0.37f, vec2(0.0f, 0.14f)},
 	};
+
+	char *ItemList(int List)
+	{
+		return g_Config.m_ClMClientAccessoryFavorites;
+	}
+	constexpr int ITEM_LIST_SIZE = sizeof(g_Config.m_ClMClientAccessoryFavorites);
 
 	const SItemInfo *ItemInfo(int Slot, int Item)
 	{
@@ -80,6 +104,7 @@ CAccessories::SConfig CAccessories::Config(bool Dummy)
 		Config.m_aSlots[SLOT_FEET] = {&g_Config.m_ClMClientDummyAccessoryFeet, &g_Config.m_ClMClientDummyAccessoryFeetSize, &g_Config.m_ClMClientDummyAccessoryFeetX, &g_Config.m_ClMClientDummyAccessoryFeetY, &g_Config.m_ClMClientDummyAccessoryFeetColor};
 		Config.m_aSlots[SLOT_FACE] = {&g_Config.m_ClMClientDummyAccessoryFace, &g_Config.m_ClMClientDummyAccessoryFaceSize, &g_Config.m_ClMClientDummyAccessoryFaceX, &g_Config.m_ClMClientDummyAccessoryFaceY, &g_Config.m_ClMClientDummyAccessoryFaceColor};
 		Config.m_pUseCustomColor = &g_Config.m_ClMClientDummyAccessoryUseCustomColor;
+		Config.m_pCustomColorSlots = &g_Config.m_ClMClientDummyAccessoryCustomColorSlots;
 	}
 	else
 	{
@@ -88,6 +113,7 @@ CAccessories::SConfig CAccessories::Config(bool Dummy)
 		Config.m_aSlots[SLOT_FEET] = {&g_Config.m_ClMClientAccessoryFeet, &g_Config.m_ClMClientAccessoryFeetSize, &g_Config.m_ClMClientAccessoryFeetX, &g_Config.m_ClMClientAccessoryFeetY, &g_Config.m_ClMClientAccessoryFeetColor};
 		Config.m_aSlots[SLOT_FACE] = {&g_Config.m_ClMClientAccessoryFace, &g_Config.m_ClMClientAccessoryFaceSize, &g_Config.m_ClMClientAccessoryFaceX, &g_Config.m_ClMClientAccessoryFaceY, &g_Config.m_ClMClientAccessoryFaceColor};
 		Config.m_pUseCustomColor = &g_Config.m_ClMClientAccessoryUseCustomColor;
+		Config.m_pCustomColorSlots = &g_Config.m_ClMClientAccessoryCustomColorSlots;
 	}
 	return Config;
 }
@@ -102,6 +128,7 @@ CAccessories::SSettings CAccessories::Settings(bool Dummy)
 		Settings.m_aSlots[Slot] = {*SlotConfig.m_pItem, *SlotConfig.m_pSize, *SlotConfig.m_pX, *SlotConfig.m_pY, *SlotConfig.m_pColor};
 	}
 	Settings.m_UseCustomColor = *Config.m_pUseCustomColor != 0;
+	Settings.m_CustomColorSlots = *Config.m_pCustomColorSlots;
 	return Settings;
 }
 
@@ -117,7 +144,10 @@ bool CAccessories::AnyEquipped(const SSettings &Settings)
 
 void CAccessories::Serialize(const SSettings &Settings, char *pBuf, int BufSize)
 {
-	str_format(pBuf, BufSize, "%d", Settings.m_UseCustomColor ? 1 : 0);
+	int CustomColor = 0;
+	if(Settings.m_UseCustomColor)
+		CustomColor = Settings.m_CustomColorSlots == CUSTOM_COLOR_ALL_SLOTS ? 1 : (CUSTOM_COLOR_PARTIAL | Settings.m_CustomColorSlots);
+	str_format(pBuf, BufSize, "%d", CustomColor);
 	for(const SSlotSettings &Slot : Settings.m_aSlots)
 	{
 		char aSlot[64];
@@ -134,10 +164,11 @@ bool CAccessories::Deserialize(const char *pText, SSettings *pSettings)
 	SSettings Settings{};
 	char aPart[64];
 	const char *pRest = str_next_token(pText, ",", aPart, sizeof(aPart));
-	int UseCustomColor;
-	if(!pRest || !str_toint(aPart, &UseCustomColor))
+	int CustomColor;
+	if(!pRest || !str_toint(aPart, &CustomColor))
 		return false;
-	Settings.m_UseCustomColor = UseCustomColor != 0;
+	Settings.m_UseCustomColor = CustomColor != 0;
+	Settings.m_CustomColorSlots = (CustomColor & CUSTOM_COLOR_PARTIAL) ? (CustomColor & CUSTOM_COLOR_ALL_SLOTS) : CUSTOM_COLOR_ALL_SLOTS;
 
 	for(SSlotSettings &Slot : Settings.m_aSlots)
 	{
@@ -250,6 +281,51 @@ void CAccessories::SaveAdjustment(bool Dummy, int Slot, int Item, int Size, int 
 	str_copy(pList, aNewList, ListSize);
 }
 
+bool CAccessories::IsInList(int List, int Slot, int Item)
+{
+	char aKey[64];
+	ItemKey(Slot, Item, aKey, sizeof(aKey));
+	if(aKey[0] == '\0')
+		return false;
+
+	const char *pList = ItemList(List);
+	char aEntry[64];
+	while((pList = str_next_token(pList, " ", aEntry, sizeof(aEntry))))
+	{
+		if(str_comp(aEntry, aKey) == 0)
+			return true;
+	}
+	return false;
+}
+
+void CAccessories::SetInList(int List, int Slot, int Item, bool Listed)
+{
+	char aKey[64];
+	ItemKey(Slot, Item, aKey, sizeof(aKey));
+	if(aKey[0] == '\0')
+		return;
+
+	char *pList = ItemList(List);
+	char aNewList[ITEM_LIST_SIZE] = "";
+	const char *pRest = pList;
+	char aEntry[64];
+	while((pRest = str_next_token(pRest, " ", aEntry, sizeof(aEntry))))
+	{
+		if(str_comp(aEntry, aKey) == 0)
+			continue;
+		if(aNewList[0] != '\0')
+			str_append(aNewList, " ");
+		str_append(aNewList, aEntry);
+	}
+	if(Listed)
+	{
+		if(aNewList[0] != '\0')
+			str_append(aNewList, " ");
+		str_append(aNewList, aKey);
+	}
+	str_copy(pList, aNewList, ITEM_LIST_SIZE);
+}
+
 void CAccessories::Equip(bool Dummy, int Slot, int Item)
 {
 	const SSlotConfig &SlotConfig = Config(Dummy).m_aSlots[Slot];
@@ -296,6 +372,16 @@ const char *CAccessories::ItemName(int Slot, int Item)
 		case HEAD_GHOST: return Localize("Ghost");
 		case HEAD_BOW: return Localize("Bow");
 		case HEAD_CHERRY_BLOSSOM: return Localize("Cherry blossom");
+		case HEAD_MOHAWK: return Localize("Mohawk");
+		case HEAD_TRAFFIC_CONE: return Localize("Traffic cone");
+		case HEAD_RUBBER_DUCK: return Localize("Rubber duck");
+		case HEAD_PROPELLER_CAP: return Localize("Propeller cap");
+		case HEAD_PLUNGER: return Localize("Plunger");
+		case HEAD_GOLDEN_CHRISTMAS_HAT: return Localize("Golden Christmas hat");
+		case HEAD_HOLLY_HAT: return Localize("Holly hat");
+		case HEAD_CHRISTMAS_HAT_LEFT: return Localize("Christmas hat (left)");
+		case HEAD_CHRISTMAS_HAT_LONG: return Localize("Christmas hat (long)");
+		case HEAD_CHRISTMAS_HAT_BLACK: return Localize("Black and white hat");
 		}
 	}
 	else if(Slot == SLOT_BODY)
@@ -305,6 +391,8 @@ const char *CAccessories::ItemName(int Slot, int Item)
 		case BODY_ANGEL_WINGS: return Localize("Angel wings");
 		case BODY_DEVIL_WINGS: return Localize("Devil wings");
 		case BODY_BAT_WINGS: return Localize("Bat wings");
+		case BODY_GOLDEN_CHAIN: return Localize("Golden chain");
+		case BODY_BOW_TIE: return Localize("Bow tie");
 		}
 	}
 	else if(Slot == SLOT_FACE)
@@ -314,6 +402,9 @@ const char *CAccessories::ItemName(int Slot, int Item)
 		case FACE_GLASSES: return Localize("Glasses");
 		case FACE_SUNGLASSES: return Localize("Sunglasses");
 		case FACE_ROUND_GLASSES: return Localize("Round glasses");
+		case FACE_DISGUISE: return Localize("Silly disguise");
+		case FACE_MOUSTACHE: return Localize("Moustache");
+		case FACE_CLOWN_NOSE: return Localize("Clown nose");
 		}
 	}
 	return "";
@@ -361,7 +452,7 @@ void CAccessories::OnInit()
 					int aFreq[256] = {0};
 					for(size_t i = 0; i < NumPixels; i++)
 					{
-						if(Gray.m_pData[i * 4 + 3] > 128)
+						if(Gray.m_pData[i * 4 + 3] > 128 && Gray.m_pData[i * 4] > OUTLINE_SHADE)
 							aFreq[Gray.m_pData[i * 4]]++;
 					}
 					uint8_t OrgWeight = 1;
@@ -382,6 +473,23 @@ void CAccessories::OnInit()
 						Gray.m_pData[i * 4 + 1] = Value;
 						Gray.m_pData[i * 4 + 2] = Value;
 					}
+				}
+
+				if(pInfo->m_KeepWhite && Image.m_Format == CImageInfo::FORMAT_RGBA)
+				{
+					CImageInfo White = Image.DeepCopy();
+					const size_t NumPixels = White.m_Width * White.m_Height;
+					for(size_t i = 0; i < NumPixels; i++)
+					{
+						uint8_t *pPixel = &White.m_pData[i * 4];
+						const float Max = std::max({pPixel[0], pPixel[1], pPixel[2]});
+						const float Min = std::min({pPixel[0], pPixel[1], pPixel[2]});
+						const float Saturation = Max > 0.0f ? (Max - Min) / Max : 0.0f;
+						const float Luma = 0.2126f * pPixel[0] + 0.7152f * pPixel[1] + 0.0722f * pPixel[2];
+						const float Whiteness = std::clamp((0.3f - Saturation) / 0.1f, 0.0f, 1.0f) * std::clamp((Luma - 110.0f) / 40.0f, 0.0f, 1.0f);
+						pPixel[3] = (uint8_t)(pPixel[3] * Whiteness);
+					}
+					m_aaKeepWhiteTextures[Slot][Item] = Graphics()->LoadTextureRawMove(White, 0, pFile);
 				}
 
 				m_aaaTextures[Slot][Item][Side] = Graphics()->LoadTextureRawMove(Image, 0, pFile);
@@ -445,8 +553,9 @@ void CAccessories::RenderSlot(int Slot, const SFit &Fit, vec2 Direction, float A
 	if(!pItem)
 		return;
 
-	const auto &aTextures = Settings.m_UseCustomColor ? m_aaaGrayTextures[Slot][SlotSettings.m_Item] : m_aaaTextures[Slot][SlotSettings.m_Item];
-	ColorRGBA Color = Settings.m_UseCustomColor ? color_cast<ColorRGBA>(ColorHSLA(SlotSettings.m_Color).UnclampLighting(ColorHSLA::DARKEST_LGT)) : ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+	const bool UseCustomColor = Settings.m_UseCustomColor && (Settings.m_CustomColorSlots & (1 << Slot));
+	const auto &aTextures = UseCustomColor ? m_aaaGrayTextures[Slot][SlotSettings.m_Item] : m_aaaTextures[Slot][SlotSettings.m_Item];
+	ColorRGBA Color = UseCustomColor ? color_cast<ColorRGBA>(ColorHSLA(SlotSettings.m_Color).UnclampLighting(ColorHSLA::DARKEST_LGT)) : ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 	Color.a = Alpha;
 
 	const float AngleDeg = Fit.m_Angle * 180.0f / pi;
@@ -468,6 +577,8 @@ void CAccessories::RenderSlot(int Slot, const SFit &Fit, vec2 Direction, float A
 		}
 		const vec2 Offset = pItem->m_Pos * BodyWidth * Scale + SliderOffset;
 		RenderCanvas(aTextures[0], Anchor + rotate(Offset, AngleDeg), pItem->m_Size * BodyWidth * Scale, Fit.m_Angle, Color);
+		if(UseCustomColor)
+			RenderCanvas(m_aaKeepWhiteTextures[Slot][SlotSettings.m_Item], Anchor + rotate(Offset, AngleDeg), pItem->m_Size * BodyWidth * Scale, Fit.m_Angle, ColorRGBA(1.0f, 1.0f, 1.0f, Alpha));
 		return;
 	}
 
@@ -492,6 +603,9 @@ void CAccessories::RenderSlot(int Slot, const SFit &Fit, vec2 Direction, float A
 
 void CAccessories::RenderBack(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 Pos, float Alpha, const SSettings &Settings)
 {
+	const SItemInfo *pBody = ItemInfo(SLOT_BODY, Settings.m_aSlots[SLOT_BODY].m_Item);
+	if(!pBody || pBody->m_Front)
+		return;
 	const SFit Fit = FitToTee(pAnim, pInfo, Pos);
 	RenderSlot(SLOT_BODY, Fit, vec2(1.0f, 0.0f), Alpha, Settings);
 }
@@ -500,6 +614,9 @@ void CAccessories::RenderFront(const CAnimState *pAnim, const CTeeRenderInfo *pI
 {
 	const SFit Fit = FitToTee(pAnim, pInfo, Pos);
 	RenderSlot(SLOT_FEET, Fit, Direction, Alpha, Settings);
+	const SItemInfo *pBody = ItemInfo(SLOT_BODY, Settings.m_aSlots[SLOT_BODY].m_Item);
+	if(pBody && pBody->m_Front)
+		RenderSlot(SLOT_BODY, Fit, Direction, Alpha, Settings);
 	RenderSlot(SLOT_FACE, Fit, Direction, Alpha, Settings);
 	RenderSlot(SLOT_HEAD, Fit, Direction, Alpha, Settings);
 }

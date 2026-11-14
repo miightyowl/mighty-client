@@ -608,24 +608,27 @@ void CMClientDetect::UpdatePet()
 		ForgetPetTold(Conn);
 	}
 
-	bool On;
-	char aSkin[MAX_SKIN_LENGTH];
-	bool UseCustomColor;
-	int ColorBody, ColorFeet;
-	LocalPet(&On, aSkin, sizeof(aSkin), &UseCustomColor, &ColorBody, &ColorFeet);
-	const CAccessories::SSettings Accessories = CAccessories::Settings(Conn == IClient::CONN_DUMMY);
-
-	if(On != Pet.m_On || str_comp(aSkin, Pet.m_aSkin) != 0 ||
-		UseCustomColor != Pet.m_UseCustomColor || ColorBody != Pet.m_ColorBody || ColorFeet != Pet.m_ColorFeet ||
-		!(Accessories == Pet.m_Accessories))
+	if(!GameClient()->m_Menus.IsActive())
 	{
-		ForgetPetTold(Conn);
-		Pet.m_On = On;
-		str_copy(Pet.m_aSkin, aSkin);
-		Pet.m_UseCustomColor = UseCustomColor;
-		Pet.m_ColorBody = ColorBody;
-		Pet.m_ColorFeet = ColorFeet;
-		Pet.m_Accessories = Accessories;
+		bool On;
+		char aSkin[MAX_SKIN_LENGTH];
+		bool UseCustomColor;
+		int ColorBody, ColorFeet;
+		LocalPet(&On, aSkin, sizeof(aSkin), &UseCustomColor, &ColorBody, &ColorFeet);
+		const CAccessories::SSettings Accessories = CAccessories::Settings(Conn == IClient::CONN_DUMMY);
+
+		if(On != Pet.m_On || str_comp(aSkin, Pet.m_aSkin) != 0 ||
+			UseCustomColor != Pet.m_UseCustomColor || ColorBody != Pet.m_ColorBody || ColorFeet != Pet.m_ColorFeet ||
+			!(Accessories == Pet.m_Accessories))
+		{
+			ForgetPetTold(Conn);
+			Pet.m_On = On;
+			str_copy(Pet.m_aSkin, aSkin);
+			Pet.m_UseCustomColor = UseCustomColor;
+			Pet.m_ColorBody = ColorBody;
+			Pet.m_ColorFeet = ColorFeet;
+			Pet.m_Accessories = Accessories;
+		}
 	}
 
 	if(!PetAudience(Conn))
@@ -638,7 +641,7 @@ void CMClientDetect::UpdatePet()
 		CPeer &Peer = m_aPeers[ClientId];
 		if(!Peer.m_Detected || Peer.m_aPetTold[Conn])
 			continue;
-		SendPetWhisper(ClientId, On, aSkin, UseCustomColor, ColorBody, ColorFeet, Accessories);
+		SendPetWhisper(ClientId, Pet.m_On, Pet.m_aSkin, Pet.m_UseCustomColor, Pet.m_ColorBody, Pet.m_ColorFeet, Pet.m_Accessories);
 		Peer.m_aPetTold[Conn] = true;
 	}
 }

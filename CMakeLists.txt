@@ -1229,24 +1229,39 @@ set(EXPECTED_DATA
   accessories/antlers.png
   accessories/bat_wings.png
   accessories/bow.png
+  accessories/bow_tie.png
   accessories/cherry_blossom.png
   accessories/christmas_hat.png
+  accessories/christmas_hat_black.png
+  accessories/christmas_hat_left.png
+  accessories/christmas_hat_long.png
+  accessories/clown_nose.png
   accessories/crown.png
   accessories/devilwing_left.png
   accessories/devilwing_right.png
+  accessories/disguise.png
   accessories/flower.png
   accessories/frog.png
   accessories/ghost.png
   accessories/glasses.png
+  accessories/golden_chain.png
+  accessories/golden_christmas_hat.png
   accessories/golden_halo.png
   accessories/heart.png
+  accessories/holly_hat.png
+  accessories/mohawk.png
+  accessories/moustache.png
   accessories/party_hat.png
   accessories/pirate_hat.png
+  accessories/plunger.png
+  accessories/propeller_cap.png
   accessories/round_glasses.png
+  accessories/rubber_duck.png
   accessories/snowflake.png
   accessories/sprout.png
   accessories/sunglasses.png
   accessories/top_hat.png
+  accessories/traffic_cone.png
   accessories/wing_left.png
   accessories/wing_right.png
   accessories/witch_hat.png
