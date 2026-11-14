@@ -3,6 +3,7 @@
 #include <base/secure.h>
 #include <base/str.h>
 
+#include <engine/gfx/image_loader.h>
 #include <engine/http.h>
 #include <engine/shared/json.h>
 
@@ -292,7 +293,9 @@ void CUnfinishedMapVote::PollMapPreviews()
 			size_t DataSize;
 			Preview.m_pRequest->Result(&pData, &DataSize);
 			CImageInfo ImageInfo;
-			if(Graphics()->LoadPng(ImageInfo, pData, DataSize, Name.c_str()))
+			CByteBufferReader Reader(pData, DataSize);
+			int PngliteIncompatible;
+			if(CImageLoader::LoadPng(Reader, Name.c_str(), ImageInfo, PngliteIncompatible))
 				Preview.m_Texture = Graphics()->LoadTextureRawMove(ImageInfo, 0, Name.c_str());
 		}
 		Preview.m_Failed = !Preview.m_Texture.IsValid();
