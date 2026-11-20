@@ -193,7 +193,7 @@ private:
 	static SFit FitToTee(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 Pos);
 	void RenderSlot(int Slot, const SFit &Fit, vec2 Direction, float Alpha, const SSettings &Settings);
 	void RenderParticles(const SFit &Fit, float Alpha, const SSettings &Settings);
-	void RenderCanvas(IGraphics::CTextureHandle Texture, vec2 Center, float Size, float Angle, ColorRGBA Color);
+	void RenderCanvas(IGraphics::CTextureHandle Texture, vec2 Center, float Size, float Angle, ColorRGBA Color, float HeightScale = 1.0f);
 };
 
 #endif

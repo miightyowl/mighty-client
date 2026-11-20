@@ -29,11 +29,14 @@ namespace
 		vec2 m_Pos;
 		bool m_Front = false;
 		bool m_KeepWhite = false;
+		float m_HeightScale = 1.0f;
 	};
+
+	constexpr float CHRISTMAS_HAT_HEIGHT = 0.82f;
 
 	const SItemInfo s_aHeadItems[CAccessories::NUM_HEADS] = {
 		{{nullptr, nullptr}, 0.0f, vec2(0.0f, 0.0f)},
-		{{"accessories/christmas_hat.png", nullptr}, 1.22f, vec2(0.085f, -0.205f), false, true},
+		{{"accessories/christmas_hat.png", nullptr}, 1.22f, vec2(0.085f, -0.205f), false, true, CHRISTMAS_HAT_HEIGHT},
 		{{"accessories/crown.png", nullptr}, 0.94f, vec2(0.0f, -0.13f)},
 		{{"accessories/witch_hat.png", nullptr}, 1.38f, vec2(0.0f, -0.34f)},
 		{{"accessories/sprout.png", nullptr}, 0.86f, vec2(0.0f, -0.135f)},
@@ -54,11 +57,11 @@ namespace
 		{{"accessories/rubber_duck.png", nullptr}, 0.86f, vec2(0.03f, -0.19f)},
 		{{"accessories/propeller_cap.png", nullptr}, 0.98f, vec2(0.1f, -0.125f)},
 		{{"accessories/plunger.png", nullptr}, 1.12f, vec2(0.005f, -0.385f)},
-		{{"accessories/golden_christmas_hat.png", nullptr}, 1.24f, vec2(0.1f, -0.205f), false, true},
-		{{"accessories/holly_hat.png", nullptr}, 1.22f, vec2(0.085f, -0.205f), false, true},
-		{{"accessories/christmas_hat_left.png", nullptr}, 1.22f, vec2(-0.09f, -0.205f), false, true},
-		{{"accessories/christmas_hat_long.png", nullptr}, 1.3f, vec2(0.125f, -0.02f), false, true},
-		{{"accessories/christmas_hat_black.png", nullptr}, 1.22f, vec2(0.085f, -0.205f), false, true},
+		{{"accessories/golden_christmas_hat.png", nullptr}, 1.24f, vec2(0.1f, -0.205f), false, true, CHRISTMAS_HAT_HEIGHT},
+		{{"accessories/holly_hat.png", nullptr}, 1.22f, vec2(0.085f, -0.205f), false, true, CHRISTMAS_HAT_HEIGHT},
+		{{"accessories/christmas_hat_left.png", nullptr}, 1.22f, vec2(-0.09f, -0.205f), false, true, CHRISTMAS_HAT_HEIGHT},
+		{{"accessories/christmas_hat_long.png", nullptr}, 1.3f, vec2(0.125f, -0.02f), false, true, CHRISTMAS_HAT_HEIGHT},
+		{{"accessories/christmas_hat_black.png", nullptr}, 1.22f, vec2(0.085f, -0.205f), false, true, CHRISTMAS_HAT_HEIGHT},
 	};
 	const SItemInfo s_aBodyItems[CAccessories::NUM_BODIES] = {
 		{{nullptr, nullptr}, 0.0f, vec2(0.0f, 0.0f)},
@@ -634,7 +637,7 @@ CAccessories::SFit CAccessories::FitToTee(const CAnimState *pAnim, const CTeeRen
 	return Fit;
 }
 
-void CAccessories::RenderCanvas(IGraphics::CTextureHandle Texture, vec2 Center, float Size, float Angle, ColorRGBA Color)
+void CAccessories::RenderCanvas(IGraphics::CTextureHandle Texture, vec2 Center, float Size, float Angle, ColorRGBA Color, float HeightScale)
 {
 	if(!Texture.IsValid())
 		return;
@@ -642,7 +645,7 @@ void CAccessories::RenderCanvas(IGraphics::CTextureHandle Texture, vec2 Center, 
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(Color);
 	Graphics()->QuadsSetRotation(Angle);
-	IGraphics::CQuadItem QuadItem(Center.x, Center.y, Size, Size);
+	IGraphics::CQuadItem QuadItem(Center.x, Center.y, Size, Size * HeightScale);
 	Graphics()->QuadsDraw(&QuadItem, 1);
 	Graphics()->QuadsEnd();
 	Graphics()->QuadsSetRotation(0.0f);
@@ -679,9 +682,9 @@ void CAccessories::RenderSlot(int Slot, const SFit &Fit, vec2 Direction, float A
 			Anchor = Fit.m_Center + rotate(vec2(0.0f, AnchorY), AngleDeg);
 		}
 		const vec2 Offset = pItem->m_Pos * BodyWidth * Scale + SliderOffset;
-		RenderCanvas(aTextures[0], Anchor + rotate(Offset, AngleDeg), pItem->m_Size * BodyWidth * Scale, Fit.m_Angle, Color);
+		RenderCanvas(aTextures[0], Anchor + rotate(Offset, AngleDeg), pItem->m_Size * BodyWidth * Scale, Fit.m_Angle, Color, pItem->m_HeightScale);
 		if(UseCustomColor)
-			RenderCanvas(m_aaKeepWhiteTextures[Slot][SlotSettings.m_Item], Anchor + rotate(Offset, AngleDeg), pItem->m_Size * BodyWidth * Scale, Fit.m_Angle, ColorRGBA(1.0f, 1.0f, 1.0f, Alpha));
+			RenderCanvas(m_aaKeepWhiteTextures[Slot][SlotSettings.m_Item], Anchor + rotate(Offset, AngleDeg), pItem->m_Size * BodyWidth * Scale, Fit.m_Angle, ColorRGBA(1.0f, 1.0f, 1.0f, Alpha), pItem->m_HeightScale);
 		return;
 	}
 
