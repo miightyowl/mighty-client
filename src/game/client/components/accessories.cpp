@@ -6,11 +6,15 @@
 #include <engine/shared/config.h>
 #include <engine/storage.h>
 
+#include <generated/client_data.h>
+
 #include <game/client/animstate.h>
+#include <game/client/gameclient.h>
 #include <game/client/render.h>
 #include <game/localization.h>
 
 #include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -74,6 +78,71 @@ namespace
 		{{"accessories/clown_nose.png", nullptr}, 0.37f, vec2(0.0f, 0.14f)},
 	};
 
+	constexpr int WIRE_OLD_SLOTS = (1 << 4) - 1;
+	constexpr int WIRE_PARTIAL = 1 << 4;
+	constexpr int WIRE_PARTICLES = 1 << 5;
+
+	const char *const s_apParticleKeys[CAccessories::NUM_PARTICLES] = {
+		"",
+		"particles_sparkles",
+		"particles_golden_sparkles",
+		"particles_rainbow_sparkles",
+		"particles_orbit",
+		"particles_hearts",
+		"particles_snow",
+		"particles_embers",
+		"particles_bubbles",
+		"particles_smoke",
+		"particles_petals",
+	};
+
+	struct SParticleKind
+	{
+		int m_Sprite;
+		int m_HeadItem;
+		int m_Num;
+		float m_LifeSpan;
+		float m_SpawnRadius;
+		bool m_SpawnLine;
+		vec2 m_SpawnOffset;
+		vec2 m_Vel;
+		float m_Wobble;
+		float m_StartSize;
+		float m_EndSize;
+		float m_SizeVariation;
+		float m_StartAlpha;
+		float m_EndAlpha;
+		bool m_FadeIn;
+		float m_RotSpeed;
+		ColorRGBA m_Color;
+		bool m_Rainbow;
+		bool m_Additive;
+		bool m_Orbit;
+	};
+
+	const SParticleKind s_aParticleKinds[CAccessories::NUM_PARTICLES] = {
+		{},
+		{SPRITE_PART_SPARKLE, 0, 25, 0.5f, 40.0f, false, vec2(0.0f, 0.0f), vec2(0.0f, 0.0f), 0.0f, 0.0f, 20.0f, 10.0f, 1.0f, 0.2f, false, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), false, false, false},
+		{SPRITE_PART_SPARKLE, 0, 25, 0.5f, 40.0f, false, vec2(0.0f, 0.0f), vec2(0.0f, 0.0f), 0.0f, 0.0f, 20.0f, 10.0f, 1.0f, 0.2f, false, 0.0f, ColorRGBA(1.0f, 0.82f, 0.25f, 1.0f), false, false, false},
+		{SPRITE_PART_SPARKLE, 0, 25, 0.5f, 40.0f, false, vec2(0.0f, 0.0f), vec2(0.0f, 0.0f), 0.0f, 0.0f, 20.0f, 10.0f, 1.0f, 0.2f, false, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), true, false, false},
+		{SPRITE_PART_SPARKLE, 0, 6, 4.0f, 38.0f, false, vec2(0.0f, 0.0f), vec2(0.0f, 0.0f), 0.0f, 14.0f, 14.0f, 0.0f, 0.9f, 0.9f, false, 0.0f, ColorRGBA(0.85f, 0.95f, 1.0f, 1.0f), false, false, true},
+		{-1, CAccessories::HEAD_HEART, 6, 1.8f, 28.0f, false, vec2(0.0f, 0.0f), vec2(0.0f, -28.0f), 6.0f, 9.0f, 13.0f, 2.0f, 1.0f, 0.0f, true, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), false, false, false},
+		{SPRITE_PART_SNOWFLAKE, 0, 12, 2.2f, 45.0f, true, vec2(0.0f, -50.0f), vec2(0.0f, 42.0f), 8.0f, 9.0f, 9.0f, 4.0f, 1.0f, 0.0f, true, 1.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), false, false, false},
+		{SPRITE_PART_BALL, 0, 18, 0.9f, 24.0f, false, vec2(0.0f, 10.0f), vec2(0.0f, -55.0f), 5.0f, 9.0f, 0.0f, 3.0f, 1.0f, 0.0f, false, 0.0f, ColorRGBA(1.0f, 0.55f, 0.15f, 1.0f), false, true, false},
+		{SPRITE_PART_BALL, 0, 8, 1.6f, 30.0f, false, vec2(0.0f, 10.0f), vec2(0.0f, -35.0f), 7.0f, 5.0f, 11.0f, 3.0f, 0.6f, 0.0f, true, 0.0f, ColorRGBA(0.55f, 0.8f, 1.0f, 1.0f), false, false, false},
+		{SPRITE_PART_SMOKE, 0, 10, 1.4f, 24.0f, false, vec2(0.0f, 12.0f), vec2(0.0f, -25.0f), 4.0f, 14.0f, 28.0f, 6.0f, 0.45f, 0.0f, false, 0.8f, ColorRGBA(0.6f, 0.6f, 0.65f, 1.0f), false, false, false},
+		{-1, CAccessories::HEAD_CHERRY_BLOSSOM, 7, 2.4f, 45.0f, true, vec2(0.0f, -50.0f), vec2(10.0f, 32.0f), 12.0f, 9.0f, 9.0f, 3.0f, 1.0f, 0.0f, true, 1.6f, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), false, false, false},
+	};
+
+	float ParticleRandom(int Index, int Cycle, int Value)
+	{
+		uint32_t Hash = (uint32_t)Index * 73856093u ^ (uint32_t)Cycle * 19349663u ^ (uint32_t)Value * 83492791u;
+		Hash ^= Hash >> 13;
+		Hash *= 0x5bd1e995u;
+		Hash ^= Hash >> 15;
+		return (float)(Hash % 10000u) / 10000.0f;
+	}
+
 	char *ItemList(int List)
 	{
 		return g_Config.m_ClMClientAccessoryFavorites;
@@ -103,6 +172,7 @@ CAccessories::SConfig CAccessories::Config(bool Dummy)
 		Config.m_aSlots[SLOT_BODY] = {&g_Config.m_ClMClientDummyAccessoryBody, &g_Config.m_ClMClientDummyAccessoryBodySize, &g_Config.m_ClMClientDummyAccessoryBodySpread, &g_Config.m_ClMClientDummyAccessoryBodyY, &g_Config.m_ClMClientDummyAccessoryBodyColor};
 		Config.m_aSlots[SLOT_FEET] = {&g_Config.m_ClMClientDummyAccessoryFeet, &g_Config.m_ClMClientDummyAccessoryFeetSize, &g_Config.m_ClMClientDummyAccessoryFeetX, &g_Config.m_ClMClientDummyAccessoryFeetY, &g_Config.m_ClMClientDummyAccessoryFeetColor};
 		Config.m_aSlots[SLOT_FACE] = {&g_Config.m_ClMClientDummyAccessoryFace, &g_Config.m_ClMClientDummyAccessoryFaceSize, &g_Config.m_ClMClientDummyAccessoryFaceX, &g_Config.m_ClMClientDummyAccessoryFaceY, &g_Config.m_ClMClientDummyAccessoryFaceColor};
+		Config.m_aSlots[SLOT_PARTICLES] = {&g_Config.m_ClMClientDummyAccessoryParticles, &g_Config.m_ClMClientDummyAccessoryParticlesSize, &g_Config.m_ClMClientDummyAccessoryParticlesX, &g_Config.m_ClMClientDummyAccessoryParticlesY, &g_Config.m_ClMClientDummyAccessoryParticlesColor};
 		Config.m_pUseCustomColor = &g_Config.m_ClMClientDummyAccessoryUseCustomColor;
 		Config.m_pCustomColorSlots = &g_Config.m_ClMClientDummyAccessoryCustomColorSlots;
 	}
@@ -112,6 +182,7 @@ CAccessories::SConfig CAccessories::Config(bool Dummy)
 		Config.m_aSlots[SLOT_BODY] = {&g_Config.m_ClMClientAccessoryBody, &g_Config.m_ClMClientAccessoryBodySize, &g_Config.m_ClMClientAccessoryBodySpread, &g_Config.m_ClMClientAccessoryBodyY, &g_Config.m_ClMClientAccessoryBodyColor};
 		Config.m_aSlots[SLOT_FEET] = {&g_Config.m_ClMClientAccessoryFeet, &g_Config.m_ClMClientAccessoryFeetSize, &g_Config.m_ClMClientAccessoryFeetX, &g_Config.m_ClMClientAccessoryFeetY, &g_Config.m_ClMClientAccessoryFeetColor};
 		Config.m_aSlots[SLOT_FACE] = {&g_Config.m_ClMClientAccessoryFace, &g_Config.m_ClMClientAccessoryFaceSize, &g_Config.m_ClMClientAccessoryFaceX, &g_Config.m_ClMClientAccessoryFaceY, &g_Config.m_ClMClientAccessoryFaceColor};
+		Config.m_aSlots[SLOT_PARTICLES] = {&g_Config.m_ClMClientAccessoryParticles, &g_Config.m_ClMClientAccessoryParticlesSize, &g_Config.m_ClMClientAccessoryParticlesX, &g_Config.m_ClMClientAccessoryParticlesY, &g_Config.m_ClMClientAccessoryParticlesColor};
 		Config.m_pUseCustomColor = &g_Config.m_ClMClientAccessoryUseCustomColor;
 		Config.m_pCustomColorSlots = &g_Config.m_ClMClientAccessoryCustomColorSlots;
 	}
@@ -146,7 +217,12 @@ void CAccessories::Serialize(const SSettings &Settings, char *pBuf, int BufSize)
 {
 	int CustomColor = 0;
 	if(Settings.m_UseCustomColor)
-		CustomColor = Settings.m_CustomColorSlots == CUSTOM_COLOR_ALL_SLOTS ? 1 : (CUSTOM_COLOR_PARTIAL | Settings.m_CustomColorSlots);
+	{
+		if(Settings.m_CustomColorSlots == CUSTOM_COLOR_ALL_SLOTS)
+			CustomColor = 1;
+		else
+			CustomColor = WIRE_PARTIAL | (Settings.m_CustomColorSlots & WIRE_OLD_SLOTS) | ((Settings.m_CustomColorSlots & (1 << SLOT_PARTICLES)) ? WIRE_PARTICLES : 0);
+	}
 	str_format(pBuf, BufSize, "%d", CustomColor);
 	for(const SSlotSettings &Slot : Settings.m_aSlots)
 	{
@@ -168,7 +244,10 @@ bool CAccessories::Deserialize(const char *pText, SSettings *pSettings)
 	if(!pRest || !str_toint(aPart, &CustomColor))
 		return false;
 	Settings.m_UseCustomColor = CustomColor != 0;
-	Settings.m_CustomColorSlots = (CustomColor & CUSTOM_COLOR_PARTIAL) ? (CustomColor & CUSTOM_COLOR_ALL_SLOTS) : CUSTOM_COLOR_ALL_SLOTS;
+	if(CustomColor & WIRE_PARTIAL)
+		Settings.m_CustomColorSlots = (CustomColor & WIRE_OLD_SLOTS) | ((CustomColor & WIRE_PARTICLES) ? (1 << SLOT_PARTICLES) : 0);
+	else
+		Settings.m_CustomColorSlots = CUSTOM_COLOR_ALL_SLOTS;
 
 	for(SSlotSettings &Slot : Settings.m_aSlots)
 	{
@@ -201,6 +280,12 @@ bool CAccessories::Deserialize(const char *pText, SSettings *pSettings)
 void CAccessories::ItemKey(int Slot, int Item, char *pBuf, int BufSize)
 {
 	pBuf[0] = '\0';
+	if(Slot == SLOT_PARTICLES)
+	{
+		if(Item > 0 && Item < NUM_PARTICLES)
+			str_copy(pBuf, s_apParticleKeys[Item], BufSize);
+		return;
+	}
 	const SItemInfo *pInfo = ItemInfo(Slot, Item);
 	if(!pInfo)
 		return;
@@ -344,6 +429,7 @@ int CAccessories::NumItems(int Slot)
 	case SLOT_BODY: return NUM_BODIES;
 	case SLOT_FEET: return NUM_FEET;
 	case SLOT_FACE: return NUM_FACES;
+	case SLOT_PARTICLES: return NUM_PARTICLES;
 	default: return 0;
 	}
 }
@@ -407,6 +493,22 @@ const char *CAccessories::ItemName(int Slot, int Item)
 		case FACE_CLOWN_NOSE: return Localize("Clown nose");
 		}
 	}
+	else if(Slot == SLOT_PARTICLES)
+	{
+		switch(Item)
+		{
+		case PARTICLES_SPARKLES: return Localize("Sparkles");
+		case PARTICLES_GOLDEN_SPARKLES: return Localize("Golden sparkles");
+		case PARTICLES_RAINBOW_SPARKLES: return Localize("Rainbow sparkles");
+		case PARTICLES_ORBIT: return Localize("Orbiting stars");
+		case PARTICLES_HEARTS: return Localize("Floating hearts");
+		case PARTICLES_SNOW: return Localize("Snowfall");
+		case PARTICLES_EMBERS: return Localize("Embers");
+		case PARTICLES_BUBBLES: return Localize("Bubbles");
+		case PARTICLES_SMOKE: return Localize("Smoke");
+		case PARTICLES_PETALS: return Localize("Cherry petals");
+		}
+	}
 	return "";
 }
 
@@ -418,6 +520,7 @@ const char *CAccessories::SlotName(int Slot)
 	case SLOT_BODY: return Localize("Body");
 	case SLOT_FEET: return Localize("Feet");
 	case SLOT_FACE: return Localize("Face");
+	case SLOT_PARTICLES: return Localize("Particles");
 	default: return "";
 	}
 }
@@ -601,15 +704,95 @@ void CAccessories::RenderSlot(int Slot, const SFit &Fit, vec2 Direction, float A
 	RenderCanvas(aTextures[0], Fit.m_Center + rotate(Offset, AngleDeg), Size, Fit.m_Angle, Color);
 }
 
+void CAccessories::RenderParticles(const SFit &Fit, float Alpha, const SSettings &Settings)
+{
+	const SSlotSettings &SlotSettings = Settings.m_aSlots[SLOT_PARTICLES];
+	if(SlotSettings.m_Item <= 0 || SlotSettings.m_Item >= NUM_PARTICLES)
+		return;
+	const SParticleKind &Kind = s_aParticleKinds[SlotSettings.m_Item];
+	const bool UseCustomColor = Settings.m_UseCustomColor && (Settings.m_CustomColorSlots & (1 << SLOT_PARTICLES));
+	IGraphics::CTextureHandle Texture;
+	if(Kind.m_Sprite < 0)
+		Texture = (UseCustomColor ? m_aaaGrayTextures : m_aaaTextures)[SLOT_HEAD][Kind.m_HeadItem][0];
+	else if(Kind.m_Sprite >= SPRITE_PART_SNOWFLAKE)
+		Texture = GameClient()->m_ExtrasSkin.m_aSpriteParticles[Kind.m_Sprite - SPRITE_PART_SNOWFLAKE];
+	else
+		Texture = GameClient()->m_ParticlesSkin.m_aSpriteParticles[Kind.m_Sprite - SPRITE_PART_SLICE];
+	if(!Texture.IsValid())
+		return;
+
+	ColorRGBA CustomColor = Kind.m_Color;
+	if(UseCustomColor)
+		CustomColor = color_cast<ColorRGBA>(ColorHSLA(SlotSettings.m_Color).UnclampLighting(ColorHSLA::DARKEST_LGT));
+
+	const float Scale = Fit.m_Scale * SlotSettings.m_Size / 100.0f;
+	const vec2 Center = Fit.m_BodyPos + vec2(SlotSettings.m_X, -SlotSettings.m_Y) * Fit.m_Scale + Kind.m_SpawnOffset * Scale;
+	const float Time = LocalTime();
+
+	if(Kind.m_Additive)
+		Graphics()->BlendAdditive();
+	Graphics()->TextureSet(Texture);
+	Graphics()->QuadsBegin();
+	for(int i = 0; i < Kind.m_Num; i++)
+	{
+		vec2 Pos;
+		float Size, ParticleAlpha, Rotation = 0.0f;
+		float Hue = ParticleRandom(i, 0, 7);
+		if(Kind.m_Orbit)
+		{
+			const float Angle = (float)i / (float)Kind.m_Num * 2.0f * pi + Time * 2.0f * pi / Kind.m_LifeSpan;
+			Pos = Center + vec2(std::cos(Angle), std::sin(Angle) * 0.35f) * Kind.m_SpawnRadius * Scale;
+			Size = Kind.m_StartSize * (1.0f + 0.25f * std::sin(Time * 5.0f + (float)i)) * (0.85f + 0.15f * std::sin(Angle));
+			ParticleAlpha = Kind.m_StartAlpha * (std::sin(Angle) > 0.0f ? 1.0f : 0.6f);
+		}
+		else
+		{
+			const float Life = Time / Kind.m_LifeSpan + ((float)i + ParticleRandom(i, 0, 0) * 0.5f) / (float)Kind.m_Num;
+			const int Cycle = (int)std::floor(Life);
+			const float Age = Life - (float)Cycle;
+			const float Seconds = Age * Kind.m_LifeSpan;
+
+			vec2 Spawn;
+			if(Kind.m_SpawnLine)
+				Spawn = vec2((ParticleRandom(i, Cycle, 1) * 2.0f - 1.0f) * Kind.m_SpawnRadius, 0.0f);
+			else
+				Spawn = direction(ParticleRandom(i, Cycle, 1) * 2.0f * pi) * (ParticleRandom(i, Cycle, 2) * Kind.m_SpawnRadius);
+			const float Wobble = std::sin(Seconds * 3.0f + ParticleRandom(i, Cycle, 3) * 2.0f * pi) * Kind.m_Wobble;
+			Pos = Center + (Spawn + Kind.m_Vel * Seconds + vec2(Wobble, 0.0f)) * Scale;
+
+			const float EndSize = Kind.m_EndSize + ParticleRandom(i, Cycle, 4) * Kind.m_SizeVariation;
+			Size = mix(Kind.m_StartSize, EndSize, Age);
+			ParticleAlpha = Kind.m_FadeIn ? Kind.m_StartAlpha * std::sin(Age * pi) : mix(Kind.m_StartAlpha, Kind.m_EndAlpha, Age);
+			if(Kind.m_RotSpeed != 0.0f)
+				Rotation = ParticleRandom(i, Cycle, 5) * 2.0f * pi + Kind.m_RotSpeed * Seconds;
+			Hue = ParticleRandom(i, Cycle, 6);
+		}
+
+		ColorRGBA Color = CustomColor;
+		if(Kind.m_Rainbow && !UseCustomColor)
+			Color = color_cast<ColorRGBA>(ColorHSLA(std::fmod(Hue + Time * 0.2f, 1.0f), 1.0f, 0.65f));
+		Color.a = ParticleAlpha * Alpha;
+		Graphics()->SetColor(Color);
+		Graphics()->QuadsSetRotation(Rotation);
+		IGraphics::CQuadItem QuadItem(Pos.x, Pos.y, Size * Scale, Size * Scale);
+		Graphics()->QuadsDraw(&QuadItem, 1);
+	}
+	Graphics()->QuadsEnd();
+	Graphics()->QuadsSetRotation(0.0f);
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+	if(Kind.m_Additive)
+		Graphics()->BlendNormal();
+}
+
 void CAccessories::RenderBack(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 Pos, float Alpha, const SSettings &Settings)
 {
-	const SItemInfo *pBody = ItemInfo(SLOT_BODY, Settings.m_aSlots[SLOT_BODY].m_Item);
-	if(!pBody || pBody->m_Front)
-		return;
 	CScreenRect OldScreen(0.0f, 0.0f, 0.0f, 0.0f);
 	const bool UpsideDown = RenderTools()->BeginUpsideDown(pInfo, Pos, OldScreen);
 	const SFit Fit = FitToTee(pAnim, pInfo, Pos);
-	RenderSlot(SLOT_BODY, Fit, vec2(1.0f, 0.0f), Alpha, Settings);
+	RenderParticles(Fit, Alpha, Settings);
+	const SItemInfo *pBody = ItemInfo(SLOT_BODY, Settings.m_aSlots[SLOT_BODY].m_Item);
+	if(pBody && !pBody->m_Front)
+		RenderSlot(SLOT_BODY, Fit, vec2(1.0f, 0.0f), Alpha, Settings);
 	if(UpsideDown)
 		Graphics()->MapScreen(OldScreen);
 }

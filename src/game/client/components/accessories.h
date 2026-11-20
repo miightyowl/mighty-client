@@ -20,6 +20,7 @@ public:
 		SLOT_BODY,
 		SLOT_FEET,
 		SLOT_FACE,
+		SLOT_PARTICLES,
 		NUM_SLOTS,
 	};
 
@@ -86,6 +87,22 @@ public:
 
 	enum
 	{
+		PARTICLES_NONE = 0,
+		PARTICLES_SPARKLES,
+		PARTICLES_GOLDEN_SPARKLES,
+		PARTICLES_RAINBOW_SPARKLES,
+		PARTICLES_ORBIT,
+		PARTICLES_HEARTS,
+		PARTICLES_SNOW,
+		PARTICLES_EMBERS,
+		PARTICLES_BUBBLES,
+		PARTICLES_SMOKE,
+		PARTICLES_PETALS,
+		NUM_PARTICLES,
+	};
+
+	enum
+	{
 		MAX_ITEMS = 32,
 	};
 
@@ -97,7 +114,6 @@ public:
 	enum
 	{
 		CUSTOM_COLOR_ALL_SLOTS = (1 << NUM_SLOTS) - 1,
-		CUSTOM_COLOR_PARTIAL = 1 << NUM_SLOTS,
 	};
 
 	struct SSlotSettings
@@ -176,6 +192,7 @@ private:
 	};
 	static SFit FitToTee(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 Pos);
 	void RenderSlot(int Slot, const SFit &Fit, vec2 Direction, float Alpha, const SSettings &Settings);
+	void RenderParticles(const SFit &Fit, float Alpha, const SSettings &Settings);
 	void RenderCanvas(IGraphics::CTextureHandle Texture, vec2 Center, float Size, float Angle, ColorRGBA Color);
 };
 

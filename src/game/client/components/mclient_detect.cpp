@@ -655,10 +655,10 @@ void CMClientDetect::SendPetWhisper(int ClientId, bool On, const char *pSkin, bo
 		HexEncode(pSkin, aEncodedSkin, sizeof(aEncodedSkin));
 	if(On && aEncodedSkin[0] == '\0')
 		str_copy(aEncodedSkin, "-");
-	char aMessage[192];
+	char aMessage[256];
 	if(CAccessories::AnyEquipped(Accessories))
 	{
-		char aAccessories[96];
+		char aAccessories[128];
 		CAccessories::Serialize(Accessories, aAccessories, sizeof(aAccessories));
 		const bool PetColors = On && UseCustomColor;
 		str_format(aMessage, sizeof(aMessage), "%s%s %d %08x %08x %s%s", PET_WHISPER_PREFIX, aEncodedSkin, PetColors ? 1 : 0,

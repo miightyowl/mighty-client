@@ -607,7 +607,7 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
 	m_AccessorySlot = std::clamp(m_AccessorySlot, 0, (int)CAccessories::NUM_SLOTS - 1);
-	static const int s_aSlotOrder[] = {CAccessories::SLOT_HEAD, CAccessories::SLOT_FACE, CAccessories::SLOT_BODY};
+	static const int s_aSlotOrder[] = {CAccessories::SLOT_HEAD, CAccessories::SLOT_FACE, CAccessories::SLOT_BODY, CAccessories::SLOT_PARTICLES};
 	const int NumSlotTabs = (int)std::size(s_aSlotOrder);
 	const CAccessories::SConfig Config = CAccessories::Config(m_Dummy);
 	const CAccessories::SSlotConfig &SlotConfig = Config.m_aSlots[m_AccessorySlot];
