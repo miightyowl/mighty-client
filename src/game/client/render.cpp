@@ -253,13 +253,34 @@ void CRenderTools::GetRenderTeeOffsetToRenderedTee(const CAnimState *pAnim, cons
 	TeeOffsetToMid.y = -MidOfRendered;
 }
 
+bool CRenderTools::BeginUpsideDown(const CTeeRenderInfo *pInfo, vec2 Pos, CScreenRect &OldScreen) const
+{
+	if(!g_Config.m_ClMClientUpsideDown)
+		return false;
+	vec2 OffsetToMid;
+	GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), pInfo, OffsetToMid);
+	const float MirrorY = Pos.y - OffsetToMid.y;
+	OldScreen = Graphics()->GetScreen();
+	Graphics()->MapScreen(CScreenRect(
+		vec2(OldScreen.m_TopLeft.x, 2.0f * MirrorY - OldScreen.m_TopLeft.y),
+		vec2(OldScreen.m_BottomRight.x, 2.0f * MirrorY - OldScreen.m_BottomRight.y)));
+	return true;
+}
+
 void CRenderTools::RenderTee(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, int Emote, vec2 Dir, vec2 Pos, float Alpha) const
 {
+	CScreenRect OldScreen(0.0f, 0.0f, 0.0f, 0.0f);
+	const bool UpsideDown = BeginUpsideDown(pInfo, Pos, OldScreen);
+	if(UpsideDown)
+		Dir.y = -Dir.y;
+
 	if(pInfo->m_aSixup[g_Config.m_ClDummy].PartTexture(protocol7::SKINPART_BODY).IsValid())
 		RenderTee7(pAnim, pInfo, Emote, Dir, Pos, Alpha);
 	else
 		RenderTee6(pAnim, pInfo, Emote, Dir, Pos, Alpha);
 
+	if(UpsideDown)
+		Graphics()->MapScreen(OldScreen);
 	Graphics()->SetColor(1.f, 1.f, 1.f, 1.f);
 	Graphics()->QuadsSetRotation(0);
 }

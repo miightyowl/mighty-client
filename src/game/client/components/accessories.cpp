@@ -606,12 +606,20 @@ void CAccessories::RenderBack(const CAnimState *pAnim, const CTeeRenderInfo *pIn
 	const SItemInfo *pBody = ItemInfo(SLOT_BODY, Settings.m_aSlots[SLOT_BODY].m_Item);
 	if(!pBody || pBody->m_Front)
 		return;
+	CScreenRect OldScreen(0.0f, 0.0f, 0.0f, 0.0f);
+	const bool UpsideDown = RenderTools()->BeginUpsideDown(pInfo, Pos, OldScreen);
 	const SFit Fit = FitToTee(pAnim, pInfo, Pos);
 	RenderSlot(SLOT_BODY, Fit, vec2(1.0f, 0.0f), Alpha, Settings);
+	if(UpsideDown)
+		Graphics()->MapScreen(OldScreen);
 }
 
 void CAccessories::RenderFront(const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 Pos, vec2 Direction, float Alpha, const SSettings &Settings)
 {
+	CScreenRect OldScreen(0.0f, 0.0f, 0.0f, 0.0f);
+	const bool UpsideDown = RenderTools()->BeginUpsideDown(pInfo, Pos, OldScreen);
+	if(UpsideDown)
+		Direction.y = -Direction.y;
 	const SFit Fit = FitToTee(pAnim, pInfo, Pos);
 	RenderSlot(SLOT_FEET, Fit, Direction, Alpha, Settings);
 	const SItemInfo *pBody = ItemInfo(SLOT_BODY, Settings.m_aSlots[SLOT_BODY].m_Item);
@@ -619,4 +627,6 @@ void CAccessories::RenderFront(const CAnimState *pAnim, const CTeeRenderInfo *pI
 		RenderSlot(SLOT_BODY, Fit, Direction, Alpha, Settings);
 	RenderSlot(SLOT_FACE, Fit, Direction, Alpha, Settings);
 	RenderSlot(SLOT_HEAD, Fit, Direction, Alpha, Settings);
+	if(UpsideDown)
+		Graphics()->MapScreen(OldScreen);
 }
