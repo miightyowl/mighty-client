@@ -968,12 +968,14 @@ void CMenus::RenderServerInfoMotd(CUIRect Motd)
 
 	static float s_MotdHeight = 0.0f;
 	static int64_t s_MotdLastUpdateTime = -1;
-	if(!m_MotdTextContainerIndex.Valid() || s_MotdLastUpdateTime == -1 || s_MotdLastUpdateTime != GameClient()->m_Motd.ServerMotdUpdateTime())
+	static int s_MotdHideMillis = -1;
+	if(!m_MotdTextContainerIndex.Valid() || s_MotdLastUpdateTime == -1 || s_MotdLastUpdateTime != GameClient()->m_Motd.ServerMotdUpdateTime() || s_MotdHideMillis != g_Config.m_ClMClientHideMillis)
 	{
+		s_MotdHideMillis = g_Config.m_ClMClientHideMillis;
 		CTextCursor Cursor;
 		Cursor.m_FontSize = MotdFontSize;
 		Cursor.m_LineWidth = Motd.w;
-		TextRender()->RecreateTextContainer(m_MotdTextContainerIndex, &Cursor, GameClient()->m_Motd.ServerMotd());
+		TextRender()->RecreateTextContainer(m_MotdTextContainerIndex, &Cursor, GameClient()->m_Motd.DisplayMotd());
 		s_MotdHeight = Cursor.Height();
 		s_MotdLastUpdateTime = GameClient()->m_Motd.ServerMotdUpdateTime();
 	}

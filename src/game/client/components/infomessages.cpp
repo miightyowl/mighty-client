@@ -305,7 +305,7 @@ void CInfoMessages::OnRaceFinishMessage(const CNetMsg_Sv_RaceFinish *pMsg)
 		str_time_float(absolute(Finish.m_Diff) / 1000.0f, ETimeFormat::HOURS_CENTISECS, aBuf, sizeof(aBuf));
 		str_format(Finish.m_aDiffText, sizeof(Finish.m_aDiffText), "(%c%s)", Finish.m_Diff < 0 ? '-' : '+', aBuf);
 	}
-	str_time_float(pMsg->m_Time / 1000.0f, ETimeFormat::HOURS_CENTISECS, Finish.m_aTimeText, sizeof(Finish.m_aTimeText));
+	str_time_float(pMsg->m_Time / 1000.0f, g_Config.m_ClMClientHideMillis ? ETimeFormat::HOURS : ETimeFormat::HOURS_CENTISECS, Finish.m_aTimeText, sizeof(Finish.m_aTimeText));
 
 	AddInfoMsg(Finish);
 }

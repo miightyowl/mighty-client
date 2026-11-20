@@ -249,11 +249,14 @@ void CScoreboard::RenderTitleScore(CUIRect ScoreLabel, int Team, float TitleFont
 	{
 		if(GameClient()->m_MapDetails.HasMedianTime())
 		{
+			const int MedianSeconds = GameClient()->m_MapDetails.MedianTimeSeconds();
+			const int64_t MotdMedianMillis = GameClient()->m_Motd.MedianTimeMillis();
+			const bool UseMotdMedian = MotdMedianMillis >= 0 && absolute(MotdMedianMillis / 1000 - MedianSeconds) <= 1;
 			Ui()->RenderTime(ScoreLabel,
 				TitleFontSize,
-				GameClient()->m_MapDetails.MedianTimeSeconds(),
+				UseMotdMedian ? (int)(MotdMedianMillis / 1000) : MedianSeconds,
 				false,
-				-1,
+				UseMotdMedian ? (int)(MotdMedianMillis % 1000) : -1,
 				false,
 				m_TitleScore, m_TitleScoreMillis, TextRender()->DefaultTextColor());
 			return;
@@ -782,7 +785,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 			ScorePosition.h = Row.h;
 
 			auto DoMillisecondTooltip = [&](const CUIRect *pRect, int64_t TimeInMillis, float WidthHint) {
-				if(m_MouseUnlocked && pRect->Inside(Ui()->MousePos()))
+				if(!g_Config.m_ClMClientHideMillis && m_MouseUnlocked && pRect->Inside(Ui()->MousePos()))
 				{
 					Ui()->SetHotItem(&Player.m_TimeTooltipId);
 					str_time(TimeInMillis / 10, ETimeFormat::HOURS_CENTISECS, Player.m_aTimeTooltip, sizeof(Player.m_aTimeTooltip));

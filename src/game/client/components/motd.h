@@ -15,6 +15,9 @@
 class CMotd : public CComponent
 {
 	char m_aServerMotd[std::size(g_Config.m_SvMotd)];
+	char m_aServerMotdNoMillis[std::size(g_Config.m_SvMotd)];
+	int m_ShownHideMillis = -1;
+	int64_t m_MedianTimeMillis = -1;
 	int64_t m_ServerMotdTime;
 	int64_t m_ServerMotdUpdateTime;
 	std::chrono::nanoseconds m_ShownSince{0}; // when the MOTD last became visible
@@ -28,6 +31,8 @@ public:
 	int Sizeof() const override { return sizeof(*this); }
 
 	const char *ServerMotd() const { return m_aServerMotd; }
+	const char *DisplayMotd() const { return g_Config.m_ClMClientHideMillis ? m_aServerMotdNoMillis : m_aServerMotd; }
+	int64_t MedianTimeMillis() const { return m_MedianTimeMillis; }
 	int64_t ServerMotdUpdateTime() const { return m_ServerMotdUpdateTime; }
 	void Clear();
 	bool IsActive() const;

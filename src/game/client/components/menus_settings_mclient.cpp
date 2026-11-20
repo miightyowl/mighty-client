@@ -98,11 +98,9 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFriendsCommunityFilter, Localize("Only show friends in enabled communities"), &g_Config.m_ClMClientFriendsCommunityFilter, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFinishFireworks, Localize("Play fireworks when you finish"), &g_Config.m_ClMClientFinishFireworks, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientSaveNoticeHideCode, Localize("Map Saves: Hide names and password when entering a new map"), &g_Config.m_ClMClientSaveNoticeHideCode, &LeftView, LineSize);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMiniGames, Localize("Mini Game: Let other players invite you to games"), &g_Config.m_ClMClientMiniGames, &LeftView, LineSize);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMiniGamesHold, Localize("Mini Game: Make the game key holdable"), &g_Config.m_ClMClientMiniGamesHold, &LeftView, LineSize);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientHideProtocolEmotes, Localize("Hide emoticons that appear during communication"), &g_Config.m_ClMClientHideProtocolEmotes, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientHideProtocolWhispers, Localize("Hide protocol whispers"), &g_Config.m_ClMClientHideProtocolWhispers, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatSpamFilter, Localize("Hide spam bots in chat"), &g_Config.m_ClChatSpamFilter, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientHideMillis, Localize("Hide milliseconds in race times"), &g_Config.m_ClMClientHideMillis, &LeftView, LineSize);
 
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFastInput, Localize("Fast input (lower input delay)"), &g_Config.m_ClMClientFastInput, &LeftView, LineSize);
 		if(g_Config.m_ClMClientFastInput)
@@ -138,6 +136,13 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		TextRender()->TextColor(0.6f, 0.6f, 0.6f, 1.0f);
 		Ui()->DoLabel(&Label, Localize("Pick the companion skin in the Tee settings tab."), 11.0f, TEXTALIGN_ML);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+		RightView.HSplitTop(MarginBetweenViews, nullptr, &RightView);
+		Ui()->DoLabel_AutoLineSize(Localize("Mini-Games"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
+		RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMiniGames, Localize("Let other players invite you to games"), &g_Config.m_ClMClientMiniGames, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMiniGamesHold, Localize("Make the game key holdable"), &g_Config.m_ClMClientMiniGamesHold, &RightView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientHideProtocolEmotes, Localize("Hide emoticons that appear during communication"), &g_Config.m_ClMClientHideProtocolEmotes, &RightView, LineSize);
 
 		RightView.HSplitTop(MarginBetweenViews, nullptr, &RightView);
 		Ui()->DoLabel_AutoLineSize(Localize("Experimental"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
@@ -627,7 +632,7 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	};
 
 	CUIRect TopArea, Preview, Options;
-	MainView.HSplitTop(160.0f, &TopArea, &MainView);
+	MainView.HSplitTop(120.0f, &TopArea, &MainView);
 	CUIRect Toggles;
 	TopArea.VSplitLeft(TopArea.h, &Preview, &Options);
 	Options.VSplitLeft(20.0f, nullptr, &Options);
@@ -638,7 +643,7 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 		const vec2 Center = vec2(Preview.x + Preview.w / 2.0f, Preview.y + Preview.h * 0.55f);
 		const vec2 DeltaPosition = Ui()->MousePos() - Center;
 		const vec2 TeeDirection = length(DeltaPosition) < 20.0f ? vec2(1.0f, 0.0f) : normalize(DeltaPosition);
-		RenderAccessoryTee(Preview, Preview.w * 0.4f, Settings, TeeDirection);
+		RenderAccessoryTee(Preview, Preview.w * 0.5f, Settings, TeeDirection);
 	}
 
 	{

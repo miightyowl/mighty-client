@@ -282,6 +282,7 @@ MACRO_CONFIG_INT(ClMClientMiniGames, cl_mclient_minigames, 1, 0, 1, CFGFLAG_CLIE
 MACRO_CONFIG_INT(ClMClientMiniGamesAlpha, cl_mclient_minigames_alpha, 60, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: background opacity of the game windows")
 MACRO_CONFIG_INT(ClMClientMiniGamesBarAlpha, cl_mclient_minigames_bar_alpha, 35, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: background opacity of the game status window")
 MACRO_CONFIG_INT(ClMClientMiniGamesHold, cl_mclient_minigames_hold, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: hold the mini game key to show a game, when off it is clicked on and off instead")
+MACRO_CONFIG_INT(ClMClientHideMillis, cl_mclient_hide_millis, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: hide the milliseconds of race times")
 MACRO_CONFIG_INT(ClMClientUserDetection, cl_mclient_user_detection, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: temporarily mark unused color bits after joining, so other M-Client players are detected automatically")
 MACRO_CONFIG_INT(ClMClientHideProtocolEmotes, cl_mclient_hide_protocol_emotes, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: hide emoticons that appear during communication")
 MACRO_CONFIG_INT(ClMClientHideProtocolWhispers, cl_mclient_hide_protocol_whispers, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: hide protocol whispers used for communication")

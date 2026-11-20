@@ -20,9 +20,80 @@
 #include <algorithm>
 #include <chrono>
 
+namespace
+{
+	bool IsDigit(char c) { return c >= '0' && c <= '9'; }
+
+	void StripTimeFractions(const char *pSrc, char *pDst, size_t DstSize)
+	{
+		size_t k = 0;
+		for(size_t i = 0; pSrc[i] != '\0' && k + 1 < DstSize; i++)
+		{
+			const bool AfterTime = k >= 4 && IsDigit(pDst[k - 1]) && IsDigit(pDst[k - 2]) && pDst[k - 3] == ':' && IsDigit(pDst[k - 4]);
+			if(pSrc[i] == '.' && AfterTime && IsDigit(pSrc[i + 1]))
+			{
+				while(IsDigit(pSrc[i + 1]))
+					i++;
+				continue;
+			}
+			pDst[k++] = pSrc[i];
+		}
+		pDst[k] = '\0';
+	}
+
+	int64_t ParseMedianTimeMillis(const char *pMotd)
+	{
+		const char *pLabel = str_find_nocase(pMotd, "Median Time:");
+		if(pLabel == nullptr)
+			return -1;
+		const char *p = pLabel + str_length("Median Time:");
+		while(*p == ' ')
+			p++;
+
+		int64_t Seconds = 0;
+		int Part = 0;
+		int Digits = 0;
+		int Colons = 0;
+		for(; IsDigit(*p) || *p == ':'; p++)
+		{
+			if(*p == ':')
+			{
+				if(Digits == 0 || ++Colons > 2)
+					return -1;
+				Seconds = Seconds * 60 + Part;
+				Part = 0;
+				Digits = 0;
+			}
+			else
+			{
+				Part = Part * 10 + (*p - '0');
+				if(++Digits > 2 && Colons > 0)
+					return -1;
+			}
+		}
+		if(Digits == 0 || Colons == 0)
+			return -1;
+		Seconds = Seconds * 60 + Part;
+
+		int Millis = 0;
+		if(*p == '.' && IsDigit(p[1]))
+		{
+			p++;
+			int Scale = 100;
+			for(; IsDigit(*p); p++)
+			{
+				Millis += (*p - '0') * Scale;
+				Scale /= 10;
+			}
+		}
+		return Seconds * 1000 + Millis;
+	}
+}
+
 CMotd::CMotd()
 {
 	m_aServerMotd[0] = '\0';
+	m_aServerMotdNoMillis[0] = '\0';
 	m_ServerMotdTime = 0;
 	m_ServerMotdUpdateTime = 0;
 }
@@ -91,6 +162,12 @@ void CMotd::OnRender()
 		Graphics()->RenderQuadContainer(m_RectQuadContainer, -1);
 	}
 
+	if(m_ShownHideMillis != g_Config.m_ClMClientHideMillis)
+	{
+		TextRender()->DeleteTextContainer(m_TextContainerIndex);
+		m_ShownHideMillis = g_Config.m_ClMClientHideMillis;
+	}
+
 	if(!m_TextContainerIndex.Valid())
 	{
 		CTextCursor Cursor;
@@ -100,7 +177,7 @@ void CMotd::OnRender()
 		Cursor.m_FontSize = FontSize;
 		Cursor.m_LineWidth = RectWidth - 2.0f * FontSize;
 		Cursor.m_MaxLines = MaxLines;
-		TextRender()->CreateTextContainer(m_TextContainerIndex, &Cursor, ServerMotd());
+		TextRender()->CreateTextContainer(m_TextContainerIndex, &Cursor, DisplayMotd());
 	}
 
 	if(m_TextContainerIndex.Valid())
@@ -144,6 +221,8 @@ void CMotd::OnMessage(int MsgType, void *pRawMsg)
 			}
 		}
 		m_aServerMotd[sizeof(m_aServerMotd) - 1] = '\0';
+		StripTimeFractions(m_aServerMotd, m_aServerMotdNoMillis, sizeof(m_aServerMotdNoMillis));
+		m_MedianTimeMillis = ParseMedianTimeMillis(m_aServerMotd);
 		if(g_Config.m_ClPrintMotd && *pLast != '\0')
 		{
 			log_info_color(LogColor, "motd", "%s", pLast);

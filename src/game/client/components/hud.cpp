@@ -2019,13 +2019,14 @@ void CHud::RenderDDRaceEffects()
 
 void CHud::RenderRecord()
 {
+	const ETimeFormat TimeFormat = g_Config.m_ClMClientHideMillis ? ETimeFormat::HOURS : ETimeFormat::HOURS_CENTISECS;
 	if(GameClient()->m_MapBestTimeSeconds != FinishTime::UNSET && GameClient()->m_MapBestTimeSeconds != FinishTime::NOT_FINISHED_MILLIS)
 	{
 		char aBuf[64];
 		TextRender()->Text(5, 75, 6, Localize("Server best:"), -1.0f);
 		char aTime[32];
 		int64_t TimeCentiseconds = static_cast<int64_t>(GameClient()->m_MapBestTimeSeconds) * 100 + static_cast<int64_t>(GameClient()->m_MapBestTimeMillis) / 10;
-		str_time(TimeCentiseconds, ETimeFormat::HOURS_CENTISECS, aTime, sizeof(aTime));
+		str_time(TimeCentiseconds, TimeFormat, aTime, sizeof(aTime));
 		str_format(aBuf, sizeof(aBuf), "%s%s", GameClient()->m_MapBestTimeSeconds > 3600 ? "" : "   ", aTime);
 		TextRender()->Text(53, 75, 6, aBuf, -1.0f);
 	}
@@ -2040,7 +2041,7 @@ void CHud::RenderRecord()
 			char aTime[32];
 			const int PlayerTimeMillis = GameClient()->m_aClients[GameClient()->m_aLocalIds[g_Config.m_ClDummy]].m_FinishTimeMillis;
 			int64_t TimeCentiseconds = static_cast<int64_t>(PlayerTimeSeconds) * 100 + static_cast<int64_t>(PlayerTimeMillis) / 10;
-			str_time(TimeCentiseconds, ETimeFormat::HOURS_CENTISECS, aTime, sizeof(aTime));
+			str_time(TimeCentiseconds, TimeFormat, aTime, sizeof(aTime));
 			str_format(aBuf, sizeof(aBuf), "%s%s", PlayerTimeSeconds > 3600 ? "" : "   ", aTime);
 			TextRender()->Text(53, 82, 6, aBuf, -1.0f);
 		}
@@ -2053,7 +2054,7 @@ void CHud::RenderRecord()
 			char aBuf[64];
 			TextRender()->Text(5, 82, 6, Localize("Personal best:"), -1.0f);
 			char aTime[32];
-			str_time_float(PlayerRecord, ETimeFormat::HOURS_CENTISECS, aTime, sizeof(aTime));
+			str_time_float(PlayerRecord, TimeFormat, aTime, sizeof(aTime));
 			str_format(aBuf, sizeof(aBuf), "%s%s", PlayerRecord > 3600 ? "" : "   ", aTime);
 			TextRender()->Text(53, 82, 6, aBuf, -1.0f);
 		}

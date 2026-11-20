@@ -1694,7 +1694,7 @@ void CUi::RenderTime(CUIRect TimeRect, float FontSize, int Seconds, bool NotFini
 	Cursor.y += ((TimeRect.h - SecondsText.MaxCharacterHeight()) / 2.0f - (FontSize - SecondsText.MaxCharacterHeight()));
 
 	// show milliseconds or centiseconds if we are under an hour
-	if(Millis >= 0 && Seconds < 60 * 60)
+	if(Millis >= 0 && Seconds < 60 * 60 && !g_Config.m_ClMClientHideMillis)
 	{
 		constexpr float Ratio = 0.7f;
 		const float CentisecondFontSize = FontSize * Ratio;
