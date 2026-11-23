@@ -28,6 +28,11 @@ inline bool IsMClient(int ColorBody, int ColorFeet)
 {
 	return HasBrowserMarker(ColorBody, ColorFeet) || Has(ColorBody, ColorFeet, BEACON_BODY, BEACON_FEET);
 }
+
+inline bool IsMClient(bool CustomColors, int ColorBody, int ColorFeet)
+{
+	return CustomColors && IsMClient(ColorBody, ColorFeet);
+}
 }
 
 #endif

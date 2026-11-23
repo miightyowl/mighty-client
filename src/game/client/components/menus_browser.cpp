@@ -98,7 +98,6 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		COL_NAME,
 		COL_GAMETYPE,
 		COL_MAP,
-		COL_MCLIENT,
 		COL_FRIENDS,
 		COL_PLAYERS,
 		COL_PING,
@@ -133,7 +132,6 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		{COL_NAME, IServerBrowser::SORT_NAME, Localizable("Name"), 0, 50.0f, {0}},
 		{COL_GAMETYPE, IServerBrowser::SORT_GAMETYPE, Localizable("Type"), 1, 50.0f, {0}},
 		{COL_MAP, IServerBrowser::SORT_MAP, Localizable("Map"), 1, 120.0f + (Headers.w - 480) / 8, {0}},
-		{COL_MCLIENT, -1, "", 1, ClickableIconSpace, {0}},
 		{COL_FRIENDS, IServerBrowser::SORT_NUMFRIENDS, "", 1, ClickableIconSpace, {0}},
 		{COL_PLAYERS, IServerBrowser::SORT_NUMPLAYERS, Localizable("Players"), 1, 60.0f, {0}},
 		{-1, -1, "", 1, 4.0f, {0}},
@@ -191,12 +189,6 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			Ui()->DoLabel(&Col.m_Rect, Col.m_Id == COL_FRIENDS ? FontIcon::HEART : FontIcon::STAR, 11.0f, TEXTALIGN_MC, Props);
 			TextRender()->SetRenderFlags(0);
 			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-		}
-		else if(Col.m_Id == COL_MCLIENT)
-		{
-			SLabelProperties Props;
-			Props.SetColor(CaptionColor);
-			Ui()->DoLabel(&Col.m_Rect, "M", 10.0f, TEXTALIGN_MC, Props);
 		}
 		else if(Col.m_pCaption[0] != '\0')
 		{
@@ -453,19 +445,6 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 					});
 				if(!Printed)
 					Ui()->DoLabelStreamed(*pUiElement->Rect(UI_ELEM_MAP_1), &Button, pItem->m_aMap, FontSize, TEXTALIGN_ML, Props);
-			}
-			else if(Id == COL_MCLIENT)
-			{
-				const int NumMClient = std::count_if(pItem->m_vClients.begin(), pItem->m_vClients.end(), [](const CServerInfo::CClient &Client) {
-					return Client.m_CustomSkinColors && MClientMarker::IsMClient(Client.m_CustomSkinColorBody, Client.m_CustomSkinColorFeet);
-				});
-				if(NumMClient > 0)
-				{
-					str_format(aTemp, sizeof(aTemp), "%d", NumMClient);
-					SLabelProperties Props;
-					Props.SetColor(AccentColorLight().WithAlpha(1.0f));
-					Ui()->DoLabel(&Button, aTemp, 10.0f, TEXTALIGN_MC, Props);
-				}
 			}
 			else if(Id == COL_FRIENDS)
 			{
@@ -1354,7 +1333,7 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 		Name.VSplitLeft(18.0f, &Skin, &Name);
 		Name.VSplitRight(26.0f, &Name, &Flag);
 		Flag.HMargin(6.0f, &Flag);
-		const bool MClientUser = !IsFoe && CurrentClient.m_CustomSkinColors && MClientMarker::IsMClient(CurrentClient.m_CustomSkinColorBody, CurrentClient.m_CustomSkinColorFeet);
+		const bool MClientUser = !IsFoe && MClientMarker::IsMClient(CurrentClient.m_CustomSkinColors, CurrentClient.m_CustomSkinColorBody, CurrentClient.m_CustomSkinColorFeet);
 		if(MClientUser)
 		{
 			CUIRect MClientBadge;
@@ -1531,7 +1510,7 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 
 		for(const CServerInfo::CClient &CurrentClient : pEntry->m_vClients)
 		{
-			if(CurrentClient.m_CustomSkinColors && MClientMarker::IsMClient(CurrentClient.m_CustomSkinColorBody, CurrentClient.m_CustomSkinColorFeet) &&
+			if(MClientMarker::IsMClient(CurrentClient.m_CustomSkinColors, CurrentClient.m_CustomSkinColorBody, CurrentClient.m_CustomSkinColorFeet) &&
 				!(g_Config.m_ClFoeAnonymize && GameClient()->Foes()->IsFriend(CurrentClient.m_aName, CurrentClient.m_aClan, true)))
 				m_avFriends[FRIEND_MCLIENT_ON].emplace_back(CurrentClient, pEntry);
 
