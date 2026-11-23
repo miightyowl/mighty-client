@@ -157,6 +157,7 @@ public:
 	static void Serialize(const SSettings &Settings, char *pBuf, int BufSize);
 	static bool Deserialize(const char *pText, SSettings *pSettings);
 	static bool AnyEquipped(const SSettings &Settings);
+	static void ApplySettings(bool Dummy, const SSettings &Settings);
 
 	static bool LoadAdjustment(bool Dummy, int Slot, int Item, int *pSize, int *pX, int *pY);
 	static void SaveAdjustment(bool Dummy, int Slot, int Item, int Size, int X, int Y);

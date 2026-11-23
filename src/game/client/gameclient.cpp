@@ -146,6 +146,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Particles.m_RenderTrailExtra,
 					      &m_Items,
 					      &m_Ghost,
+					      &m_FinishFans,
 					      &m_Players,
 					      &m_Petting,
 					      &m_PetTee,
@@ -4006,7 +4007,7 @@ void CGameClient::UpdateRenderedCharacters()
 			if(i == m_Snap.m_LocalClientId || IsDummy)
 			{
 				m_aClients[i].m_IsPredictedLocal = true;
-				if(AntiPingGunfire() && ((pChar->m_NinjaJetpack && pChar->m_FreezeTime == 0) || m_Snap.m_aCharacters[i].m_Cur.m_Weapon != WEAPON_NINJA || m_Snap.m_aCharacters[i].m_Cur.m_Weapon == m_aClients[i].m_Predicted.m_ActiveWeapon))
+				if(!PracticeTee && AntiPingGunfire() && ((pChar->m_NinjaJetpack && pChar->m_FreezeTime == 0) || m_Snap.m_aCharacters[i].m_Cur.m_Weapon != WEAPON_NINJA || m_Snap.m_aCharacters[i].m_Cur.m_Weapon == m_aClients[i].m_Predicted.m_ActiveWeapon))
 				{
 					m_aClients[i].m_RenderCur.m_AttackTick = pChar->GetAttackTick();
 					if(m_Snap.m_aCharacters[i].m_Cur.m_Weapon != WEAPON_NINJA && !(pChar->m_NinjaJetpack && pChar->Core()->m_ActiveWeapon == WEAPON_GUN))
@@ -4413,6 +4414,15 @@ bool CGameClient::MaskFoeNames(const char *pText, char *pBuffer, int BufferSize)
 	});
 }
 
+static const CNetMsg_Sv_PreInput *LatestPreInput(const CGameClient::CClientData &Client)
+{
+	const CNetMsg_Sv_PreInput *pLatest = nullptr;
+	for(const CNetMsg_Sv_PreInput &PreInput : Client.m_aPreInputs)
+		if(PreInput.m_IntendedTick > 0 && (!pLatest || PreInput.m_IntendedTick > pLatest->m_IntendedTick))
+			pLatest = &PreInput;
+	return pLatest;
+}
+
 bool CGameClient::IsHoldingFire(int ClientId) const
 {
 	if(!in_range(ClientId, 0, MAX_CLIENTS - 1))
@@ -4422,17 +4432,21 @@ bool CGameClient::IsHoldingFire(int ClientId) const
 		if(ClientId == m_aLocalIds[Dummy])
 			return (m_Controls.m_aInputData[Dummy].m_Fire & 1) != 0;
 
-	int LatestTick = 0;
-	int Fire = 0;
-	for(const CNetMsg_Sv_PreInput &PreInput : m_aClients[ClientId].m_aPreInputs)
-	{
-		if(PreInput.m_IntendedTick > LatestTick)
-		{
-			LatestTick = PreInput.m_IntendedTick;
-			Fire = PreInput.m_Fire;
-		}
-	}
-	return (Fire & 1) != 0;
+	const CNetMsg_Sv_PreInput *pPreInput = LatestPreInput(m_aClients[ClientId]);
+	return pPreInput && (pPreInput->m_Fire & 1) != 0;
+}
+
+bool CGameClient::IsHoldingHook(int ClientId) const
+{
+	if(!in_range(ClientId, 0, MAX_CLIENTS - 1))
+		return false;
+
+	for(int Dummy = 0; Dummy < NUM_DUMMIES; Dummy++)
+		if(ClientId == m_aLocalIds[Dummy])
+			return m_Controls.m_aInputData[Dummy].m_Hook != 0;
+
+	const CNetMsg_Sv_PreInput *pPreInput = LatestPreInput(m_aClients[ClientId]);
+	return pPreInput && pPreInput->m_Hook != 0;
 }
 
 static int EmoticonEmote(int Emoticon)

@@ -57,6 +57,7 @@
 #include "components/items.h"
 #include "components/key_binder.h"
 #include "components/local_server.h"
+#include "components/finish_fans.h"
 #include "components/maodie_walk.h"
 #include "components/map_details.h"
 #include "components/mapimages.h"
@@ -210,6 +211,7 @@ public:
 	CFastPractice m_FastPractice;
 	CAds m_Ads;
 	CMaodieWalk m_MaodieWalk;
+	CFinishFans m_FinishFans;
 	CBindWheel m_BindWheel;
 	CNamePlates m_NamePlates;
 	CFreezeBars m_FreezeBars;
@@ -787,6 +789,7 @@ public:
 	bool MaskFoeNames(const char *pText, char *pBuffer, int BufferSize);
 	bool IsOtherTeam(int ClientId) const;
 	bool IsHoldingFire(int ClientId) const;
+	bool IsHoldingHook(int ClientId) const;
 	void HideEmote(int ClientId, int Emoticon, int Conn);
 	int VisibleEmote(int ClientId, int Emote) const;
 	int SwitchStateTeam() const;

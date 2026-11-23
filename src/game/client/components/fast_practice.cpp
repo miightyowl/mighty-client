@@ -110,6 +110,7 @@ void CFastPractice::Start()
 	m_ClientId = GameClient()->m_Snap.m_LocalClientId;
 	m_StartedInSpectator = GameClient()->m_Snap.m_SpecInfo.m_Active;
 	m_PracticePaused = false;
+	m_NoGravity = false;
 
 	const CCharacter *pChar = GameClient()->m_Snap.m_aCharacters[m_ClientId].m_Active ?
 					  GameClient()->m_PredictedWorld.GetCharacterById(m_ClientId) :
@@ -243,6 +244,8 @@ bool CFastPractice::Respawn(const vec2 *pSpectatorSpawnPos)
 	}
 
 	m_World.CopyWorldClean(&GameClient()->m_PredictedWorld);
+	UpdateTuning();
+	m_World.SetTuningList(m_aTuningList);
 
 	m_World.m_LocalClientId = m_ClientId;
 
@@ -296,6 +299,8 @@ bool CFastPractice::Respawn(const vec2 *pSpectatorSpawnPos)
 		Stop();
 		return false;
 	}
+
+	GiveDefaultWeapons(&m_CheckpointCore);
 
 	CCharacterCore Core = m_CheckpointCore;
 	RebaseCore(&Core, m_World.GameTick() - m_CheckpointTick);
@@ -491,7 +496,17 @@ void CFastPractice::ApplyRenderedCharacter(CNetObj_Character *pPrev, CNetObj_Cha
 	pPrev->m_Emote = pCur->m_Emote = PracticeEyeEmote(pChar->GetCore());
 
 	const int Age = m_World.GameTick() - pChar->GetAttackTick();
-	pPrev->m_AttackTick = pCur->m_AttackTick = Client()->GameTick(g_Config.m_ClDummy) - Age;
+	const int Now = GameClient()->AntiPingGunfire() ? Client()->PredGameTick(g_Config.m_ClDummy) : Client()->GameTick(g_Config.m_ClDummy);
+	pPrev->m_AttackTick = pCur->m_AttackTick = Now - Age;
+}
+
+void CFastPractice::GiveDefaultWeapons(CCharacterCore *pCore)
+{
+	for(const int Weapon : {WEAPON_HAMMER, WEAPON_GUN})
+	{
+		pCore->m_aWeapons[Weapon].m_Got = true;
+		pCore->m_aWeapons[Weapon].m_Ammo = -1;
+	}
 }
 
 void CFastPractice::ClearFreeze(CCharacterCore *pCore)
@@ -581,6 +596,12 @@ void CFastPractice::ApplyAction(CCharacter *pChar, int Action)
 		if(!Remove && Weapon != WEAPON_NINJA)
 			pChar->SetWeaponAmmo(Weapon, -1);
 	};
+	const auto &&SetCoreFlag = [&](bool CCharacterCore::*pFlag, bool Value) {
+		CCharacterCore Core = pChar->GetCore();
+		Core.*pFlag = Value;
+		pChar->SetCore(Core);
+		pChar->SetCoreWorld(pChar->GameWorld());
+	};
 
 	switch(Action)
 	{
@@ -629,6 +650,26 @@ void CFastPractice::ApplyAction(CCharacter *pChar, int Action)
 	case ACTION_TAKE_GRENADE: Give(WEAPON_GRENADE, true); break;
 	case ACTION_TAKE_LASER: Give(WEAPON_LASER, true); break;
 	case ACTION_TAKE_NINJA: pChar->RemoveNinja(); break;
+	case ACTION_JETPACK: SetCoreFlag(&CCharacterCore::m_Jetpack, true); break;
+	case ACTION_UNJETPACK: SetCoreFlag(&CCharacterCore::m_Jetpack, false); break;
+	case ACTION_ENDLESS_JUMP: SetCoreFlag(&CCharacterCore::m_EndlessJump, true); break;
+	case ACTION_UNENDLESS_JUMP: SetCoreFlag(&CCharacterCore::m_EndlessJump, false); break;
+	case ACTION_ENDLESS_HOOK: SetCoreFlag(&CCharacterCore::m_EndlessHook, true); break;
+	case ACTION_UNENDLESS_HOOK: SetCoreFlag(&CCharacterCore::m_EndlessHook, false); break;
+	case ACTION_NO_GRAVITY:
+	{
+		m_NoGravity = true;
+		UpdateTuning();
+		CCharacterCore Core = pChar->GetCore();
+		Core.m_Vel = vec2(0.0f, 0.0f);
+		pChar->SetCore(Core);
+		pChar->SetCoreWorld(pChar->GameWorld());
+		break;
+	}
+	case ACTION_GRAVITY:
+		m_NoGravity = false;
+		UpdateTuning();
+		break;
 	default: break;
 	}
 
@@ -929,9 +970,24 @@ void CFastPractice::ApplyRespawn(CCharacter *pChar)
 	pChar->ResetInput();
 }
 
+void CFastPractice::UpdateTuning()
+{
+	static const CTuningParams s_DefaultTuning;
+	const bool RealJetpack = m_ClientId >= 0 && GameClient()->m_aClients[m_ClientId].m_Jetpack;
+	for(int Zone = 0; Zone < TuneZone::NUM; Zone++)
+	{
+		m_aTuningList[Zone] = GameClient()->m_PredictedWorld.TuningList()[Zone];
+		if(!RealJetpack && m_aTuningList[Zone].m_JetpackStrength == 0.0f)
+			m_aTuningList[Zone].m_JetpackStrength = s_DefaultTuning.m_JetpackStrength;
+		if(m_NoGravity)
+			m_aTuningList[Zone].m_Gravity = 0.0f;
+	}
+}
+
 void CFastPractice::Advance(int Ticks)
 {
 	const CNetObj_PlayerInput &Input = GameClient()->m_Controls.m_aInputData[g_Config.m_ClDummy];
+	UpdateTuning();
 
 	const CScopedPredictEvents ScopedEvents;
 
@@ -1153,6 +1209,14 @@ bool CFastPractice::OnChatCommand(const char *pLine)
 		{"unrifle", ACTION_TAKE_LASER},
 		{"unlaser", ACTION_TAKE_LASER},
 		{"unninja", ACTION_TAKE_NINJA},
+		{"jetpack", ACTION_JETPACK},
+		{"unjetpack", ACTION_UNJETPACK},
+		{"endless", ACTION_ENDLESS_HOOK},
+		{"unendless", ACTION_UNENDLESS_HOOK},
+		{"infjump", ACTION_ENDLESS_JUMP},
+		{"uninfjump", ACTION_UNENDLESS_JUMP},
+		{"nogravity", ACTION_NO_GRAVITY},
+		{"gravity", ACTION_GRAVITY},
 	};
 
 	CCharacter *pChar = m_World.GetCharacterById(m_ClientId);

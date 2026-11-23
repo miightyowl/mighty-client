@@ -1746,7 +1746,7 @@ void CChat::MaybeTranslateLine(CLine &Line)
 	const bool OwnMessage = Line.m_ClientId == GameClient()->m_aLocalIds[0] || Line.m_ClientId == GameClient()->m_aLocalIds[1];
 	const bool MightyMessage = IsMightyMessage(pBody);
 
-	if(g_Config.m_ClMClientMightyRead && !OwnMessage && MightyMessage)
+	if(!OwnMessage && MightyMessage)
 	{
 		char aDecoded[MAX_CHAT_LENGTH];
 		if(DecodeMighty(pBody, aDecoded, sizeof(aDecoded)))

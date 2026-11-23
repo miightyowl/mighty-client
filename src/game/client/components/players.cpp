@@ -210,7 +210,12 @@ void CPlayers::RenderHookCollLine(
 		RenderHookCollPlayer = g_Config.m_ClShowHookCollOther > 0;
 	}
 
-	if(!AlwaysRenderHookColl && !RenderHookCollPlayer)
+	const bool IsLocalTee = ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1];
+	const bool FrozenHookAttempt = g_Config.m_ClMClientFrozenHook &&
+				       !(g_Config.m_ClMClientFrozenHookNotSelf && IsLocalTee) &&
+				       Player.m_HookState <= 0 && IsFrozen(ClientId) && GameClient()->IsHoldingHook(ClientId);
+
+	if(!AlwaysRenderHookColl && !RenderHookCollPlayer && !FrozenHookAttempt)
 		return;
 
 	float Intra = GameClient()->m_aClients[ClientId].m_IsPredicted ? Client()->PredIntraGameTick(g_Config.m_ClDummy) : Client()->IntraGameTick(g_Config.m_ClDummy);
@@ -407,7 +412,11 @@ void CPlayers::RenderHookCollLine(
 	// add a line from the player to the start position to prevent a visual gap
 	vLineSegments.emplace_back(Position, Position + StartOffset);
 
-	if(AlwaysRenderHookColl && RenderHookCollPlayer)
+	if(FrozenHookAttempt)
+	{
+		HookCollColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMClientFrozenHookColor, false));
+	}
+	else if(AlwaysRenderHookColl && RenderHookCollPlayer)
 	{
 		// invert the hook coll colors when using cl_show_hook_coll_always and +showhookcoll is pressed
 		HookCollColor = color_invert(HookCollColor);
@@ -417,10 +426,10 @@ void CPlayers::RenderHookCollLine(
 	const int HookCollSize = Local ? g_Config.m_ClHookCollSize : g_Config.m_ClHookCollSizeOther;
 
 	float Alpha = GameClient()->IsOtherTeam(ClientId) ? g_Config.m_ClShowOthersAlpha / 100.0f : 1.0f;
-	Alpha *= (float)g_Config.m_ClHookCollAlpha / 100;
+	Alpha *= (float)(FrozenHookAttempt ? g_Config.m_ClMClientFrozenHookAlpha : g_Config.m_ClHookCollAlpha) / 100;
 	if(Alpha <= 0.0f)
 		return;
-	ColorRGBA HookCollTipColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClHookCollTipColor, true));
+	ColorRGBA HookCollTipColor = FrozenHookAttempt ? HookCollColor : color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClHookCollTipColor, true));
 
 	Graphics()->TextureClear();
 	if(HookCollSize > 0)

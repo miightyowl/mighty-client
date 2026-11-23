@@ -78,6 +78,10 @@ private:
 
 	bool m_MouseFocus;
 
+	bool m_SuppressFocusClick = false;
+	uint32_t m_FocusGainedTimestamp = 0;
+	int m_SuppressedMouseKey = KEY_UNKNOWN;
+
 	// IME support
 	std::string m_CompositionString;
 	int m_CompositionCursor;

@@ -188,7 +188,6 @@ void CMiniGames::ResetTag()
 
 void CMiniGames::OnReset()
 {
-	SetEmoteGameShowAll(false);
 	m_State = STATE_IDLE;
 	m_OpponentId = -1;
 	m_LocalId = -1;
@@ -430,7 +429,6 @@ void CMiniGames::Close()
 		SendTo(m_OpponentId, "Q");
 	else if(m_State == STATE_INVITED)
 		SendTo(m_OpponentId, "D");
-	SetEmoteGameShowAll(false);
 
 	m_KeyBlocked = m_ViewActive && g_Config.m_ClMClientMiniGamesHold;
 	if(!g_Config.m_ClMClientMiniGamesHold)
@@ -659,7 +657,6 @@ void CMiniGames::BeginTagCountdown()
 		Disqualified = false;
 	m_TagTargetDDTeam = -1;
 	m_TagTargetGameTeam = -1;
-	SetEmoteGameShowAll(true);
 }
 
 void CMiniGames::UpdateTagLobby()
@@ -900,7 +897,6 @@ void CMiniGames::StartGame(int OpponentId, bool Challenger)
 	m_aStatus[0] = '\0';
 	m_HasBoard = true;
 	m_State = STATE_PLAYING;
-	SetEmoteGameShowAll(true);
 	ClearRetry();
 	ResetEmoteChannel();
 }
@@ -1061,16 +1057,6 @@ void CMiniGames::ResetEmoteChannel()
 	m_FrameExpect = 0;
 	m_FrameLen = 0;
 	ClearMoveRetry();
-}
-
-void CMiniGames::SetEmoteGameShowAll(bool Enable)
-{
-	if(m_ShowAllForEmoteGame == Enable)
-		return;
-
-	m_ShowAllForEmoteGame = Enable;
-	if(Client()->State() == IClient::STATE_ONLINE)
-		GameClient()->m_Chat.SendChat(0, Enable ? "/showall 1" : "/showall 0");
 }
 
 void CMiniGames::SendFrame(int Op, const int *pDigits, int NumDigits)
@@ -2758,8 +2744,6 @@ void CMiniGames::OnUpdate()
 	FlushSendQueue();
 	UpdateTagLobby();
 	UpdateTagHitDetection();
-	if(m_State == STATE_OVER && m_vEmoteQueue.empty() && !m_EmoteWaiting && !m_MovePending)
-		SetEmoteGameShowAll(false);
 }
 
 void CMiniGames::OnRender()

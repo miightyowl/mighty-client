@@ -2780,6 +2780,8 @@ if(CLIENT)
     components/key_binder.h
     components/local_server.cpp
     components/local_server.h
+    components/finish_fans.cpp
+    components/finish_fans.h
     components/maodie_walk.cpp
     components/maodie_walk.h
     components/map_details.cpp

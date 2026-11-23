@@ -137,7 +137,6 @@ private:
 	bool m_EmoteWaiting = false;
 	float m_EmoteTime = 0.0f;
 	int m_EmoteRetries = 0;
-	bool m_ShowAllForEmoteGame = false;
 
 	int m_FrameOp = -1;
 	int m_FrameExpect = 0;
@@ -228,7 +227,6 @@ private:
 	void UpdateMoveRetry();
 	void ClearMoveRetry();
 	void ResetEmoteChannel();
-	void SetEmoteGameShowAll(bool Enable);
 	bool HandleEmoteEcho(int Emoticon);
 	bool HandleEmoteFrame(int Emoticon);
 	void ProcessFrame();

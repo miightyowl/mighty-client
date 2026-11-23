@@ -814,12 +814,30 @@ int CInput::Update()
 
 		// handle mouse buttons
 		case SDL_MOUSEBUTTONDOWN:
-			AddKeyEventChecked(TranslateMouseButtonEventKey(Event.button), IInput::FLAG_PRESS);
+		{
+			const int Key = TranslateMouseButtonEventKey(Event.button);
+			const bool FocusClick = !m_MouseFocus || (m_SuppressFocusClick && Event.button.timestamp - m_FocusGainedTimestamp < 250);
+			m_SuppressFocusClick = false;
+			if(FocusClick && Key != KEY_UNKNOWN)
+			{
+				m_SuppressedMouseKey = Key;
+				break;
+			}
+			AddKeyEventChecked(Key, IInput::FLAG_PRESS);
 			break;
+		}
 
 		case SDL_MOUSEBUTTONUP:
-			AddKeyEventChecked(TranslateMouseButtonEventKey(Event.button), IInput::FLAG_RELEASE);
+		{
+			const int Key = TranslateMouseButtonEventKey(Event.button);
+			if(Key != KEY_UNKNOWN && Key == m_SuppressedMouseKey)
+			{
+				m_SuppressedMouseKey = KEY_UNKNOWN;
+				break;
+			}
+			AddKeyEventChecked(Key, IInput::FLAG_RELEASE);
 			break;
+		}
 
 		case SDL_MOUSEWHEEL:
 			AddKeyEventChecked(TranslateMouseWheelEventKey(Event.wheel), IInput::FLAG_PRESS | IInput::FLAG_RELEASE);
@@ -865,6 +883,8 @@ int CInput::Update()
 					SDL_GetRelativeMouseState(nullptr, nullptr);
 				}
 				m_MouseFocus = true;
+				m_SuppressFocusClick = true;
+				m_FocusGainedTimestamp = Event.window.timestamp;
 				IgnoreKeys = true;
 				break;
 			case SDL_WINDOWEVENT_FOCUS_LOST:

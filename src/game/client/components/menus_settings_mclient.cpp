@@ -116,6 +116,7 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFatChat, Localize("Fat skins when someone writes \"fat\""), &g_Config.m_ClMClientFatChat, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMaodieWalk, Localize("Giant maodie walks across the screen"), &g_Config.m_ClMClientMaodieWalk, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientUpsideDown, Localize("Upside down tees"), &g_Config.m_ClMClientUpsideDown, &LeftView, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFinishFans, Localize("Twinbop fans cheer at the finish line"), &g_Config.m_ClMClientFinishFans, &LeftView, LineSize);
 
 		// companion pet
 		Ui()->DoLabel_AutoLineSize(Localize("Companion pet"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
@@ -173,7 +174,6 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 			GameClient()->m_Chat.RebuildChat();
 		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClChatTranslateShortWords, Localize("Also translate short words"), &g_Config.m_ClChatTranslateShortWords, &LeftView, LineSize))
 			GameClient()->m_Chat.ClearTranslationCache();
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientMightyRead, Localize("Read Mighty-language chat"), &g_Config.m_ClMClientMightyRead, &LeftView, LineSize);
 
 		static const char *s_apTranslateLangCodes[] = {
 			"en", "de", "es", "fr", "pt", "it", "nl", "pl", "ru", "uk", "tr", "ar",
@@ -279,6 +279,19 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenWeaponHammerOnly, Localize("Only count the hammer as interacting"), &g_Config.m_ClMClientFrozenWeaponHammerOnly, &LeftView, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenWeaponNotSelf, Localize("Do not recolor your own tee and dummy"), &g_Config.m_ClMClientFrozenWeaponNotSelf, &LeftView, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenWeaponHideSelf, Localize("Hide the weapon on your own tee and dummy"), &g_Config.m_ClMClientFrozenWeaponHideSelf, &LeftView, LineSize);
+		}
+
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+		Ui()->DoLabel_AutoLineSize(Localize("Frozen hook"), HeadlineFontSize, TEXTALIGN_ML, &LeftView, HeadlineHeight);
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHook, Localize("Show when frozen tees try to hook"), &g_Config.m_ClMClientFrozenHook, &LeftView, LineSize);
+		if(g_Config.m_ClMClientFrozenHook)
+		{
+			static CButtonContainer s_FrozenHookColorResetId;
+			DoLine_ColorPicker(&s_FrozenHookColorResetId, 25.0f, 13.0f, 2.0f, &LeftView, Localize("Hook line color"), &g_Config.m_ClMClientFrozenHookColor, color_cast<ColorRGBA>(ColorHSLA((unsigned)DefaultConfig::ClMClientFrozenHookColor, false)), false, nullptr, false);
+			LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+			Ui()->DoScrollbarOption(&g_Config.m_ClMClientFrozenHookAlpha, &g_Config.m_ClMClientFrozenHookAlpha, &Button, Localize("Hook line opacity"), 10, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE, "%");
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFrozenHookNotSelf, Localize("Not on your own tee and dummy"), &g_Config.m_ClMClientFrozenHookNotSelf, &LeftView, LineSize);
 		}
 
 		Ui()->DoLabel_AutoLineSize(Localize("Frozen teammates HUD"), HeadlineFontSize, TEXTALIGN_ML, &RightView, HeadlineHeight);
@@ -1259,7 +1272,7 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 	CUIRect Headline, TopBar, Divider;
 
 	// renders a tee
-	const auto &&RenderProfileTee = [this](const CUIRect &Rect, const char *pSkin, int UseCustomColor, int ColorBody, int ColorFeet) {
+	const auto &&RenderProfileTee = [this](const CUIRect &Rect, const char *pSkin, int UseCustomColor, int ColorBody, int ColorFeet, const CAccessories::SSettings *pAccessories) {
 		if(pSkin[0] == '\0')
 			return;
 		const CTeeRenderInfo Info = GetTeeRenderInfo(vec2(Rect.w, Rect.h), pSkin, UseCustomColor, ColorBody, ColorFeet);
@@ -1267,7 +1280,11 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		vec2 OffsetToMid;
 		CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdle, &Info, OffsetToMid);
 		const vec2 Pos = vec2(Rect.x + Rect.w / 2.0f, Rect.y + Rect.h * 0.55f + OffsetToMid.y);
+		if(pAccessories)
+			GameClient()->m_Accessories.RenderBack(pIdle, &Info, Pos, 1.0f, *pAccessories);
 		RenderTools()->RenderTee(pIdle, &Info, EMOTE_NORMAL, vec2(1.0f, 0.0f), Pos);
+		if(pAccessories)
+			GameClient()->m_Accessories.RenderFront(pIdle, &Info, Pos, vec2(1.0f, 0.0f), 1.0f, *pAccessories);
 	};
 
 	const auto &&MenuButton = [this](CUIRect Rect, const char *pText, float Size, bool Hovered) {
@@ -1294,7 +1311,8 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 	TopBar.VSplitLeft(TopBar.h, &CurTee, &CurInfo);
 	CurInfo.VSplitLeft(8.0f, nullptr, &CurInfo);
 
-	RenderProfileTee(CurTee, g_Config.m_ClPlayerSkin, g_Config.m_ClPlayerUseCustomColor, g_Config.m_ClPlayerColorBody, g_Config.m_ClPlayerColorFeet);
+	const CAccessories::SSettings CurAccessories = CAccessories::Settings(false);
+	RenderProfileTee(CurTee, g_Config.m_ClPlayerSkin, g_Config.m_ClPlayerUseCustomColor, g_Config.m_ClPlayerColorBody, g_Config.m_ClPlayerColorFeet, &CurAccessories);
 	{
 		char aCurrent[64];
 		if(g_Config.m_PlayerClan[0] != '\0')
@@ -1433,7 +1451,9 @@ void CMenus::RenderSettingsProfiles(CUIRect MainView)
 		Row.VSplitLeft(TextRender()->TextWidth(10.0f, aLoadCmd) + 18.0f, &CmdBox, &Row);
 
 		// tee preview
-		RenderProfileTee(TeeRect, Profile.m_aSkin, Profile.m_UseCustomColor, Profile.m_ColorBody, Profile.m_ColorFeet);
+		CAccessories::SSettings ProfileAccessories;
+		const bool HasAccessories = Profile.m_aAccessories[0] != '\0' && CAccessories::Deserialize(Profile.m_aAccessories, &ProfileAccessories);
+		RenderProfileTee(TeeRect, Profile.m_aSkin, Profile.m_UseCustomColor, Profile.m_ColorBody, Profile.m_ColorFeet, HasAccessories ? &ProfileAccessories : nullptr);
 
 		// name + clan
 		SLabelProperties NameProps;
@@ -1532,6 +1552,7 @@ void CMenus::LoadProfiles()
 			const json_value &UseCustomColor = Entry["use_custom_color"];
 			const json_value &ColorBody = Entry["color_body"];
 			const json_value &ColorFeet = Entry["color_feet"];
+			const json_value &Accessories = Entry["accessories"];
 			if(IsPet.type == json_integer)
 				Profile.m_IsPet = IsPet.u.integer != 0;
 			if(Number.type == json_integer)
@@ -1550,6 +1571,8 @@ void CMenus::LoadProfiles()
 				Profile.m_ColorBody = (int)ColorBody.u.integer;
 			if(ColorFeet.type == json_integer)
 				Profile.m_ColorFeet = (int)ColorFeet.u.integer;
+			if(Accessories.type == json_string)
+				str_copy(Profile.m_aAccessories, Accessories);
 			m_vProfiles.push_back(Profile);
 		}
 	}
@@ -1600,6 +1623,11 @@ void CMenus::SaveMClient()
 		Writer.WriteIntValue(Profile.m_ColorBody);
 		Writer.WriteAttribute("color_feet");
 		Writer.WriteIntValue(Profile.m_ColorFeet);
+		if(Profile.m_aAccessories[0] != '\0')
+		{
+			Writer.WriteAttribute("accessories");
+			Writer.WriteStrValue(Profile.m_aAccessories);
+		}
 		Writer.EndObject();
 	}
 	Writer.EndArray();
@@ -1707,6 +1735,7 @@ void CMenus::SaveProfile(bool Dummy)
 	Profile.m_UseCustomColor = Dummy ? g_Config.m_ClDummyUseCustomColor : g_Config.m_ClPlayerUseCustomColor;
 	Profile.m_ColorBody = Dummy ? g_Config.m_ClDummyColorBody : g_Config.m_ClPlayerColorBody;
 	Profile.m_ColorFeet = Dummy ? g_Config.m_ClDummyColorFeet : g_Config.m_ClPlayerColorFeet;
+	CAccessories::Serialize(CAccessories::Settings(Dummy), Profile.m_aAccessories, sizeof(Profile.m_aAccessories));
 	m_vProfiles.push_back(Profile);
 	SortProfiles();
 	SaveMClient();
@@ -1763,6 +1792,10 @@ void CMenus::ApplyProfile(const CProfile &Profile, bool Dummy)
 		g_Config.m_ClPlayerColorBody = Profile.m_ColorBody;
 		g_Config.m_ClPlayerColorFeet = Profile.m_ColorFeet;
 	}
+
+	CAccessories::SSettings Accessories;
+	if(Profile.m_aAccessories[0] != '\0' && CAccessories::Deserialize(Profile.m_aAccessories, &Accessories))
+		CAccessories::ApplySettings(Dummy, Accessories);
 
 	if(Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK)
 	{

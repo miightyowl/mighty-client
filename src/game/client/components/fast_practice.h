@@ -101,7 +101,20 @@ private:
 		ACTION_TAKE_GRENADE,
 		ACTION_TAKE_LASER,
 		ACTION_TAKE_NINJA,
+		ACTION_JETPACK,
+		ACTION_UNJETPACK,
+		ACTION_ENDLESS_HOOK,
+		ACTION_UNENDLESS_HOOK,
+		ACTION_ENDLESS_JUMP,
+		ACTION_UNENDLESS_JUMP,
+		ACTION_NO_GRAVITY,
+		ACTION_GRAVITY,
 	};
+
+	bool m_NoGravity = false;
+
+	CTuningParams m_aTuningList[TuneZone::NUM];
+	void UpdateTuning();
 
 	void Notify(const char *pMessage);
 	void CaptureSpectatorStart();
@@ -136,6 +149,7 @@ private:
 	void RebaseCore(CCharacterCore *pCore, int Delta) const;
 
 	static void ClearFreeze(CCharacterCore *pCore);
+	static void GiveDefaultWeapons(CCharacterCore *pCore);
 	void TeleportTo(class CCharacter *pChar, const std::vector<vec2> &vOuts, bool ResetVelocity);
 	void FlushPredictedEvents(CGameWorld *pWorld, bool Emit);
 

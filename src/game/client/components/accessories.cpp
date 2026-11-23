@@ -280,6 +280,29 @@ bool CAccessories::Deserialize(const char *pText, SSettings *pSettings)
 	return true;
 }
 
+void CAccessories::ApplySettings(bool Dummy, const SSettings &Settings)
+{
+	const SConfig Config = CAccessories::Config(Dummy);
+	for(int Slot = 0; Slot < NUM_SLOTS; Slot++)
+	{
+		const SSlotConfig &SlotConfig = Config.m_aSlots[Slot];
+		const SSlotSettings &New = Settings.m_aSlots[Slot];
+		const int Item = std::clamp(New.m_Item, 0, NumItems(Slot) - 1);
+		if(*SlotConfig.m_pItem != Item)
+			SaveAdjustment(Dummy, Slot, *SlotConfig.m_pItem, *SlotConfig.m_pSize, *SlotConfig.m_pX, *SlotConfig.m_pY);
+		*SlotConfig.m_pItem = Item;
+		if(Item == 0)
+			continue;
+		*SlotConfig.m_pSize = New.m_Size;
+		*SlotConfig.m_pX = New.m_X;
+		*SlotConfig.m_pY = New.m_Y;
+		*SlotConfig.m_pColor = New.m_Color;
+		SaveAdjustment(Dummy, Slot, Item, New.m_Size, New.m_X, New.m_Y);
+	}
+	*Config.m_pUseCustomColor = Settings.m_UseCustomColor ? 1 : 0;
+	*Config.m_pCustomColorSlots = Settings.m_CustomColorSlots;
+}
+
 void CAccessories::ItemKey(int Slot, int Item, char *pBuf, int BufSize)
 {
 	pBuf[0] = '\0';

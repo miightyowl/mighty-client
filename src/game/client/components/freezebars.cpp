@@ -16,15 +16,19 @@ void CFreezeBars::RenderFreezeBar(const int ClientId)
 		return;
 	}
 
+	const bool PracticeTee = GameClient()->m_FastPractice.IsActive() && ClientId == GameClient()->m_Snap.m_LocalClientId;
+
 	// only show the freeze bar once the server confirmed the freeze, so mispredicted freezes are not shown
-	if(GameClient()->m_Snap.m_aCharacters[ClientId].m_ExtendedData.m_FreezeEnd <= 0)
+	if(!PracticeTee && GameClient()->m_Snap.m_aCharacters[ClientId].m_ExtendedData.m_FreezeEnd <= 0)
 	{
 		return;
 	}
 
-	// the freeze ticks of predicted characters are in predicted time, so compare them against the tick they were predicted to
 	int Tick = Client()->GameTick(g_Config.m_ClDummy);
-	if(GameClient()->m_aClients[ClientId].m_IsPredictedLocal)
+	if(PracticeTee)
+	{
+	}
+	else if(GameClient()->m_aClients[ClientId].m_IsPredictedLocal)
 	{
 		Tick = Client()->PredGameTick(g_Config.m_ClDummy);
 	}

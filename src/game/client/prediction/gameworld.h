@@ -107,6 +107,7 @@ public:
 
 	const CTuningParams *TuningList() const { return m_pTuningList; }
 	CTuningParams *TuningList() { return m_pTuningList; }
+	void SetTuningList(CTuningParams *pTuningList) { m_pTuningList = pTuningList; }
 	const CTuningParams *GlobalTuning() const { return &TuningList()[0]; }
 	CTuningParams *GlobalTuning() { return &TuningList()[0]; }
 	const CTuningParams *GetTuning(int i) const { return &TuningList()[i]; }
