@@ -716,6 +716,7 @@ public:
 	bool GotWantedSkin7(bool Dummy);
 	void SendInfo(bool Start);
 	void SendDummyInfo(bool Start) override;
+	int OutgoingTeeColor(int Color, bool Body) const;
 	void SendKill() const;
 	void SendReadyChange7(); // NOLINT(readability-make-member-function-const)
 

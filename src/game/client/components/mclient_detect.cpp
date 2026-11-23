@@ -7,6 +7,7 @@
 #include <generated/protocol.h>
 
 #include <game/client/gameclient.h>
+#include <game/client/mclient_marker.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -446,6 +447,12 @@ void CMClientDetect::DetectColorBeacons()
 			continue;
 
 		CPeer &Peer = m_aPeers[ClientId];
+		if(!Peer.m_Detected && MClientMarker::HasBrowserMarker(Client.m_ColorBody, Client.m_ColorFeet))
+		{
+			Peer.m_Detected = true;
+			str_copy(Peer.m_aName, Client.m_aRealName);
+		}
+
 		const unsigned ColorBody = static_cast<unsigned>(Client.m_ColorBody);
 		const unsigned ColorFeet = static_cast<unsigned>(Client.m_ColorFeet);
 		const bool MarkerVisible = (ColorBody >> 24) == COLOR_BEACON_BODY && (ColorFeet >> 24) == COLOR_BEACON_FEET;
@@ -493,8 +500,8 @@ void CMClientDetect::SendColorBeacon()
 {
 	m_ColorBeaconConn = g_Config.m_ClDummy ? IClient::CONN_DUMMY : IClient::CONN_MAIN;
 	const bool Dummy = m_ColorBeaconConn == IClient::CONN_DUMMY;
-	m_OriginalColorBody = Dummy ? g_Config.m_ClDummyColorBody : g_Config.m_ClPlayerColorBody;
-	m_OriginalColorFeet = Dummy ? g_Config.m_ClDummyColorFeet : g_Config.m_ClPlayerColorFeet;
+	m_OriginalColorBody = GameClient()->OutgoingTeeColor(Dummy ? g_Config.m_ClDummyColorBody : g_Config.m_ClPlayerColorBody, true);
+	m_OriginalColorFeet = GameClient()->OutgoingTeeColor(Dummy ? g_Config.m_ClDummyColorFeet : g_Config.m_ClPlayerColorFeet, false);
 	m_MarkerColorBody = static_cast<int>((static_cast<unsigned>(m_OriginalColorBody) & COLOR_VALUE_MASK) | (COLOR_BEACON_BODY << 24));
 	m_MarkerColorFeet = static_cast<int>((static_cast<unsigned>(m_OriginalColorFeet) & COLOR_VALUE_MASK) | (COLOR_BEACON_FEET << 24));
 	SendInfoColors(m_ColorBeaconConn, m_MarkerColorBody, m_MarkerColorFeet);

@@ -38,6 +38,7 @@
 #include "components/statboard.h"
 #include "components/voting.h"
 #include "lineinput.h"
+#include "mclient_marker.h"
 #include "prediction/entities/character.h"
 #include "prediction/entities/projectile.h"
 #include "race.h"
@@ -886,8 +887,8 @@ void CGameClient::OnRender()
 					m_aClients[m_aLocalIds[0]].m_Country != g_Config.m_PlayerCountry ||
 					str_comp(m_aClients[m_aLocalIds[0]].m_aSkinName, g_Config.m_ClPlayerSkin) ||
 					m_aClients[m_aLocalIds[0]].m_UseCustomColor != g_Config.m_ClPlayerUseCustomColor ||
-					m_aClients[m_aLocalIds[0]].m_ColorBody != (int)g_Config.m_ClPlayerColorBody ||
-					m_aClients[m_aLocalIds[0]].m_ColorFeet != (int)g_Config.m_ClPlayerColorFeet)
+					m_aClients[m_aLocalIds[0]].m_ColorBody != OutgoingTeeColor(g_Config.m_ClPlayerColorBody, true) ||
+					m_aClients[m_aLocalIds[0]].m_ColorFeet != OutgoingTeeColor(g_Config.m_ClPlayerColorFeet, false))
 					SendInfo(false);
 				else
 					m_aCheckInfo[0] = -1;
@@ -918,8 +919,8 @@ void CGameClient::OnRender()
 						m_aClients[m_aLocalIds[1]].m_Country != g_Config.m_ClDummyCountry ||
 						str_comp(m_aClients[m_aLocalIds[1]].m_aSkinName, g_Config.m_ClDummySkin) ||
 						m_aClients[m_aLocalIds[1]].m_UseCustomColor != g_Config.m_ClDummyUseCustomColor ||
-						m_aClients[m_aLocalIds[1]].m_ColorBody != (int)g_Config.m_ClDummyColorBody ||
-						m_aClients[m_aLocalIds[1]].m_ColorFeet != (int)g_Config.m_ClDummyColorFeet)
+						m_aClients[m_aLocalIds[1]].m_ColorBody != OutgoingTeeColor(g_Config.m_ClDummyColorBody, true) ||
+						m_aClients[m_aLocalIds[1]].m_ColorFeet != OutgoingTeeColor(g_Config.m_ClDummyColorFeet, false))
 						SendDummyInfo(false);
 					else
 						m_aCheckInfo[1] = -1;
@@ -3394,6 +3395,13 @@ bool CGameClient::GotWantedSkin7(bool Dummy)
 	return true;
 }
 
+int CGameClient::OutgoingTeeColor(int Color, bool Body) const
+{
+	if(!g_Config.m_ClMClientShowInBrowser)
+		return Color;
+	return MClientMarker::Mark(Color, Body ? MClientMarker::BODY : MClientMarker::FEET);
+}
+
 void CGameClient::SendInfo(bool Start)
 {
 	if(m_pClient->IsSixup())
@@ -3412,8 +3420,8 @@ void CGameClient::SendInfo(bool Start)
 		Msg.m_Country = g_Config.m_PlayerCountry;
 		Msg.m_pSkin = g_Config.m_ClPlayerSkin;
 		Msg.m_UseCustomColor = g_Config.m_ClPlayerUseCustomColor;
-		Msg.m_ColorBody = g_Config.m_ClPlayerColorBody;
-		Msg.m_ColorFeet = g_Config.m_ClPlayerColorFeet;
+		Msg.m_ColorBody = OutgoingTeeColor(g_Config.m_ClPlayerColorBody, true);
+		Msg.m_ColorFeet = OutgoingTeeColor(g_Config.m_ClPlayerColorFeet, false);
 		CMsgPacker Packer(&Msg);
 		Msg.Pack(&Packer);
 		Client()->SendMsg(IClient::CONN_MAIN, &Packer, MSGFLAG_VITAL | MSGFLAG_FLUSH);
@@ -3427,8 +3435,8 @@ void CGameClient::SendInfo(bool Start)
 		Msg.m_Country = g_Config.m_PlayerCountry;
 		Msg.m_pSkin = g_Config.m_ClPlayerSkin;
 		Msg.m_UseCustomColor = g_Config.m_ClPlayerUseCustomColor;
-		Msg.m_ColorBody = g_Config.m_ClPlayerColorBody;
-		Msg.m_ColorFeet = g_Config.m_ClPlayerColorFeet;
+		Msg.m_ColorBody = OutgoingTeeColor(g_Config.m_ClPlayerColorBody, true);
+		Msg.m_ColorFeet = OutgoingTeeColor(g_Config.m_ClPlayerColorFeet, false);
 		CMsgPacker Packer(&Msg);
 		Msg.Pack(&Packer);
 		Client()->SendMsg(IClient::CONN_MAIN, &Packer, MSGFLAG_VITAL);
@@ -3454,8 +3462,8 @@ void CGameClient::SendDummyInfo(bool Start)
 		Msg.m_Country = g_Config.m_ClDummyCountry;
 		Msg.m_pSkin = g_Config.m_ClDummySkin;
 		Msg.m_UseCustomColor = g_Config.m_ClDummyUseCustomColor;
-		Msg.m_ColorBody = g_Config.m_ClDummyColorBody;
-		Msg.m_ColorFeet = g_Config.m_ClDummyColorFeet;
+		Msg.m_ColorBody = OutgoingTeeColor(g_Config.m_ClDummyColorBody, true);
+		Msg.m_ColorFeet = OutgoingTeeColor(g_Config.m_ClDummyColorFeet, false);
 		CMsgPacker Packer(&Msg);
 		Msg.Pack(&Packer);
 		Client()->SendMsg(IClient::CONN_DUMMY, &Packer, MSGFLAG_VITAL);
@@ -3469,8 +3477,8 @@ void CGameClient::SendDummyInfo(bool Start)
 		Msg.m_Country = g_Config.m_ClDummyCountry;
 		Msg.m_pSkin = g_Config.m_ClDummySkin;
 		Msg.m_UseCustomColor = g_Config.m_ClDummyUseCustomColor;
-		Msg.m_ColorBody = g_Config.m_ClDummyColorBody;
-		Msg.m_ColorFeet = g_Config.m_ClDummyColorFeet;
+		Msg.m_ColorBody = OutgoingTeeColor(g_Config.m_ClDummyColorBody, true);
+		Msg.m_ColorFeet = OutgoingTeeColor(g_Config.m_ClDummyColorFeet, false);
 		CMsgPacker Packer(&Msg);
 		Msg.Pack(&Packer);
 		Client()->SendMsg(IClient::CONN_DUMMY, &Packer, MSGFLAG_VITAL);

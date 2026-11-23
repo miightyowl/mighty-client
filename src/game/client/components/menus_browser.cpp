@@ -20,9 +20,12 @@
 #include <game/client/animstate.h>
 #include <game/client/components/countryflags.h>
 #include <game/client/gameclient.h>
+#include <game/client/mclient_marker.h>
 #include <game/client/ui.h>
 #include <game/client/ui_listbox.h>
 #include <game/localization.h>
+
+#include <algorithm>
 
 static constexpr ColorRGBA HIGHLIGHTED_TEXT_COLOR = ColorRGBA(0.4f, 0.4f, 1.0f, 1.0f);
 
@@ -95,6 +98,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		COL_NAME,
 		COL_GAMETYPE,
 		COL_MAP,
+		COL_MCLIENT,
 		COL_FRIENDS,
 		COL_PLAYERS,
 		COL_PING,
@@ -129,6 +133,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		{COL_NAME, IServerBrowser::SORT_NAME, Localizable("Name"), 0, 50.0f, {0}},
 		{COL_GAMETYPE, IServerBrowser::SORT_GAMETYPE, Localizable("Type"), 1, 50.0f, {0}},
 		{COL_MAP, IServerBrowser::SORT_MAP, Localizable("Map"), 1, 120.0f + (Headers.w - 480) / 8, {0}},
+		{COL_MCLIENT, -1, "", 1, ClickableIconSpace, {0}},
 		{COL_FRIENDS, IServerBrowser::SORT_NUMFRIENDS, "", 1, ClickableIconSpace, {0}},
 		{COL_PLAYERS, IServerBrowser::SORT_NUMPLAYERS, Localizable("Players"), 1, 60.0f, {0}},
 		{-1, -1, "", 1, 4.0f, {0}},
@@ -186,6 +191,12 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			Ui()->DoLabel(&Col.m_Rect, Col.m_Id == COL_FRIENDS ? FontIcon::HEART : FontIcon::STAR, 11.0f, TEXTALIGN_MC, Props);
 			TextRender()->SetRenderFlags(0);
 			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		}
+		else if(Col.m_Id == COL_MCLIENT)
+		{
+			SLabelProperties Props;
+			Props.SetColor(CaptionColor);
+			Ui()->DoLabel(&Col.m_Rect, "M", 10.0f, TEXTALIGN_MC, Props);
 		}
 		else if(Col.m_pCaption[0] != '\0')
 		{
@@ -442,6 +453,19 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 					});
 				if(!Printed)
 					Ui()->DoLabelStreamed(*pUiElement->Rect(UI_ELEM_MAP_1), &Button, pItem->m_aMap, FontSize, TEXTALIGN_ML, Props);
+			}
+			else if(Id == COL_MCLIENT)
+			{
+				const int NumMClient = std::count_if(pItem->m_vClients.begin(), pItem->m_vClients.end(), [](const CServerInfo::CClient &Client) {
+					return Client.m_CustomSkinColors && MClientMarker::IsMClient(Client.m_CustomSkinColorBody, Client.m_CustomSkinColorFeet);
+				});
+				if(NumMClient > 0)
+				{
+					str_format(aTemp, sizeof(aTemp), "%d", NumMClient);
+					SLabelProperties Props;
+					Props.SetColor(AccentColorLight().WithAlpha(1.0f));
+					Ui()->DoLabel(&Button, aTemp, 10.0f, TEXTALIGN_MC, Props);
+				}
 			}
 			else if(Id == COL_FRIENDS)
 			{
@@ -1330,6 +1354,17 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 		Name.VSplitLeft(18.0f, &Skin, &Name);
 		Name.VSplitRight(26.0f, &Name, &Flag);
 		Flag.HMargin(6.0f, &Flag);
+		const bool MClientUser = !IsFoe && CurrentClient.m_CustomSkinColors && MClientMarker::IsMClient(CurrentClient.m_CustomSkinColorBody, CurrentClient.m_CustomSkinColorFeet);
+		if(MClientUser)
+		{
+			CUIRect MClientBadge;
+			Name.VSplitRight(14.0f, &Name, &MClientBadge);
+			SLabelProperties Props;
+			Props.SetColor(AccentColorLight().WithAlpha(1.0f));
+			Ui()->DoLabel(&MClientBadge, "M", FontSize, TEXTALIGN_MC, Props);
+			Ui()->DoButtonLogic(&CurrentClient.m_aClan, 0, &MClientBadge, BUTTONFLAG_NONE);
+			Ui()->DoToolTip(&CurrentClient.m_aClan, &MClientBadge, Localize("Uses M-Client"));
+		}
 		Name.HSplitTop(12.0f, &Name, &Clan);
 
 		// score
@@ -1461,7 +1496,7 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 void CMenus::RenderServerbrowserFriends(CUIRect View)
 {
 	const float FontSize = 10.0f;
-	static bool s_aListExtended[NUM_FRIEND_TYPES] = {true, true, false};
+	static bool s_aListExtended[NUM_FRIEND_TYPES] = {true, true, true, false};
 	const float SpacingH = 2.0f;
 
 	CUIRect List, ServerFriends;
@@ -1489,8 +1524,6 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 	for(int ServerIndex = 0; ServerIndex < ServerBrowser()->NumServers(); ++ServerIndex)
 	{
 		const CServerInfo *pEntry = ServerBrowser()->Get(ServerIndex);
-		if(pEntry->m_FriendState == IFriends::FRIEND_NO)
-			continue;
 
 		// only show friends in same community
 		if(g_Config.m_ClMClientFriendsCommunityFilter && ServerBrowser()->CommunitiesFilter().Filtered(pEntry->m_aCommunityId))
@@ -1498,7 +1531,11 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 
 		for(const CServerInfo::CClient &CurrentClient : pEntry->m_vClients)
 		{
-			if(CurrentClient.m_FriendState == IFriends::FRIEND_NO)
+			if(CurrentClient.m_CustomSkinColors && MClientMarker::IsMClient(CurrentClient.m_CustomSkinColorBody, CurrentClient.m_CustomSkinColorFeet) &&
+				!(g_Config.m_ClFoeAnonymize && GameClient()->Foes()->IsFriend(CurrentClient.m_aName, CurrentClient.m_aClan, true)))
+				m_avFriends[FRIEND_MCLIENT_ON].emplace_back(CurrentClient, pEntry);
+
+			if(pEntry->m_FriendState == IFriends::FRIEND_NO || CurrentClient.m_FriendState == IFriends::FRIEND_NO)
 				continue;
 
 			const int FriendIndex = CurrentClient.m_FriendState == IFriends::FRIEND_PLAYER ? FRIEND_PLAYER_ON : FRIEND_CLAN_ON;
@@ -1544,6 +1581,9 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 		case FRIEND_CLAN_ON:
 			str_format(aBuf, sizeof(aBuf), Localize("Online clanmates (%d)"), (int)m_avFriends[FriendType].size());
 			break;
+		case FRIEND_MCLIENT_ON:
+			str_format(aBuf, sizeof(aBuf), Localize("M-Client users (%d)"), (int)m_avFriends[FriendType].size());
+			break;
 		case FRIEND_OFF:
 			str_format(aBuf, sizeof(aBuf), Localize("Offline (%d)", "friends (server browser)"), (int)m_avFriends[FriendType].size());
 			break;
@@ -1580,7 +1620,7 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 
 				if(Friend.ServerInfo())
 				{
-					Ui()->DoToolTip(Friend.ListItemId(), &Rect, Localize("Click to select server. Double click to join your friend."));
+					Ui()->DoToolTip(Friend.ListItemId(), &Rect, FriendType == FRIEND_MCLIENT_ON ? Localize("Click to select server. Double click to join this player.") : Localize("Click to select server. Double click to join your friend."));
 				}
 
 				// Compare unsorted server id of the friend with the unsorted id of the currently selected server
@@ -1661,7 +1701,7 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 				}
 
 				// remove button
-				if(Inside)
+				if(Inside && FriendType != FRIEND_MCLIENT_ON)
 				{
 					TextRender()->TextColor(Ui()->HotItem() == Friend.RemoveButtonId() ? TextRender()->DefaultTextColor() : ColorRGBA(0.4f, 0.4f, 0.4f, 1.0f));
 					TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
@@ -1696,6 +1736,8 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 				pText = Localize("Add friends by entering their name below or by clicking their name in the player list.");
 			else if(FriendType == FRIEND_CLAN_ON && !HasClan)
 				pText = Localize("Add clanmates by entering their clan below and leaving the name blank.");
+			else if(FriendType == FRIEND_MCLIENT_ON && m_avFriends[FriendType].empty())
+				pText = Localize("Players show up here when they enable \"Show me as M-Client user in the server browser\".");
 			if(pText != nullptr)
 			{
 				const float DescriptionMargin = 2.0f;

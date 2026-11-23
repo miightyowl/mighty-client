@@ -96,6 +96,11 @@ void CMenus::RenderSettingsMClient(CUIRect MainView)
 		if(g_Config.m_ClFoeAnonymize)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFoeAnonymizeRealNamesInChat, Localize("Keep real foe names in chat messages of others"), &g_Config.m_ClFoeAnonymizeRealNamesInChat, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFriendsCommunityFilter, Localize("Only show friends in enabled communities"), &g_Config.m_ClMClientFriendsCommunityFilter, &LeftView, LineSize);
+		if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientShowInBrowser, Localize("Show me as M-Client user in the server browser"), &g_Config.m_ClMClientShowInBrowser, &LeftView, LineSize))
+		{
+			m_NeedSendinfo = true;
+			m_NeedSendDummyinfo = true;
+		}
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientFinishFireworks, Localize("Play fireworks when you finish"), &g_Config.m_ClMClientFinishFireworks, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientSaveNoticeHideCode, Localize("Map Saves: Hide names and password when entering a new map"), &g_Config.m_ClMClientSaveNoticeHideCode, &LeftView, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClMClientHideProtocolWhispers, Localize("Hide protocol whispers"), &g_Config.m_ClMClientHideProtocolWhispers, &LeftView, LineSize);
