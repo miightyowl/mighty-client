@@ -13,6 +13,7 @@
 
 #include <chrono>
 #include <list>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string_view>
@@ -269,6 +270,7 @@ public:
 	const CSkinContainer *FindContainerOrNullptr(const char *pName);
 	const CSkin *FindOrNullptr(const char *pName);
 	const CSkin *Find(const char *pName);
+	std::unique_ptr<CSkin> LoadDetachedSkin(const char *pName, const char *pPath);
 
 	void AddFavorite(const char *pName);
 	void RemoveFavorite(const char *pName);
@@ -351,6 +353,7 @@ private:
 	char m_aEventSkinPrefix[MAX_SKIN_LENGTH];
 
 	bool LoadSkinData(const char *pName, CSkinLoadData &Data) const;
+	void FillSkin(CSkin &Skin, const CSkinLoadData &Data);
 	void LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData &Data);
 	void LoadSkinDirect(const char *pName);
 	const CSkinContainer *FindContainerImpl(const char *pName);

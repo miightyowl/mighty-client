@@ -433,10 +433,8 @@ bool CSkins::LoadSkinData(const char *pName, CSkinLoadData &Data) const
 	return true;
 }
 
-void CSkins::LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData &Data)
+void CSkins::FillSkin(CSkin &Skin, const CSkinLoadData &Data)
 {
-	CSkin Skin{pSkinContainer->Name()};
-
 	// people load the jankiest skins, so we ignore empty sprites
 	Skin.m_OriginalSkin.m_Body = Graphics()->LoadSpriteTexture(Data.m_Info, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_BODY]);
 	Skin.m_OriginalSkin.m_BodyOutline = Graphics()->LoadSpriteTexture(Data.m_Info, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE]);
@@ -462,6 +460,26 @@ void CSkins::LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData 
 
 	Skin.m_Metrics = Data.m_Metrics;
 	Skin.m_BloodColor = Data.m_BloodColor;
+}
+
+std::unique_ptr<CSkin> CSkins::LoadDetachedSkin(const char *pName, const char *pPath)
+{
+	CSkinLoadData Data;
+	std::unique_ptr<CSkin> pSkin;
+	if(Graphics()->LoadPng(Data.m_Info, pPath, IStorage::TYPE_ALL) && LoadSkinData(pName, Data))
+	{
+		pSkin = std::make_unique<CSkin>(pName);
+		FillSkin(*pSkin, Data);
+	}
+	Data.m_Info.Free();
+	Data.m_InfoGrayscale.Free();
+	return pSkin;
+}
+
+void CSkins::LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData &Data)
+{
+	CSkin Skin{pSkinContainer->Name()};
+	FillSkin(Skin, Data);
 
 	if(g_Config.m_Debug)
 	{

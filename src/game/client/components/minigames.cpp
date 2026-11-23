@@ -29,11 +29,14 @@ namespace
 {
 	const char *PROTOCOL_PREFIX = "MGAME1 ";
 	const char *VIEW_BIND = "+minigames";
-	const char *g_apGameNames[CMiniGames::NUM_GAMES] = {"Tic tac toe", "Chess", "Battleship"};
+	const char *g_apGameNames[CMiniGames::NUM_GAMES] = {"Tic tac toe", "Chess", "Battleship", "Memory"};
 
 	const int g_aShipSizes[10] = {4, 3, 3, 2, 2, 2, 1, 1, 1, 1};
 	const int SHIP_CELLS = 20;
 	const float BATTLE_NOTE_TIME = 4.0f;
+	const float MEMORY_SECOND_DELAY = 0.6f;
+	const float MEMORY_PEEK_TIME = 1.6f;
+	const float MEMORY_FLIP_TIME = 0.28f;
 
 	// handshake goes over whispers
 	const float SEND_INTERVAL = 1.2f;
@@ -66,7 +69,8 @@ namespace
 		switch(Op)
 		{
 		case EMOTE_OP_MOVE:
-			return Battle ? 3 : 2;
+			return Battle ? 3 : Game == CMiniGames::GAME_MEMORY ? 5 :
+									      2;
 		case EMOTE_OP_ACK:
 			return Battle ? 2 : 1;
 		case EMOTE_OP_CHESS:
@@ -101,6 +105,30 @@ namespace
 		case 'P': return "\xe2\x99\x9f";
 		default: return "";
 		}
+	}
+
+	int ParseInts(const char *pText, int *pOut, int Max)
+	{
+		int Num = 0;
+		while(Num < Max)
+		{
+			while(*pText == ' ')
+				pText++;
+			if(*pText < '0' || *pText > '9')
+				break;
+			int Value = 0;
+			while(*pText >= '0' && *pText <= '9')
+			{
+				Value = Value * 10 + (*pText - '0');
+				if(Value > 100000000)
+					return -1;
+				pText++;
+			}
+			pOut[Num++] = Value;
+		}
+		while(*pText == ' ')
+			pText++;
+		return *pText == '\0' ? Num : -1;
 	}
 
 	const int g_aaWinLines[8][3] = {
@@ -221,6 +249,8 @@ bool CMiniGames::MyTurn() const
 		return m_Chess.WhiteToMove() == AmWhite();
 	if(m_Game == GAME_BATTLESHIP)
 		return m_BattleMyTurn;
+	if(m_Game == GAME_MEMORY)
+		return m_MemoryTurn == m_MyMark;
 	return (m_MoveCount % 2 == 0) == (m_MyMark == 'X');
 }
 
@@ -238,7 +268,7 @@ void CMiniGames::StatusText(char *pBuf, size_t Size) const
 		str_format(pBuf, Size, Localize("%s challenged you"), OpponentName());
 		break;
 	case STATE_PLAYING:
-		if(m_Game == GAME_BATTLESHIP && m_BattleNote != NOTE_NONE && LocalTime() - m_BattleNoteTime < BATTLE_NOTE_TIME)
+		if((m_Game == GAME_BATTLESHIP || (m_Game == GAME_MEMORY && m_MemoryPick < 0)) && m_BattleNote != NOTE_NONE && LocalTime() - m_BattleNoteTime < BATTLE_NOTE_TIME)
 		{
 			switch(m_BattleNote)
 			{
@@ -257,6 +287,18 @@ void CMiniGames::StatusText(char *pBuf, size_t Size) const
 			case NOTE_FOE_HIT:
 				str_copy(pBuf, Localize("One of your ships was hit."), Size);
 				break;
+			case NOTE_PAIR:
+				str_copy(pBuf, Localize("Pair! Flip again."), Size);
+				break;
+			case NOTE_NO_PAIR:
+				str_format(pBuf, Size, Localize("No pair, %s goes next."), OpponentName());
+				break;
+			case NOTE_FOE_PAIR:
+				str_format(pBuf, Size, Localize("%s found a pair."), OpponentName());
+				break;
+			case NOTE_FOE_NO_PAIR:
+				str_copy(pBuf, Localize("No pair, your turn."), Size);
+				break;
 			default:
 				str_copy(pBuf, Localize("One of your ships went down."), Size);
 				break;
@@ -266,6 +308,8 @@ void CMiniGames::StatusText(char *pBuf, size_t Size) const
 			str_format(pBuf, Size, Localize("%s is thinking..."), OpponentName());
 		else if(m_Game == GAME_BATTLESHIP)
 			str_copy(pBuf, Localize("Your turn, pick a target"), Size);
+		else if(m_Game == GAME_MEMORY)
+			str_copy(pBuf, m_MemoryPick < 0 ? Localize("Your turn, flip two cards") : Localize("Now find the matching card"), Size);
 		else if(m_Game == GAME_CHESS)
 			str_format(pBuf, Size, Localize("Your turn, you play %s"), AmWhite() ? Localize("white") : Localize("black"));
 		else
@@ -391,8 +435,14 @@ void CMiniGames::Challenge(int ClientId)
 	m_aStatus[0] = '\0';
 	m_HasBoard = false;
 	m_State = STATE_CALLING;
-	char aMessage[16];
-	str_format(aMessage, sizeof(aMessage), "C %d", (int)m_Game);
+	char aMessage[32];
+	if(m_Game == GAME_MEMORY)
+	{
+		m_MemorySeed = secure_rand_below(1000000);
+		str_format(aMessage, sizeof(aMessage), "C %d %d %d", (int)m_Game, m_MemorySeed, MemoryCards::Version());
+	}
+	else
+		str_format(aMessage, sizeof(aMessage), "C %d", (int)m_Game);
 	SendProtocol(aMessage, MAX_CHALLENGE_RETRIES);
 }
 
@@ -414,6 +464,7 @@ void CMiniGames::StartGame(int OpponentId, bool Challenger)
 	m_aWinLine[0] = m_aWinLine[1] = m_aWinLine[2] = -1;
 	m_Result = 0;
 	m_aStatus[0] = '\0';
+	ResetMemory(Challenger);
 	m_HasBoard = true;
 	m_State = STATE_PLAYING;
 	ClearRetry();
@@ -448,8 +499,15 @@ void CMiniGames::QueueWhisper(int ClientId, const char *pMessage, bool Priority,
 	CQueuedWhisper Queued{ClientId, ReplaceKey, aLine, Conn, Conn < 0 ? -1 : GameClient()->m_aLocalIds[Conn]};
 	if(Priority)
 		m_vSendQueue.insert(m_vSendQueue.begin(), std::move(Queued));
-	else
+	else if(Queued.m_ReplaceKey == WHISPER_REPLACE_PET)
 		m_vSendQueue.push_back(std::move(Queued));
+	else
+	{
+		const auto FirstPet = std::find_if(m_vSendQueue.begin(), m_vSendQueue.end(), [](const CQueuedWhisper &Other) {
+			return Other.m_ReplaceKey == WHISPER_REPLACE_PET;
+		});
+		m_vSendQueue.insert(FirstPet, std::move(Queued));
+	}
 }
 
 void CMiniGames::SendTo(int ClientId, const char *pMessage, bool Priority, int ReplaceKey)
@@ -504,7 +562,8 @@ void CMiniGames::FlushSendQueue()
 	if(Now < m_NextSendTime)
 		return;
 
-	if(m_ChatScore + CHAT_SCORE_PENALTY > CHAT_SCORE_BUDGET)
+	const float Reserve = m_vSendQueue.front().m_ReplaceKey == WHISPER_REPLACE_PET ? CHAT_SCORE_PENALTY : 0.0f;
+	if(m_ChatScore + CHAT_SCORE_PENALTY + Reserve > CHAT_SCORE_BUDGET)
 		return;
 
 	GameClient()->m_Chat.SendChat(0, m_vSendQueue.front().m_Command.c_str(), m_vSendQueue.front().m_Conn);
@@ -554,6 +613,14 @@ int CMiniGames::BoardHash() const
 		}
 		aState[Out++] = m_BattleMyTurn == AmWhite() ? 'X' : 'O';
 		aState[Out] = '\0';
+		pState = aState;
+	}
+	else if(m_Game == GAME_MEMORY)
+	{
+		for(int i = 0; i < MemoryCards::NUM_CARDS; i++)
+			aState[i] = m_aMemoryOwner[i];
+		aState[MemoryCards::NUM_CARDS] = m_MemoryTurn;
+		aState[MemoryCards::NUM_CARDS + 1] = '\0';
 		pState = aState;
 	}
 
@@ -765,6 +832,29 @@ void CMiniGames::ProcessFrame()
 
 		if(m_aMyWaters[Cell] == 'o' || m_aMyWaters[Cell] == 'X')
 			SendMoveAck(Cell);
+		return;
+	}
+
+	if(m_Game == GAME_MEMORY)
+	{
+		const int First = m_aFrame[1] * EMOTE_RADIX + m_aFrame[2];
+		const int Second = m_aFrame[3] * EMOTE_RADIX + m_aFrame[4];
+		const bool Valid = First < MemoryCards::NUM_CARDS && Second < MemoryCards::NUM_CARDS &&
+				   m_aMemoryOwner[First] == '.' && m_aMemoryOwner[Second] == '.';
+		const bool Current = Valid && m_State == STATE_PLAYING && !MyTurn() && m_aFrame[0] == BoardHash();
+		if(First == Second)
+		{
+			if(Current)
+			{
+				m_MemoryFoePick = First;
+				m_aMemoryPeek[0] = m_aMemoryPeek[1] = -1;
+				m_MemoryPeekUntil = 0.0f;
+			}
+			return;
+		}
+		if(Current)
+			PlayMemoryTurn(First, Second, false);
+		SendMoveAck(-1);
 		return;
 	}
 
@@ -990,8 +1080,127 @@ void CMiniGames::ApplyShotResult(int Cell, int Result)
 	CheckGameEnd();
 }
 
+void CMiniGames::ResetMemory(bool Challenger)
+{
+	MemoryCards::Deal(m_MemorySeed, m_aMemoryFaces, m_aMemoryCards);
+	for(int i = 0; i < MemoryCards::NUM_CARDS; i++)
+	{
+		m_aMemoryOwner[i] = '.';
+		m_aMemoryShown[i] = false;
+		m_aMemoryFlipAt[i] = -MEMORY_FLIP_TIME;
+	}
+	m_MemoryTurn = 'X';
+	m_MemoryPick = -1;
+	m_MemoryFoePick = -1;
+	m_aMemoryPeek[0] = m_aMemoryPeek[1] = -1;
+	m_MemoryPeekSecondAt = 0.0f;
+	m_MemoryPeekUntil = 0.0f;
+
+	if(m_Game != GAME_MEMORY || m_MemorySkinsLoaded)
+		return;
+	m_MemorySkinsLoaded = true;
+	m_vpMemorySkins.clear();
+	for(int i = 0; i < MemoryCards::NumStored(); i++)
+		m_vpMemorySkins.push_back(GameClient()->m_Skins.LoadDetachedSkin("memory", MemoryCards::StoredPath(i)));
+}
+
+void CMiniGames::MemoryClick(int Card)
+{
+	if(m_State != STATE_PLAYING || !MyTurn() || m_aMemoryOwner[Card] != '.' || Card == m_MemoryPick || LocalTime() < m_MemoryPeekSecondAt)
+		return;
+
+	if(m_MemoryPick < 0)
+	{
+		m_MemoryPick = Card;
+		m_aMemoryPeek[0] = m_aMemoryPeek[1] = -1;
+		m_MemoryPeekUntil = 0.0f;
+		const int aPick[5] = {BoardHash(), Card / EMOTE_RADIX, Card % EMOTE_RADIX, Card / EMOTE_RADIX, Card % EMOTE_RADIX};
+		SendFrame(EMOTE_OP_MOVE, aPick, 5);
+		return;
+	}
+	if(m_MovePending)
+		return;
+
+	const int First = m_MemoryPick;
+	m_aMoveFrame[0] = BoardHash();
+	m_aMoveFrame[1] = First / EMOTE_RADIX;
+	m_aMoveFrame[2] = First % EMOTE_RADIX;
+	m_aMoveFrame[3] = Card / EMOTE_RADIX;
+	m_aMoveFrame[4] = Card % EMOTE_RADIX;
+	PlayMemoryTurn(First, Card, true);
+
+	m_MoveFrameLen = 5;
+	m_MovePending = true;
+	m_MoveRetryCount = 0;
+	m_MoveRetryTime = LocalTime() + MOVE_RETRY_INTERVAL;
+	SendFrame(EMOTE_OP_MOVE, m_aMoveFrame, m_MoveFrameLen);
+}
+
+void CMiniGames::PlayMemoryTurn(int First, int Second, bool Mine)
+{
+	const char Mark = Mine ? m_MyMark : OtherMark();
+	const bool Pair = m_aMemoryCards[First] == m_aMemoryCards[Second];
+	const float Now = LocalTime();
+
+	const bool FirstShown = Mine || m_MemoryFoePick == First;
+	m_aMemoryPeek[0] = First;
+	m_aMemoryPeek[1] = Second;
+	m_MemoryPeekSecondAt = Mine ? Now : Now + (FirstShown ? MEMORY_SECOND_DELAY / 3.0f : MEMORY_SECOND_DELAY);
+	m_MemoryFoePick = -1;
+	m_MemoryPeekUntil = m_MemoryPeekSecondAt + (Pair ? 0.0f : MEMORY_PEEK_TIME);
+	m_MemoryPick = -1;
+
+	if(Pair)
+		m_aMemoryOwner[First] = m_aMemoryOwner[Second] = Mark;
+	else
+		m_MemoryTurn = Mark == 'X' ? 'O' : 'X';
+
+	m_MoveCount++;
+	m_BattleNote = Mine ? (Pair ? NOTE_PAIR : NOTE_NO_PAIR) : (Pair ? NOTE_FOE_PAIR : NOTE_FOE_NO_PAIR);
+	m_BattleNoteTime = Now;
+	CheckGameEnd();
+}
+
+bool CMiniGames::MemoryCardFaceUp(int Card) const
+{
+	const float Now = LocalTime();
+	if(Card == m_aMemoryPeek[1] && Now < m_MemoryPeekSecondAt)
+		return false;
+	if(m_aMemoryOwner[Card] != '.' || Card == m_MemoryPick || Card == m_MemoryFoePick)
+		return true;
+	return (Card == m_aMemoryPeek[0] || Card == m_aMemoryPeek[1]) && Now < m_MemoryPeekUntil;
+}
+
+int CMiniGames::MemoryScore(char Mark) const
+{
+	int Cards = 0;
+	for(const char Owner : m_aMemoryOwner)
+		Cards += Owner == Mark ? 1 : 0;
+	return Cards / 2;
+}
+
 bool CMiniGames::CheckGameEnd()
 {
+	if(m_Game == GAME_MEMORY)
+	{
+		const int Mine = MemoryScore(m_MyMark);
+		const int Theirs = MemoryScore(OtherMark());
+		if(Mine + Theirs < MemoryCards::NUM_PAIRS)
+			return false;
+
+		char aStatus[128];
+		if(Mine > Theirs)
+			str_format(aStatus, sizeof(aStatus), "You found %d pairs, you won!", Mine);
+		else if(Mine < Theirs)
+			str_format(aStatus, sizeof(aStatus), "%s found %d pairs and won.", OpponentName(), Theirs);
+		else
+			str_format(aStatus, sizeof(aStatus), "Draw, %d pairs each.", Mine);
+		Finish(Mine > Theirs ? 'W' : Mine < Theirs ? 'L' :
+							     'D',
+			aStatus);
+		return true;
+	}
+
 	if(m_Game == GAME_BATTLESHIP)
 	{
 		int MyHits = 0;
@@ -1125,12 +1334,17 @@ bool CMiniGames::OnWhisper(int ClientId, int Team, const char *pMessage)
 		}
 		else
 		{
-			int Game;
-			if(!str_toint(pRest, &Game) || Game < 0 || Game >= NUM_GAMES)
+			int aArgs[3];
+			const int NumArgs = ParseInts(pRest, aArgs, 3);
+			const int Game = NumArgs >= 1 ? aArgs[0] : -1;
+			const bool Valid = Game >= 0 && Game < NUM_GAMES && (Game == GAME_MEMORY ? NumArgs == 3 && aArgs[2] == MemoryCards::Version() : NumArgs == 1);
+			if(!Valid)
 			{
 				SendTo(ClientId, "D");
 				break;
 			}
+			if(Game == GAME_MEMORY)
+				m_MemorySeed = aArgs[1];
 
 			ClearRetry();
 			m_Game = (EGame)Game;
@@ -1262,6 +1476,27 @@ void CMiniGames::RenderGameIcon(int Game, CUIRect Area, float Alpha)
 		}
 		TextRender()->TextColor(CMenus::AccentColor().WithAlpha(Alpha));
 		Ui()->DoLabel(&Grid, PieceGlyph('Q'), Size * 0.7f, TEXTALIGN_MC);
+	}
+	else if(Game == GAME_MEMORY)
+	{
+		const float CellW = Size / 3.0f;
+		const float CellH = Size / 2.0f;
+		for(int i = 0; i < 6; i++)
+		{
+			CUIRect Cell;
+			Cell.x = Grid.x + (i % 3) * CellW;
+			Cell.y = Grid.y + (i / 3) * CellH;
+			Cell.w = CellW;
+			Cell.h = CellH;
+			Cell.Margin(1.5f, &Cell);
+
+			Cell.Draw(CMenus::AccentColor().WithAlpha(0.55f * Alpha), IGraphics::CORNER_ALL, 2.0f);
+			CUIRect Inner;
+			Cell.Margin(Cell.w * 0.15f, &Inner);
+			Inner.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.22f * Alpha), IGraphics::CORNER_ALL, 1.5f);
+			TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f * Alpha));
+			Ui()->DoLabel(&Cell, "?", Cell.h * 0.45f, TEXTALIGN_MC);
+		}
 	}
 	else if(Game == GAME_BATTLESHIP)
 	{
@@ -1544,14 +1779,30 @@ void CMiniGames::RenderView(bool Interactive, float Alpha)
 
 	const CUIRect Screen = *Ui()->Screen();
 	CUIRect Panel;
-	const bool Chess = m_Game == GAME_CHESS;
-	const bool Battle = m_Game == GAME_BATTLESHIP;
-	Panel.w = ShowBoard ? (Chess ? 280.0f : Battle ? 330.0f :
-							 210.0f) :
-			      260.0f;
-	Panel.h = ShowBoard ? (Chess ? 320.0f : Battle ? 240.0f :
-							 250.0f) :
-			      84.0f;
+	Panel.w = 260.0f;
+	Panel.h = 84.0f;
+	if(ShowBoard)
+	{
+		switch(m_Game)
+		{
+		case GAME_CHESS:
+			Panel.w = 280.0f;
+			Panel.h = 320.0f;
+			break;
+		case GAME_BATTLESHIP:
+			Panel.w = 330.0f;
+			Panel.h = 240.0f;
+			break;
+		case GAME_MEMORY:
+			Panel.w = 300.0f;
+			Panel.h = 300.0f;
+			break;
+		default:
+			Panel.w = 210.0f;
+			Panel.h = 250.0f;
+			break;
+		}
+	}
 	Panel.x = Screen.x + (Screen.w - Panel.w) / 2.0f;
 	Panel.y = Screen.y + (Screen.h - Panel.h) / 2.0f;
 	Panel.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, BackgroundAlpha() * Alpha), IGraphics::CORNER_ALL, 8.0f);
@@ -1658,6 +1909,11 @@ void CMiniGames::RenderBoard(CUIRect Area, bool Interactive, float Alpha)
 	if(m_Game == GAME_BATTLESHIP)
 	{
 		RenderBattleshipBoard(Area, Interactive, Alpha);
+		return;
+	}
+	if(m_Game == GAME_MEMORY)
+	{
+		RenderMemoryBoard(Area, Interactive, Alpha);
 		return;
 	}
 
@@ -1777,6 +2033,111 @@ void CMiniGames::RenderWaterGrid(CUIRect Area, bool Own, bool Interactive, float
 	}
 }
 
+const CSkin *CMiniGames::MemorySkin(const MemoryCards::SFace &Face)
+{
+	if(Face.m_Stored >= 0 && Face.m_Stored < (int)m_vpMemorySkins.size() && m_vpMemorySkins[Face.m_Stored])
+		return m_vpMemorySkins[Face.m_Stored].get();
+	return GameClient()->m_Skins.Find(Face.m_pSkin ? Face.m_pSkin : "default");
+}
+
+void CMiniGames::RenderMemoryTee(const MemoryCards::SFace &Face, vec2 Pos, float Size, float Alpha)
+{
+	CTeeRenderInfo Info;
+	Info.Apply(MemorySkin(Face));
+	Info.ApplyColors(Face.m_CustomColors, Face.m_ColorBody, Face.m_ColorFeet);
+	Info.m_Size = Size;
+	RenderTools()->RenderIdleTeeAtCenter(&Info, Pos, EMOTE_NORMAL, vec2(1.0f, 0.0f), Alpha);
+}
+
+void CMiniGames::RenderMemoryBoard(CUIRect Area, bool Interactive, float Alpha)
+{
+	using namespace MemoryCards;
+
+	CUIRect Score, Grid;
+	Area.HSplitTop(13.0f, &Score, &Grid);
+	Grid.HSplitTop(5.0f, nullptr, &Grid);
+
+	CUIRect MineLabel, TheirsLabel;
+	Score.VSplitMid(&MineLabel, &TheirsLabel);
+	char aMine[64];
+	char aTheirs[64];
+	str_format(aMine, sizeof(aMine), "%s  %d", Localize("You"), MemoryScore(m_MyMark));
+	str_format(aTheirs, sizeof(aTheirs), "%d  %s", MemoryScore(OtherMark()), OpponentName());
+	SLabelProperties Props;
+	Props.m_MaxWidth = TheirsLabel.w;
+	Props.m_EllipsisAtEnd = true;
+	const bool Running = m_State == STATE_PLAYING;
+	TextRender()->TextColor(CMenus::AccentColor().WithAlpha((Running && !MyTurn() ? 0.6f : 1.0f) * Alpha));
+	Ui()->DoLabel(&MineLabel, aMine, 10.0f, TEXTALIGN_ML, Props);
+	TextRender()->TextColor(COLOR_MARK_OTHER.WithAlpha((Running && MyTurn() ? 0.6f : 1.0f) * Alpha));
+	Ui()->DoLabel(&TheirsLabel, aTheirs, 10.0f, TEXTALIGN_MR, Props);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	const float CardSize = std::min(Grid.w / NUM_COLUMNS, Grid.h / NUM_ROWS);
+	const float Left = Grid.x + (Grid.w - CardSize * NUM_COLUMNS) / 2.0f;
+	const float Top = Grid.y + (Grid.h - CardSize * NUM_ROWS) / 2.0f;
+	const float Now = LocalTime();
+	const bool CanFlip = Interactive && Running && MyTurn() && Now >= m_MemoryPeekSecondAt;
+
+	static char s_aCardIds[NUM_CARDS];
+	for(int i = 0; i < NUM_CARDS; i++)
+	{
+		CUIRect Cell;
+		Cell.x = Left + (i % NUM_COLUMNS) * CardSize;
+		Cell.y = Top + (i / NUM_COLUMNS) * CardSize;
+		Cell.w = CardSize;
+		Cell.h = CardSize;
+		Cell.Margin(2.5f, &Cell);
+
+		const bool Clickable = CanFlip && m_aMemoryOwner[i] == '.' && i != m_MemoryPick && (m_MemoryPick < 0 || !m_MovePending);
+		if(Clickable && Ui()->DoButtonLogic(&s_aCardIds[i], 0, &Cell, BUTTONFLAG_LEFT))
+			MemoryClick(i);
+
+		const bool FaceUp = MemoryCardFaceUp(i);
+		if(FaceUp != m_aMemoryShown[i])
+		{
+			m_aMemoryShown[i] = FaceUp;
+			m_aMemoryFlipAt[i] = Now;
+		}
+		const float Progress = std::clamp((Now - m_aMemoryFlipAt[i]) / MEMORY_FLIP_TIME, 0.0f, 1.0f);
+		const bool ShowFace = Progress < 0.5f ? !FaceUp : FaceUp;
+		const float Scale = std::fabs(1.0f - 2.0f * Progress);
+
+		CUIRect Card = Cell;
+		Card.w = Cell.w * Scale;
+		Card.x = Cell.x + (Cell.w - Card.w) / 2.0f;
+		if(Card.w < 1.0f)
+			continue;
+
+		if(!ShowFace)
+		{
+			const bool Hot = Clickable && Ui()->HotItem() == &s_aCardIds[i];
+			Card.Draw(CMenus::AccentColor().WithAlpha((Hot ? 0.8f : 0.5f) * Alpha), IGraphics::CORNER_ALL, 4.0f);
+			CUIRect Inner;
+			Card.Margin(std::min(4.0f, Card.w * 0.15f), &Inner);
+			Inner.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.22f * Alpha), IGraphics::CORNER_ALL, 3.0f);
+			if(Scale > 0.6f)
+			{
+				TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.45f * Alpha));
+				Ui()->DoLabel(&Card, "?", Cell.h * 0.42f, TEXTALIGN_MC);
+				TextRender()->TextColor(TextRender()->DefaultTextColor());
+			}
+			continue;
+		}
+
+		const char Owner = m_aMemoryOwner[i];
+		ColorRGBA Background = ColorRGBA(1.0f, 1.0f, 1.0f, i == m_MemoryPick ? 0.32f : 0.2f);
+		if(Owner == m_MyMark)
+			Background = CMenus::AccentColor().WithAlpha(0.35f);
+		else if(Owner != '.')
+			Background = COLOR_MARK_OTHER.WithAlpha(0.14f);
+		Card.Draw(Background.WithMultipliedAlpha(Alpha), IGraphics::CORNER_ALL, 4.0f);
+
+		if(Scale > 0.15f)
+			RenderMemoryTee(m_aMemoryFaces[m_aMemoryCards[i]], Cell.Center() + vec2(0.0f, Cell.h * 0.04f), Cell.h * 0.74f * Scale, Alpha);
+	}
+}
+
 void CMiniGames::RenderChessBoard(CUIRect Grid, bool Interactive, float Alpha)
 {
 	const bool Flip = !AmWhite();
@@ -1822,6 +2183,19 @@ void CMiniGames::RenderChessBoard(CUIRect Grid, bool Interactive, float Alpha)
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 		TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
 	}
+}
+
+void CMiniGames::OnShutdown()
+{
+	for(auto &pSkin : m_vpMemorySkins)
+	{
+		if(!pSkin)
+			continue;
+		pSkin->m_OriginalSkin.Unload(Graphics());
+		pSkin->m_ColorableSkin.Unload(Graphics());
+	}
+	m_vpMemorySkins.clear();
+	m_MemorySkinsLoaded = false;
 }
 
 void CMiniGames::OnUpdate()

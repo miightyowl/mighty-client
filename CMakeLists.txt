@@ -1846,6 +1846,25 @@ set(EXPECTED_DATA
   maps7/Tsunami.map
   maps7/Tutorial.map
   maps7/readme.txt
+  memory/01.png
+  memory/02.png
+  memory/03.png
+  memory/04.png
+  memory/05.png
+  memory/06.png
+  memory/07.png
+  memory/08.png
+  memory/09.png
+  memory/10.png
+  memory/11.png
+  memory/12.png
+  memory/13.png
+  memory/14.png
+  memory/15.png
+  memory/16.png
+  memory/17.png
+  memory/18.png
+  memory/19.png
   menu.png
   menuimages/demos.png
   menuimages/editor.png
@@ -2794,6 +2813,8 @@ if(CLIENT)
     components/mapsounds.h
     components/mclient_detect.cpp
     components/mclient_detect.h
+    components/memory_cards.cpp
+    components/memory_cards.h
     components/menu_background.cpp
     components/menu_background.h
     components/menus.cpp

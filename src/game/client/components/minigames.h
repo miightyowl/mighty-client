@@ -2,14 +2,19 @@
 #define GAME_CLIENT_COMPONENTS_MINIGAMES_H
 
 #include "chess_board.h"
+#include "memory_cards.h"
+
+#include <base/vmath.h>
 
 #include <engine/console.h>
 #include <engine/input.h>
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
+#include <game/client/skin.h>
 #include <game/client/ui_rect.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -21,6 +26,7 @@ public:
 		GAME_TICTACTOE,
 		GAME_CHESS,
 		GAME_BATTLESHIP,
+		GAME_MEMORY,
 		NUM_GAMES,
 	};
 
@@ -31,6 +37,7 @@ public:
 	void OnUpdate() override;
 	void OnRender() override;
 	void OnRelease() override;
+	void OnShutdown() override;
 	bool OnInput(const IInput::CEvent &Event) override;
 	bool OnCursorMove(float x, float y, IInput::ECursorType CursorType) override;
 
@@ -79,6 +86,10 @@ private:
 		NOTE_FOE_MISS,
 		NOTE_FOE_HIT,
 		NOTE_FOE_SUNK,
+		NOTE_PAIR,
+		NOTE_NO_PAIR,
+		NOTE_FOE_PAIR,
+		NOTE_FOE_NO_PAIR,
 	};
 
 	char m_aBoard[10] = ".........";
@@ -91,6 +102,21 @@ private:
 	ENote m_BattleNote = NOTE_NONE;
 	float m_BattleNoteTime = 0.0f;
 	int m_ChessSelected = -1;
+
+	int m_MemorySeed = 0;
+	MemoryCards::SFace m_aMemoryFaces[MemoryCards::NUM_PAIRS] = {};
+	int m_aMemoryCards[MemoryCards::NUM_CARDS] = {0};
+	char m_aMemoryOwner[MemoryCards::NUM_CARDS] = {0};
+	char m_MemoryTurn = 'X';
+	int m_MemoryPick = -1;
+	int m_MemoryFoePick = -1;
+	int m_aMemoryPeek[2] = {-1, -1};
+	float m_MemoryPeekSecondAt = 0.0f;
+	float m_MemoryPeekUntil = 0.0f;
+	bool m_aMemoryShown[MemoryCards::NUM_CARDS] = {false};
+	float m_aMemoryFlipAt[MemoryCards::NUM_CARDS] = {0.0f};
+	std::vector<std::unique_ptr<CSkin>> m_vpMemorySkins;
+	bool m_MemorySkinsLoaded = false;
 	int m_MoveCount = 0;
 	char m_MyMark = 'X';
 	int m_aWinLine[3] = {-1, -1, -1};
@@ -190,6 +216,14 @@ private:
 	bool ShipSunk(int Cell) const;
 	bool PlayChessMove(int From, int To);
 	bool CheckGameEnd();
+	void ResetMemory(bool Challenger);
+	void MemoryClick(int Card);
+	void PlayMemoryTurn(int First, int Second, bool Mine);
+	bool MemoryCardFaceUp(int Card) const;
+	int MemoryScore(char Mark) const;
+	char OtherMark() const { return m_MyMark == 'X' ? 'O' : 'X'; }
+	const CSkin *MemorySkin(const MemoryCards::SFace &Face);
+	void RenderMemoryTee(const MemoryCards::SFace &Face, vec2 Pos, float Size, float Alpha);
 
 	int CollectPlayers(int *pIds) const;
 
@@ -203,6 +237,7 @@ private:
 	void RenderChessBoard(CUIRect Grid, bool Interactive, float Alpha);
 	void RenderBattleshipBoard(CUIRect Area, bool Interactive, float Alpha);
 	void RenderWaterGrid(CUIRect Area, bool Own, bool Interactive, float Alpha);
+	void RenderMemoryBoard(CUIRect Area, bool Interactive, float Alpha);
 	CUIRect OpenWindow(float Width, float Height) const;
 
 	static void ConMiniGames(IConsole::IResult *pResult, void *pUserData);
