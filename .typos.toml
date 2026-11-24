@@ -33,4 +33,8 @@ extend-ignore-re = [
 	'0x510E527FUL',
 	'I\*\*nteger',
 	's\*\*tring',
+	# intentional words: chat translator word list, a player name and a skin name
+	'"youre"',
+	'"Hav"',
+	'"whis"',
 ]
