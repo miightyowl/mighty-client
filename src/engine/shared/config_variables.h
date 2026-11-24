@@ -216,7 +216,7 @@ MACRO_CONFIG_INT(ClMClientFrozenHook, cl_mclient_frozen_hook, 0, 0, 1, CFGFLAG_C
 MACRO_CONFIG_COL(ClMClientFrozenHookColor, cl_mclient_frozen_hook_color, 65408, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: color of the hook collision line of frozen tees that try to hook")
 MACRO_CONFIG_INT(ClMClientFrozenHookAlpha, cl_mclient_frozen_hook_alpha, 100, 10, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: opacity of the hook collision line of frozen tees that try to hook")
 MACRO_CONFIG_INT(ClMClientFrozenHookNotSelf, cl_mclient_frozen_hook_not_self, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: do not show the frozen hook line for your own tee and dummy")
-MACRO_CONFIG_INT(ClMClientShowInBrowser, cl_mclient_show_in_browser, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: let other M-Client users see you in the server browser")
+MACRO_CONFIG_INT(ClMClientShowInBrowser, cl_mclient_show_in_browser, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: let other M-Client users see you in the server browser")
 MACRO_CONFIG_INT(ClMClientPetTee, cl_mclient_pet_tee, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: show a companion tee that floats near you")
 MACRO_CONFIG_STR(ClMClientPetTeeSkin, cl_mclient_pet_tee_skin, 24, "twinbop", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_INSENSITIVE, "M-Client: skin used for the companion tee")
 MACRO_CONFIG_INT(ClMClientPetTeeSize, cl_mclient_pet_tee_size, 60, 10, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: size of the companion tee as a percentage of a normal player")
