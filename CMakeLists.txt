@@ -2786,6 +2786,8 @@ if(CLIENT)
     components/envelope_state.h
     components/fast_practice.cpp
     components/fast_practice.h
+    components/finish_fans.cpp
+    components/finish_fans.h
     components/finish_fireworks.cpp
     components/finish_fireworks.h
     components/finish_rename.cpp
@@ -2808,8 +2810,6 @@ if(CLIENT)
     components/key_binder.h
     components/local_server.cpp
     components/local_server.h
-    components/finish_fans.cpp
-    components/finish_fans.h
     components/maodie_walk.cpp
     components/maodie_walk.h
     components/map_details.cpp
