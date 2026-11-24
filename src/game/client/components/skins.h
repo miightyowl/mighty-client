@@ -28,7 +28,6 @@ public:
 	enum
 	{
 		SKIN_VIEW_ALL = 0,
-		SKIN_VIEW_HIDDEN,
 		SKIN_VIEW_BLOCKED,
 	};
 	enum
@@ -181,10 +180,9 @@ public:
 		CSkinListEntry() :
 			m_pSkinContainer(nullptr),
 			m_Favorite(false) {}
-		CSkinListEntry(CSkinContainer *pSkinContainer, bool Favorite, bool Hidden, bool Blocked, bool SelectedMain, bool SelectedDummy, std::optional<std::pair<int, int>> NameMatch) :
+		CSkinListEntry(CSkinContainer *pSkinContainer, bool Favorite, bool Blocked, bool SelectedMain, bool SelectedDummy, std::optional<std::pair<int, int>> NameMatch) :
 			m_pSkinContainer(pSkinContainer),
 			m_Favorite(Favorite),
-			m_Hidden(Hidden),
 			m_Blocked(Blocked),
 			m_SelectedMain(SelectedMain),
 			m_SelectedDummy(SelectedDummy),
@@ -194,7 +192,6 @@ public:
 
 		const CSkinContainer *SkinContainer() const { return m_pSkinContainer; }
 		bool IsFavorite() const { return m_Favorite; }
-		bool IsHidden() const { return m_Hidden; }
 		bool IsBlocked() const { return m_Blocked; }
 		bool IsSelectedMain() const { return m_SelectedMain; }
 		bool IsSelectedDummy() const { return m_SelectedDummy; }
@@ -202,7 +199,6 @@ public:
 
 		const void *ListItemId() const { return &m_ListItemId; }
 		const void *FavoriteButtonId() const { return &m_FavoriteButtonId; }
-		const void *HideButtonId() const { return &m_HideButtonId; }
 		const void *BlockButtonId() const { return &m_BlockButtonId; }
 		const void *ErrorTooltipId() const { return &m_ErrorTooltipId; }
 
@@ -214,14 +210,12 @@ public:
 	private:
 		CSkinContainer *m_pSkinContainer;
 		bool m_Favorite;
-		bool m_Hidden = false;
 		bool m_Blocked = false;
 		bool m_SelectedMain;
 		bool m_SelectedDummy;
 		std::optional<std::pair<int, int>> m_NameMatch;
 		char m_ListItemId;
 		char m_FavoriteButtonId;
-		char m_HideButtonId;
 		char m_BlockButtonId;
 		char m_ErrorTooltipId;
 	};
@@ -276,8 +270,6 @@ public:
 	void RemoveFavorite(const char *pName);
 	bool IsFavorite(const char *pName) const;
 
-	void SetHidden(const char *pName, bool Hidden);
-	bool IsHidden(const char *pName) const;
 	void SetBlocked(const char *pName, bool Blocked);
 	bool IsBlocked(const char *pName) const;
 
@@ -346,7 +338,6 @@ private:
 
 	CSkinList m_SkinList;
 	std::set<std::string> m_Favorites;
-	std::set<std::string> m_HiddenSkins;
 	std::set<std::string> m_BlockedSkins;
 
 	CSkin m_PlaceholderSkin;

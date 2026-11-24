@@ -529,8 +529,9 @@ void CSkins::OnConsoleInit()
 	ConfigManager()->RegisterCallback(CSkins::ConfigSaveCallback, this);
 	Console()->Register("add_favorite_skin", "s[skin_name]", CFGFLAG_CLIENT, ConAddFavoriteSkin, this, "Add a skin as a favorite");
 	Console()->Register("remove_favorite_skin", "s[skin_name]", CFGFLAG_CLIENT, ConRemFavoriteSkin, this, "Remove a skin from the favorites");
-	Console()->Register("add_hidden_skin", "s[skin_name]", CFGFLAG_CLIENT, ConAddHiddenSkin, this, "M-Client: hide a skin from the skin list");
-	Console()->Register("add_blocked_skin", "s[skin_name]", CFGFLAG_CLIENT, ConAddBlockedSkin, this, "M-Client: block a skin, players using it show the default skin");
+	// hidden skins were merged into blocked skins, keep the old command so existing configs still load
+	Console()->Register("add_hidden_skin", "s[skin_name]", CFGFLAG_CLIENT, ConAddHiddenSkin, this, "M-Client: block a skin (old name of add_blocked_skin)");
+	Console()->Register("add_blocked_skin", "s[skin_name]", CFGFLAG_CLIENT, ConAddBlockedSkin, this, "M-Client: block a skin, it is removed from the skin list and every tee using it shows the default skin");
 
 	Console()->Chain("player_skin", ConchainRefreshSkinList, this);
 	Console()->Chain("dummy_skin", ConchainRefreshSkinList, this);
@@ -789,21 +790,17 @@ CSkins::CSkinList &CSkins::SkinList()
 	m_SkinList.m_vSkins.clear();
 	m_SkinList.m_UnfilteredCount = 0;
 
-	// Ensure all favorite, hidden and blocked skins are present as skin containers so they are included in the next loop.
+	// Ensure all favorite and blocked skins are present as skin containers so they are included in the next loop.
 	for(const auto &FavoriteSkin : m_Favorites)
 	{
 		FindContainerOrNullptr(FavoriteSkin.c_str());
-	}
-	for(const auto &HiddenSkin : m_HiddenSkins)
-	{
-		FindContainerOrNullptr(HiddenSkin.c_str());
 	}
 	for(const auto &BlockedSkin : m_BlockedSkins)
 	{
 		FindContainerImpl(BlockedSkin.c_str());
 	}
 
-	const int View = std::clamp(g_Config.m_ClSkinListView, 0, 2);
+	const int View = std::clamp(g_Config.m_ClSkinListView, (int)SKIN_VIEW_ALL, (int)SKIN_VIEW_BLOCKED);
 
 	m_SkinList.m_vSkins.reserve(m_Skins.size());
 	for(const auto &[_, pSkinContainer] : m_Skins)
@@ -816,10 +813,10 @@ CSkins::CSkinList &CSkins::SkinList()
 		const bool SelectedMain = str_comp(pSkinContainer->Name(), g_Config.m_ClPlayerSkin) == 0;
 		const bool SelectedDummy = str_comp(pSkinContainer->Name(), g_Config.m_ClDummySkin) == 0;
 		const bool Favorite = IsFavorite(pSkinContainer->Name());
-		const bool Hidden = IsHidden(pSkinContainer->Name());
 		const bool Blocked = m_BlockedSkins.contains(pSkinContainer->Name());
 
-		if(View == SKIN_VIEW_HIDDEN ? !Hidden : (View == SKIN_VIEW_BLOCKED ? !Blocked : (Hidden || Blocked)))
+		// blocked skins only show up in the blocked view
+		if((View == SKIN_VIEW_BLOCKED) != Blocked)
 		{
 			continue;
 		}
@@ -831,7 +828,6 @@ CSkins::CSkinList &CSkins::SkinList()
 			!SelectedMain &&
 			!SelectedDummy &&
 			!Favorite &&
-			!Hidden &&
 			!Blocked)
 		{
 			continue;
@@ -849,7 +845,7 @@ CSkins::CSkinList &CSkins::SkinList()
 			}
 			NameMatch = std::make_pair<int, int>(pNameMatchStart - pSkinContainer->Name(), pNameMatchEnd - pNameMatchStart);
 		}
-		m_SkinList.m_vSkins.emplace_back(pSkinContainer.get(), Favorite, Hidden, Blocked, SelectedMain, SelectedDummy, NameMatch);
+		m_SkinList.m_vSkins.emplace_back(pSkinContainer.get(), Favorite, Blocked, SelectedMain, SelectedDummy, NameMatch);
 	}
 
 	const int Sort = std::clamp(g_Config.m_ClSkinListSort, 0, 2);
@@ -964,24 +960,6 @@ bool CSkins::IsFavorite(const char *pName) const
 	return m_Favorites.contains(pName);
 }
 
-void CSkins::SetHidden(const char *pName, bool Hidden)
-{
-	if(!CSkin::IsValidName(pName) || str_comp(pName, "default") == 0)
-	{
-		return;
-	}
-	const bool Changed = Hidden ? m_HiddenSkins.emplace(pName).second : m_HiddenSkins.erase(pName) > 0;
-	if(Changed)
-	{
-		m_SkinList.ForceRefresh();
-	}
-}
-
-bool CSkins::IsHidden(const char *pName) const
-{
-	return m_HiddenSkins.contains(pName);
-}
-
 void CSkins::SetBlocked(const char *pName, bool Blocked)
 {
 	if(!CSkin::IsValidName(pName) || str_comp(pName, "default") == 0)
@@ -998,12 +976,21 @@ void CSkins::SetBlocked(const char *pName, bool Blocked)
 	{
 		if(Blocked)
 		{
-			if(SkinIt->second->m_pLoadJob)
+			auto &pSkinContainer = SkinIt->second;
+			if(pSkinContainer->m_pLoadJob)
 			{
-				SkinIt->second->m_pLoadJob->Abort();
-				SkinIt->second->m_pLoadJob = nullptr;
+				pSkinContainer->m_pLoadJob->Abort();
+				pSkinContainer->m_pLoadJob = nullptr;
 			}
-			SkinIt->second->m_State = CSkinContainer::EState::NOT_FOUND;
+			// unload it right away so nothing can keep rendering the already loaded skin
+			if(pSkinContainer->m_pSkin)
+			{
+				pSkinContainer->m_pSkin->m_OriginalSkin.Unload(Graphics());
+				pSkinContainer->m_pSkin->m_ColorableSkin.Unload(Graphics());
+				pSkinContainer->m_pSkin = nullptr;
+			}
+			// SetState also drops it from the usage list, which may only hold pending, loading and loaded skins
+			pSkinContainer->SetState(CSkinContainer::EState::NOT_FOUND);
 		}
 		else
 		{
@@ -1251,7 +1238,7 @@ void CSkins::ConRemFavoriteSkin(IConsole::IResult *pResult, void *pUserData)
 void CSkins::ConAddHiddenSkin(IConsole::IResult *pResult, void *pUserData)
 {
 	auto *pSelf = static_cast<CSkins *>(pUserData);
-	pSelf->SetHidden(pResult->GetString(0), true);
+	pSelf->SetBlocked(pResult->GetString(0), true);
 }
 
 void CSkins::ConAddBlockedSkin(IConsole::IResult *pResult, void *pUserData)
@@ -1272,12 +1259,6 @@ void CSkins::OnConfigSave(IConfigManager *pConfigManager)
 	{
 		char aBuffer[32 + MAX_SKIN_LENGTH];
 		str_format(aBuffer, sizeof(aBuffer), "add_favorite_skin \"%s\"", Favorite.c_str());
-		pConfigManager->WriteLine(aBuffer);
-	}
-	for(const auto &Hidden : m_HiddenSkins)
-	{
-		char aBuffer[32 + MAX_SKIN_LENGTH];
-		str_format(aBuffer, sizeof(aBuffer), "add_hidden_skin \"%s\"", Hidden.c_str());
 		pConfigManager->WriteLine(aBuffer);
 	}
 	for(const auto &Blocked : m_BlockedSkins)

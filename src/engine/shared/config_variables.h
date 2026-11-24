@@ -307,7 +307,7 @@ MACRO_CONFIG_INT(ClChatSpamWindow, cl_chat_spam_window, 5, 1, 60, CFGFLAG_CLIENT
 MACRO_CONFIG_INT(ClChatSpamDelay, cl_chat_spam_delay, 3, 1, 30, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: seconds a suspicious chat message is held back before it is shown")
 MACRO_CONFIG_STR(ClChatSpamHandles, cl_chat_spam_handles, 256, "bratvacheats", CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: comma-separated spam handles, a new player writing one is muted right away")
 MACRO_CONFIG_INT(ClMClientSaveNoticeHideCode, cl_mclient_save_notice_hide_code, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: only show how many saves you have on the map, hiding the codes and the player names")
-MACRO_CONFIG_INT(ClSkinListView, cl_skin_list_view, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: skin list view (0 = all skins, 1 = hidden skins, 2 = blocked skins)")
+MACRO_CONFIG_INT(ClSkinListView, cl_skin_list_view, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: skin list view (0 = all skins, 1 = blocked skins)")
 MACRO_CONFIG_INT(ClSkinListSort, cl_skin_list_sort, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: skin list order (0 = name A-Z, 1 = name Z-A, 2 = recently added)")
 MACRO_CONFIG_INT(ClMClientBindWheelSlots, cl_mclient_bindwheel_slots, 8, 4, 20, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: number of slices on the bind wheel (4-20)")
 MACRO_CONFIG_INT(ClMClientBindWheelPages, cl_mclient_bindwheel_pages, 1, 1, 16, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: number of bind wheel pages, switch with the mouse wheel (1-16)")

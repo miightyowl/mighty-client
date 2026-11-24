@@ -394,7 +394,7 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 	}
 
 	CTeeRenderInfo OwnSkinInfo;
-	OwnSkinInfo.Apply(pOwnSkinContainer == nullptr || pOwnSkinContainer->Skin() == nullptr ? pDefaultSkin : pOwnSkinContainer->Skin().get());
+	OwnSkinInfo.Apply(pOwnSkinContainer == nullptr || pOwnSkinContainer->State() != CSkins::CSkinContainer::EState::LOADED || pOwnSkinContainer->Skin() == nullptr ? pDefaultSkin : pOwnSkinContainer->Skin().get());
 	OwnSkinInfo.ApplyColors(*pUseCustomColor, *pColorBody, *pColorFeet);
 	OwnSkinInfo.m_Size = 50.0f;
 
@@ -472,7 +472,7 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 	MainView.HSplitTop(20.0f, &ViewTabs, &MainView);
 	MainView.HSplitTop(5.0f, nullptr, &MainView);
 	{
-		const char *apViewNames[] = {Localize("All skins"), Localize("Hidden skins"), Localize("Blocked skins")};
+		const char *apViewNames[] = {Localize("All skins"), Localize("Blocked skins")};
 		static CButtonContainer s_aViewButtons[std::size(apViewNames)];
 		const float TabWidth = ViewTabs.w / std::size(apViewNames);
 		for(size_t i = 0; i < std::size(apViewNames); ++i)
@@ -530,20 +530,14 @@ void CMenus::RenderSettingsTeeCompanion(CUIRect MainView)
 		Ui()->DoLabel(&Label, pSkinContainer->Name(), 12.0f, TEXTALIGN_ML);
 
 		{
-			CUIRect IconBar, HideIcon, BlockIcon;
+			CUIRect IconBar, BlockIcon;
 			Item.m_Rect.HSplitTop(20.0f, &IconBar, nullptr);
-			IconBar.VSplitRight(20.0f, &IconBar, &HideIcon);
 			IconBar.VSplitRight(20.0f, nullptr, &BlockIcon);
-			if(DoButton_SkinListIcon(SkinListEntry.HideButtonId(), SkinListEntry.ListItemId(), SkinListEntry.IsHidden(), &HideIcon, FontIcon::EYE_SLASH, ColorRGBA(0.6f, 0.8f, 1.0f, 1.0f)))
-			{
-				GameClient()->m_Skins.SetHidden(pSkinContainer->Name(), !SkinListEntry.IsHidden());
-			}
-			Ui()->DoToolTip(SkinListEntry.HideButtonId(), &HideIcon, SkinListEntry.IsHidden() ? Localize("Show this skin again") : Localize("Hide this skin from the list"));
 			if(DoButton_SkinListIcon(SkinListEntry.BlockButtonId(), SkinListEntry.ListItemId(), SkinListEntry.IsBlocked(), &BlockIcon, FontIcon::BAN, ColorRGBA(1.0f, 0.4f, 0.4f, 1.0f)))
 			{
 				GameClient()->m_Skins.SetBlocked(pSkinContainer->Name(), !SkinListEntry.IsBlocked());
 			}
-			Ui()->DoToolTip(SkinListEntry.BlockButtonId(), &BlockIcon, SkinListEntry.IsBlocked() ? Localize("Unblock this skin") : Localize("Block this skin, players using it show the default skin"));
+			Ui()->DoToolTip(SkinListEntry.BlockButtonId(), &BlockIcon, SkinListEntry.IsBlocked() ? Localize("Unblock this skin") : Localize("Block this skin, it is removed from the list and every tee using it shows the default skin"));
 		}
 	}
 	const int NewSelected = s_ListBox.DoEnd();
