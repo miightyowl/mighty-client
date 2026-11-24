@@ -2813,6 +2813,8 @@ if(CLIENT)
     components/mapsounds.h
     components/mclient_detect.cpp
     components/mclient_detect.h
+    components/mclient_update_install.cpp
+    components/mclient_update_install.h
     components/memory_cards.cpp
     components/memory_cards.h
     components/menu_background.cpp

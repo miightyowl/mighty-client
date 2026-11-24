@@ -10,6 +10,7 @@
 #include <vector>
 
 class IHttpRequest;
+class CMClientUpdateInstallJob;
 
 class CMenusStart : public CComponentInterfaces
 {
@@ -26,13 +27,14 @@ private:
 	{
 		NONE,
 		DOWNLOADING,
+		INSTALLING,
 		INSTALLED,
 		FAILED,
 	};
 	void StartUpdateDownload();
 	void UpdateDownloadState();
-	bool InstallUpdate();
 	std::shared_ptr<IHttpRequest> m_pUpdateTask = nullptr;
+	std::shared_ptr<CMClientUpdateInstallJob> m_pInstallJob = nullptr;
 	EUpdateState m_UpdateState = EUpdateState::NONE;
 	char m_aUpdateAssetUrl[512] = "";
 

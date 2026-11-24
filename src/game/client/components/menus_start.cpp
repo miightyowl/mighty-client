@@ -2,10 +2,13 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "menus_start.h"
 
+#include "mclient_update_install.h"
+
 #include <base/fs.h>
 #include <base/io.h>
 #include <base/log.h>
 
+#include <engine/engine.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/http.h>
@@ -31,35 +34,19 @@
 #include <android/android_main.h>
 #endif
 
-// M-Client: platforms where a release ships a bare executable that can replace the running one
-#if (defined(CONF_PLATFORM_LINUX) && defined(CONF_ARCH_AMD64)) || defined(CONF_PLATFORM_WIN64)
+// M-Client: platforms where a release ships a full .zip package that the client installs over itself.
+// The package is named "M-Client-<version><suffix>" and contains every file of the client, so changed
+// or new data files and libraries get updated too, not just the executable.
+#if defined(CONF_PLATFORM_LINUX) && defined(CONF_ARCH_AMD64)
 #define MCLIENT_AUTOUPDATE 1
+#define MCLIENT_UPDATE_PACKAGE_SUFFIX "-linux_x86_64.zip"
+#elif defined(CONF_PLATFORM_WIN64)
+#define MCLIENT_AUTOUPDATE 1
+#define MCLIENT_UPDATE_PACKAGE_SUFFIX "-win64.zip"
 #endif
 
-#if defined(MCLIENT_AUTOUPDATE) && !defined(CONF_FAMILY_WINDOWS)
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
-static bool SetExecutableBit(const char *pPath)
-{
-	const int FileDescriptor = open(pPath, O_RDWR);
-	if(FileDescriptor < 0)
-		return false;
-	struct stat FileStats;
-	if(fstat(FileDescriptor, &FileStats) != 0)
-	{
-		close(FileDescriptor);
-		return false;
-	}
-	const bool Success = fchmod(FileDescriptor, FileStats.st_mode | S_IXUSR | S_IXGRP | S_IXOTH) == 0;
-	close(FileDescriptor);
-	return Success;
-}
-#endif
-
-// the downloaded executable is kept next to the running one until it is swapped in
-static const char *const MCLIENT_UPDATE_TMP = "update/" CLIENT_EXEC ".update";
+// the downloaded package is kept next to the client until it is installed
+static const char *const MCLIENT_UPDATE_TMP = "update/mclient-update.zip";
 static const int64_t MCLIENT_UPDATE_MIN_SIZE = 1024 * 1024;
 static const int MCLIENT_UPDATE_STORAGE_TYPE = -2;
 
@@ -492,6 +479,9 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		case EUpdateState::DOWNLOADING:
 			str_format(aSub, sizeof(aSub), Localize("Downloading update... %d%%"), m_pUpdateTask == nullptr ? 0 : m_pUpdateTask->Progress());
 			break;
+		case EUpdateState::INSTALLING:
+			str_format(aSub, sizeof(aSub), Localize("Installing update... %d%%"), m_pInstallJob == nullptr ? 0 : m_pInstallJob->Progress());
+			break;
 		case EUpdateState::INSTALLED:
 			str_copy(aSub, Localize("Update installed - click to restart"));
 			break;
@@ -510,6 +500,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 			switch(m_UpdateState)
 			{
 			case EUpdateState::DOWNLOADING:
+			case EUpdateState::INSTALLING:
 				break;
 			case EUpdateState::INSTALLED:
 				Client()->Restart();
@@ -573,7 +564,7 @@ bool CMenusStart::VersionNewer(const char *pLatest, const char *pCurrent)
 
 void CMenusStart::StartUpdateDownload()
 {
-	if(m_aUpdateAssetUrl[0] == '\0' || m_UpdateState == EUpdateState::DOWNLOADING)
+	if(m_aUpdateAssetUrl[0] == '\0' || m_UpdateState == EUpdateState::DOWNLOADING || m_UpdateState == EUpdateState::INSTALLING)
 		return;
 
 	char aUpdateDir[IO_MAX_PATH_LENGTH];
@@ -593,6 +584,20 @@ void CMenusStart::StartUpdateDownload()
 
 void CMenusStart::UpdateDownloadState()
 {
+	if(m_UpdateState == EUpdateState::INSTALLING && m_pInstallJob != nullptr)
+	{
+		if(!m_pInstallJob->Done())
+			return;
+		const bool Installed = m_pInstallJob->Success();
+		m_pInstallJob = nullptr;
+		if(Installed)
+			log_info("mclient", "Installed %s, restart to use it", m_aReleaseTag);
+		else
+			log_error("mclient", "Installing the update failed");
+		m_UpdateState = Installed ? EUpdateState::INSTALLED : EUpdateState::FAILED;
+		return;
+	}
+
 	if(m_UpdateState != EUpdateState::DOWNLOADING || m_pUpdateTask == nullptr)
 		return;
 
@@ -620,43 +625,21 @@ void CMenusStart::UpdateDownloadState()
 	}
 	if(DownloadedSize < MCLIENT_UPDATE_MIN_SIZE)
 	{
-		log_error("mclient", "The downloaded update is too small to be a client, discarding it");
+		log_error("mclient", "The downloaded update is too small to be a client package, discarding it");
 		if(fs_remove(aDownloaded) != 0)
 			log_error("mclient", "Could not remove the incomplete download '%s'", aDownloaded);
 		m_UpdateState = EUpdateState::FAILED;
 		return;
 	}
 
-	m_UpdateState = InstallUpdate() ? EUpdateState::INSTALLED : EUpdateState::FAILED;
-}
-
-bool CMenusStart::InstallUpdate()
-{
-	Storage()->RemoveBinaryFile(CLIENT_EXEC ".old");
-	if(!Storage()->RenameBinaryFile(PLAT_CLIENT_EXEC, CLIENT_EXEC ".old"))
-	{
-		log_error("mclient", "Could not move '%s' out of the way, the client directory may not be writable", PLAT_CLIENT_EXEC);
-		return false;
-	}
-	if(!Storage()->RenameBinaryFile(MCLIENT_UPDATE_TMP, PLAT_CLIENT_EXEC))
-	{
-		log_error("mclient", "Could not install the downloaded update, restoring the previous client");
-		Storage()->RenameBinaryFile(CLIENT_EXEC ".old", PLAT_CLIENT_EXEC);
-		return false;
-	}
-
-#if defined(MCLIENT_AUTOUPDATE) && !defined(CONF_FAMILY_WINDOWS)
-	char aPath[IO_MAX_PATH_LENGTH];
-	Storage()->GetBinaryPath(PLAT_CLIENT_EXEC, aPath, sizeof(aPath));
-	if(!SetExecutableBit(aPath))
-	{
-		log_error("mclient", "Could not make '%s' executable", aPath);
-		return false;
-	}
-#endif
-
-	log_info("mclient", "Installed %s, restart to use it", m_aReleaseTag);
-	return true;
+	// extracting the whole package takes a moment, keep the menu responsive
+	char aInstallDir[IO_MAX_PATH_LENGTH];
+	Storage()->GetBinaryPath(".", aInstallDir, sizeof(aInstallDir));
+	if(str_endswith(aInstallDir, "/."))
+		aInstallDir[str_length(aInstallDir) - 2] = '\0';
+	m_pInstallJob = std::make_shared<CMClientUpdateInstallJob>(aDownloaded, aInstallDir, PLAT_CLIENT_EXEC);
+	Engine()->AddJob(m_pInstallJob);
+	m_UpdateState = EUpdateState::INSTALLING;
 }
 
 void CMenusStart::UpdateLatestRelease()
@@ -712,7 +695,7 @@ void CMenusStart::UpdateLatestRelease()
 					const json_value &AssetUrl = Asset["browser_download_url"];
 					if(AssetName.type != json_string || AssetUrl.type != json_string)
 						continue;
-					if(str_comp(AssetName, PLAT_CLIENT_DOWN) != 0)
+					if(!str_startswith(AssetName, "M-Client-") || !str_endswith(AssetName, MCLIENT_UPDATE_PACKAGE_SUFFIX))
 						continue;
 					str_copy(m_aUpdateAssetUrl, AssetUrl);
 					break;
