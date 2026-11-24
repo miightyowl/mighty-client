@@ -1475,7 +1475,9 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 void CMenus::RenderServerbrowserFriends(CUIRect View)
 {
 	const float FontSize = 10.0f;
-	static bool s_aListExtended[NUM_FRIEND_TYPES] = {true, true, true, false};
+	// which groups are expanded is saved in the config as one bit per group, so it survives a restart
+	static char s_aGroupHeaderIds[NUM_FRIEND_TYPES];
+	const auto IsExtended = [](size_t FriendType) { return (g_Config.m_ClMClientFriendsExpanded & (1 << FriendType)) != 0; };
 	const float SpacingH = 2.0f;
 
 	CUIRect List, ServerFriends;
@@ -1544,12 +1546,12 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 		CUIRect Header, GroupIcon, GroupLabel;
 		List.HSplitTop(ms_ListheaderHeight, &Header, &List);
 		s_ScrollRegion.AddRect(Header);
-		Header.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_aListExtended[FriendType] ? 0.12f : 0.06f), IGraphics::CORNER_ALL, 5.0f);
+		Header.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_aGroupHeaderIds[FriendType] ? 0.12f : 0.06f), IGraphics::CORNER_ALL, 5.0f);
 		Header.VSplitLeft(Header.h, &GroupIcon, &GroupLabel);
 		GroupIcon.Margin(2.0f, &GroupIcon);
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-		TextRender()->TextColor(Ui()->HotItem() == &s_aListExtended[FriendType] ? TextRender()->DefaultTextColor() : ColorRGBA(0.6f, 0.6f, 0.6f, 1.0f));
-		Ui()->DoLabel(&GroupIcon, s_aListExtended[FriendType] ? FontIcon::SQUARE_MINUS : FontIcon::SQUARE_PLUS, GroupIcon.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
+		TextRender()->TextColor(Ui()->HotItem() == &s_aGroupHeaderIds[FriendType] ? TextRender()->DefaultTextColor() : ColorRGBA(0.6f, 0.6f, 0.6f, 1.0f));
+		Ui()->DoLabel(&GroupIcon, IsExtended(FriendType) ? FontIcon::SQUARE_MINUS : FontIcon::SQUARE_PLUS, GroupIcon.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		switch(FriendType)
@@ -1570,13 +1572,13 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 			dbg_assert_failed("FriendType invalid");
 		}
 		Ui()->DoLabel(&GroupLabel, aBuf, FontSize, TEXTALIGN_ML);
-		if(Ui()->DoButtonLogic(&s_aListExtended[FriendType], 0, &Header, BUTTONFLAG_LEFT))
+		if(Ui()->DoButtonLogic(&s_aGroupHeaderIds[FriendType], 0, &Header, BUTTONFLAG_LEFT))
 		{
-			s_aListExtended[FriendType] = !s_aListExtended[FriendType];
+			g_Config.m_ClMClientFriendsExpanded ^= 1 << FriendType;
 		}
 
 		// entries
-		if(s_aListExtended[FriendType])
+		if(IsExtended(FriendType))
 		{
 			for(size_t FriendIndex = 0; FriendIndex < m_avFriends[FriendType].size(); ++FriendIndex)
 			{

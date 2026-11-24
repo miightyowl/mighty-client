@@ -336,6 +336,7 @@ MACRO_CONFIG_COL(ClMClientInfoBarLabelColor, cl_mclient_infobar_label_color, 160
 MACRO_CONFIG_COL(ClMClientInfoBarValueColor, cl_mclient_infobar_value_color, 255, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: info bar value text color")
 MACRO_CONFIG_INT(ClMClientFastInput, cl_mclient_fast_input, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: use input for prediction before the next tick, reducing input delay")
 MACRO_CONFIG_INT(ClMClientFastInputOthers, cl_mclient_fast_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: also apply fast input prediction to other tees")
+MACRO_CONFIG_INT(ClMClientFriendsExpanded, cl_mclient_friends_expanded, 7, 0, 15, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: bitmask of the expanded groups in the server browser friends list (1 = online friends, 2 = online clanmates, 4 = M-Client users, 8 = offline)")
 MACRO_CONFIG_INT(ClMClientFriendsCommunityFilter, cl_mclient_friends_community_filter, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: only show friends in the friends list when they are on a server of an enabled community")
 MACRO_CONFIG_INT(ClMClientExtraSkinProvider, cl_mclient_extra_skin_provider, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: download community skins from an additional skin provider (skins.ddstats.tw)")
 MACRO_CONFIG_INT(ClMClientFinishFireworks, cl_mclient_finish_fireworks, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: play fireworks when you finish a map")
