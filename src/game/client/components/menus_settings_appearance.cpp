@@ -12,7 +12,6 @@
 
 #include <game/client/animstate.h>
 #include <game/client/components/chat.h>
-#include <game/client/components/effects.h>
 #include <game/client/components/items.h>
 #include <game/client/components/mapimages.h>
 #include <game/client/components/nameplates.h>
@@ -591,7 +590,7 @@ void CMenus::RenderSettingsAppearance(CUIRect MainView)
 			LeftView.HSplitTop(LineSize, nullptr, &LeftView);
 		LeftView.HSplitTop(LineSize, &Button, &LeftView);
 		if(g_Config.m_ClNamePlatesIds > 0 && g_Config.m_ClNamePlatesIdsSeparateLine > 0)
-			Ui()->DoScrollbarOption(&g_Config.m_ClNamePlatesIdsSize, &g_Config.m_ClNamePlatesIdsSize, &Button, Localize("Client IDs size"), -50, 100);
+			Ui()->DoScrollbarOption(&g_Config.m_ClNamePlatesIdsSize, &g_Config.m_ClNamePlatesIdsSize, &Button, Localize("Client IDs size"), ConfigLimits::ClNamePlatesIdsSize.m_Min, ConfigLimits::ClNamePlatesIdsSize.m_Max);
 
 		// ***** Hook Strength ***** //
 		LeftView.HSplitTop(MarginBetweenViews, nullptr, &LeftView);
@@ -1014,7 +1013,6 @@ void CMenus::DoLaserPreview(const CUIRect *pRect, const ColorHSLA LaserOutlineCo
 		TeeRenderInfo.m_ColorBody = ColorRGBA(1, 1, 1);
 		TeeRenderInfo.m_ColorFeet = ColorRGBA(1, 1, 1);
 		RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeRenderInfo, EMOTE_PAIN, vec2(1, 0), From);
-		GameClient()->m_Effects.FreezingFlakes(From, vec2(32, 32), 1.0f);
 		break;
 	}
 	default:

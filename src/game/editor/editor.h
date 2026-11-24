@@ -205,9 +205,6 @@ public:
 
 		m_BrushColorEnabled = true;
 
-		m_PopupEventActivated = false;
-		m_PopupEventWasActivated = false;
-
 		m_ToolbarPreviewSound = -1;
 
 		m_SelectEntitiesImage = "DDNet";
@@ -349,8 +346,7 @@ public:
 	};
 
 	int m_PopupEventType;
-	int m_PopupEventActivated;
-	int m_PopupEventWasActivated;
+	int m_PopupEventActivated = false;
 	bool m_LargeLayerWasWarned;
 	bool m_PreventUnusedTilesWasWarned;
 
@@ -568,8 +564,9 @@ public:
 
 	void DoQuadEnvelopes(const CLayerQuads *pLayerQuads);
 	void DoQuadEnvPoint(const CQuad *pQuad, CEnvelope *pEnvelope, int QuadIndex, int PointIndex);
-	void DoQuadPoint(int LayerIndex, const std::shared_ptr<CLayerQuads> &pLayer, CQuad *pQuad, int QuadIndex, int v);
-	void UpdateHotQuadPoint(const CLayerQuads *pLayer);
+	void DrawQuadPointHandle(const CQuad *pQuad, int PointIndex, bool Selected);
+	void DoQuadPointInteraction(int LayerIndex, const std::shared_ptr<CLayerQuads> &pLayer, CQuad *pQuad, int QuadIndex, int PointIndex);
+	void UpdateHotQuadPoint(const CLayerQuads *pLayer, const std::vector<bool> &vQuadSelected);
 
 	void DoSoundSource(int LayerIndex, CSoundSource *pSource, int Index);
 	void UpdateHotSoundSource(const CLayerSounds *pLayer);
@@ -601,7 +598,8 @@ public:
 	void DoToolbarLayers(CUIRect Toolbar);
 	void DoToolbarImages(CUIRect Toolbar);
 	void DoToolbarSounds(CUIRect Toolbar);
-	void DoQuad(int LayerIndex, const std::shared_ptr<CLayerQuads> &pLayer, CQuad *pQuad, int Index);
+	void DrawQuadPivotHandle(const CQuad *pQuad, bool Selected);
+	void DoQuadPivotInteraction(int LayerIndex, const std::shared_ptr<CLayerQuads> &pLayer, CQuad *pQuad, int Index);
 	void PreparePointDrag(const CQuad *pQuad, int QuadIndex, int PointIndex);
 	void DoPointDrag(CQuad *pQuad, int QuadIndex, int PointIndex, ivec2 Offset);
 	EAxis GetDragAxis(ivec2 Offset) const;

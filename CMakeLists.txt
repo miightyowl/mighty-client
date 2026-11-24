@@ -226,7 +226,7 @@ if(NOT "${CMAKE_CURRENT_BINARY_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 set(SERVER_EXECUTABLE DDNet-Server CACHE STRING "Name of the built server executable")
-set(CLIENT_EXECUTABLE DDNet CACHE STRING "Name of the build client executable")
+set(CLIENT_EXECUTABLE DDNet CACHE STRING "Name of the built client executable")
 set(IOS_BUNDLE_IDENTIFIER "org.ddnet.client" CACHE STRING "iOS bundle identifier")
 
 ########################################################################
@@ -382,7 +382,7 @@ if(NOT MSVC AND NOT HAIKU)
 
   # Don't insert timestamps into PEs to keep the build reproducible.
   if(TARGET_OS STREQUAL "windows")
-    add_cxx_compiler_flag_if_supported(OUR_FLAGS_LINK -Wl,--no-insert-timestamp)
+    add_linker_flag_if_supported(OUR_FLAGS_LINK -Wl,--no-insert-timestamp)
   endif()
 
   # Strip absolute build paths from debug info. Prevent adding compiler name and version metadata.
@@ -825,6 +825,7 @@ if(TARGET_OS STREQUAL "windows")
   list(APPEND PLATFORM_LIBS ws2_32.lib) # Windows sockets
   list(APPEND PLATFORM_LIBS advapi32.lib) # Reg* and Crypt* functions
   list(APPEND PLATFORM_LIBS bcrypt.lib userenv.lib) # for Rust (https://github.com/rust-lang/rust/issues/91974)
+  list(APPEND PLATFORM_LIBS synchronization.lib) # for Rust
   list(APPEND PLATFORM_LIBS ole32.lib) # CoInitialize(Ex)
   list(APPEND PLATFORM_LIBS shell32.lib)
   list(APPEND PLATFORM_LIBS ntdll.lib) # https://github.com/ddnet/ddnet/issues/6725
@@ -958,12 +959,20 @@ if(NOT(GTEST_FOUND) AND DOWNLOAD_GTEST)
       # Prevent overriding the parent project's compiler/linker settings on Windows
       set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
+      # googletest uses `include_directories` which CMake 4.5 doesn't like
+      if(CMAKE_VERSION VERSION_GREATER_EQUAL 4.5)
+        cmake_diagnostic(PUSH)
+        cmake_diagnostic(SET CMD_NON_TARGET_DIRECTIVE IGNORE)
+      endif()
       # Add googletest directly to our build. This defines the gtest target.
       add_subdirectory(
         ${PROJECT_BINARY_DIR}/googletest-src
         ${PROJECT_BINARY_DIR}/googletest-build
         EXCLUDE_FROM_ALL
       )
+      if(CMAKE_VERSION VERSION_GREATER_EQUAL 4.5)
+        cmake_diagnostic(POP)
+      endif()
 
       foreach(target gtest gmock)
         # Enable additional assertions. See:
@@ -2848,6 +2857,8 @@ if(CLIENT)
     components/minigames.h
     components/motd.cpp
     components/motd.h
+    components/multiview.cpp
+    components/multiview.h
     components/nameplates.cpp
     components/nameplates.h
     components/particles.cpp
@@ -2890,7 +2901,6 @@ if(CLIENT)
     lineinput.cpp
     lineinput.h
     mclient_marker.h
-    multiview.cpp
     pickup_data.cpp
     pickup_data.h
     prediction/entities/character.cpp
@@ -3383,11 +3393,11 @@ if(SERVER)
       ${SERVER_ICON}
       ${SERVER_VERSIONINFO}
       $<TARGET_OBJECTS:game-server-without-main>
-      # tidy-alphabetical-sort
+      # tidy-alphabetical-start
       $<TARGET_OBJECTS:engine-shared>
       $<TARGET_OBJECTS:game-shared>
       $<TARGET_OBJECTS:rust-bridge-shared>
-      # tidy-alphabetical-sort
+      # tidy-alphabetical-end
     )
   else()
     add_executable(game-server
@@ -3396,11 +3406,11 @@ if(SERVER)
       ${SERVER_ICON}
       ${SERVER_VERSIONINFO}
       $<TARGET_OBJECTS:game-server-without-main>
-      # tidy-alphabetical-sort
+      # tidy-alphabetical-start
       $<TARGET_OBJECTS:engine-shared>
       $<TARGET_OBJECTS:game-shared>
       $<TARGET_OBJECTS:rust-bridge-shared>
-      # tidy-alphabetical-sort
+      # tidy-alphabetical-end
     )
   endif()
   set_property(TARGET game-server
@@ -3474,6 +3484,7 @@ if(TOOLS)
       if(TOOL MATCHES "^map_render$" AND NOT EGL_FOUND)
         continue()
       endif()
+      set(TOOL_INCLUDE_DIRS)
       set(TOOL_DEPS ${DEPS})
       set(TOOL_LIBS ${LIBS})
       unset(EXTRA_TOOL_SRC)
@@ -3673,7 +3684,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
 
   add_custom_target(run_cxx_tests
     COMMAND $<TARGET_FILE:${TARGET_TESTRUNNER}> --gtest_brief=1 ${TESTRUNNER_ARGS}
-    COMMENT Running unit tests
+    COMMENT "Running unit tests"
     DEPENDS ${TARGET_TESTRUNNER}
     USES_TERMINAL
   )
@@ -3682,7 +3693,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
   )
   add_custom_target(run_cxx_tests_verbose
     COMMAND $<TARGET_FILE:${TARGET_TESTRUNNER}> --no-capture ${TESTRUNNER_ARGS}
-    COMMENT Running unit tests
+    COMMENT "Running unit tests"
     DEPENDS ${TARGET_TESTRUNNER}
     USES_TERMINAL
   )
