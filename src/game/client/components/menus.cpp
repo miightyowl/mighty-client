@@ -1401,26 +1401,7 @@ void CMenus::RenderPopupMClientSetup(CUIRect Box)
 	LeftView.HSplitTop(RowH, &Row, &LeftView);
 	if(DoButton_CheckBox(&g_Config.m_ClMClientPetTee, Localize("Show companion pet"), g_Config.m_ClMClientPetTee, &Row))
 		g_Config.m_ClMClientPetTee ^= 1;
-	Hint(&LeftView, Localize("A pet tee that follows you around in-game"));
-	Hint(&LeftView, Localize("Set the pet skin in the Tee settings tab"));
-
-	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
-	LeftView.HSplitTop(RowH, &Row, &LeftView);
-	if(DoButton_CheckBox(&g_Config.m_ClMClientPetTeeOthers, Localize("Show pets of other M-Client players"), g_Config.m_ClMClientPetTeeOthers, &Row))
-		g_Config.m_ClMClientPetTeeOthers ^= 1;
-	Hint(&LeftView, Localize("Shows the pets that other M-Client players announced"));
-
-	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
-	LeftView.HSplitTop(RowH, &Row, &LeftView);
-	if(DoButton_CheckBox(&g_Config.m_ClMClientAccessoriesOthers, Localize("Show accessories of other M-Client players"), g_Config.m_ClMClientAccessoriesOthers, &Row))
-		g_Config.m_ClMClientAccessoriesOthers ^= 1;
-	Hint(&LeftView, Localize("Your own accessories stay visible either way"));
-
-	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
-	LeftView.HSplitTop(RowH, &Row, &LeftView);
-	if(DoButton_CheckBox(&g_Config.m_ClMClientAccessoriesHideFrozen, Localize("Hide accessories while frozen"), g_Config.m_ClMClientAccessoriesHideFrozen, &Row))
-		g_Config.m_ClMClientAccessoriesHideFrozen ^= 1;
-	Hint(&LeftView, Localize("Hides accessories on every tee that is frozen"));
+	Hint(&LeftView, Localize("A pet tee that follows you around in-game: set the pet skin in the Tee settings tab"));
 
 	LeftView.HSplitTop(Spacing, nullptr, &LeftView);
 	LeftView.HSplitTop(RowH, &Row, &LeftView);
@@ -2511,32 +2492,66 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 			{&g_Config.m_ClMClientForceSkin, Localize("Force maodie skin on everyone"), Localize("Renders every tee with the best skin ever")},
 			{&g_Config.m_ClMClientPet, Localize("Show petting hand"), Localize("Shows a hand when a player pets someone nearby")},
 			{&g_Config.m_ClMClientAds, Localize("Random advertisement/quote pop-ups"), Localize("Occasionally shows a random advertisement or quote that definitely does not annoy")},
-			{&g_Config.m_ClMClientFatChat, Localize("Fat skins when someone writes \"fat\""), Localize("Everyone turns fat for a few seconds when \"fat\" is written in chat")}};
+			{&g_Config.m_ClMClientFatChat, Localize("Fat skins when someone writes \"fat\""), Localize("Everyone turns fat for a few seconds when \"fat\" is written in chat")},
+			{&g_Config.m_ClMClientMaodieWalk, Localize("Giant maodie walks across the screen"), Localize("Every few minutes a giant maodie walks across your screen")},
+			{&g_Config.m_ClMClientUpsideDown, Localize("Upside down tees"), Localize("Renders every tee upside down")},
+			{&g_Config.m_ClMClientFinishFans, Localize("Twinbop fans cheer at the finish line"), Localize("Twinbop tees wait behind the finish line and cheer when you finish")}};
 
-		float MaxRowWidth = 0.0f;
-		for(const auto &Toggle : aToggles)
-			MaxRowWidth = std::max(MaxRowWidth, FunnyRowH + 5.0f + TextRender()->TextWidth(FunnyFontSize, Toggle.m_pText));
-		const float LeftMargin = std::max(0.0f, (Box.w - MaxRowWidth) / 2.0f);
+		// two columns side by side, the first one gets the extra toggle if the count is odd
+		const int NumToggles = (int)std::size(aToggles);
+		const int PerColumn = (NumToggles + 1) / 2;
+		const float HintH = 14.0f;
+		const float ToggleSpacing = 6.0f;
+		const float ColumnH = PerColumn * (FunnyRowH + HintH) + (PerColumn - 1) * ToggleSpacing;
 
-		Box.HSplitTop(Gap, nullptr, &Box);
-		for(int i = 0; i < (int)std::size(aToggles); ++i)
+		// width each column needs for its widest label or hint
+		float aBlockW[2] = {0.0f, 0.0f};
+		for(int i = 0; i < NumToggles; ++i)
 		{
-			if(i > 0)
-				Box.HSplitTop(6.0f, nullptr, &Box);
+			float &BlockW = aBlockW[i / PerColumn];
+			BlockW = std::max(BlockW, FunnyRowH + 5.0f + TextRender()->TextWidth(FunnyFontSize, aToggles[i].m_pText));
+			BlockW = std::max(BlockW, FunnyRowH + 5.0f + TextRender()->TextWidth(11.0f, aToggles[i].m_pHint));
+		}
 
-			Box.HSplitTop(FunnyRowH, &Row, &Box);
-			CUIRect Checkbox;
-			Row.VSplitLeft(LeftMargin, nullptr, &Checkbox);
-			Checkbox.w = FunnyRowH + 5.0f + TextRender()->TextWidth(FunnyFontSize, aToggles[i].m_pText);
-			if(DoButton_CheckBox(aToggles[i].m_pValue, aToggles[i].m_pText, *aToggles[i].m_pValue, &Checkbox))
-				*aToggles[i].m_pValue ^= 1;
+		// center both columns together as one group with a fixed gap, shrinking them evenly if the screen is too narrow
+		const float ColumnGap = 60.0f;
+		CUIRect Columns;
+		Box.HSplitTop(Gap, nullptr, &Box);
+		Box.HSplitTop(ColumnH, &Columns, &Box);
+		Columns.VMargin(30.0f, &Columns);
+		const float Scale = std::min(1.0f, (Columns.w - ColumnGap) / (aBlockW[0] + aBlockW[1]));
+		aBlockW[0] *= Scale;
+		aBlockW[1] *= Scale;
+		const float StartX = Columns.x + (Columns.w - (aBlockW[0] + ColumnGap + aBlockW[1])) / 2.0f;
 
-			CUIRect HintRect;
-			Box.HSplitTop(14.0f, &HintRect, &Box);
-			HintRect.VSplitLeft(LeftMargin + FunnyRowH + 5.0f, nullptr, &HintRect);
-			TextRender()->TextColor(0.6f, 0.6f, 0.6f, 1.0f);
-			Ui()->DoLabel(&HintRect, aToggles[i].m_pHint, 11.0f, TEXTALIGN_ML);
-			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		for(int Column = 0; Column < 2; ++Column)
+		{
+			const int First = Column * PerColumn;
+			const int Last = std::min(NumToggles, First + PerColumn);
+
+			CUIRect View = Columns;
+			View.x = Column == 0 ? StartX : StartX + aBlockW[0] + ColumnGap;
+			View.w = aBlockW[Column];
+
+			for(int i = First; i < Last; ++i)
+			{
+				if(i > First)
+					View.HSplitTop(ToggleSpacing, nullptr, &View);
+
+				View.HSplitTop(FunnyRowH, &Row, &View);
+				Row.w = std::min(Row.w, FunnyRowH + 5.0f + TextRender()->TextWidth(FunnyFontSize, aToggles[i].m_pText));
+				if(DoButton_CheckBox(aToggles[i].m_pValue, aToggles[i].m_pText, *aToggles[i].m_pValue, &Row))
+					*aToggles[i].m_pValue ^= 1;
+
+				CUIRect HintRect;
+				View.HSplitTop(HintH, &HintRect, &View);
+				HintRect.VSplitLeft(FunnyRowH + 5.0f, nullptr, &HintRect);
+				SLabelProperties HintProps;
+				HintProps.m_MaxWidth = HintRect.w;
+				HintProps.m_EllipsisAtEnd = true;
+				HintProps.SetColor(ColorRGBA(0.6f, 0.6f, 0.6f, 1.0f));
+				Ui()->DoLabel(&HintRect, aToggles[i].m_pHint, 11.0f, TEXTALIGN_ML, HintProps);
+			}
 		}
 
 		Box.HSplitTop(Gap, nullptr, &Box);
