@@ -309,7 +309,7 @@ MACRO_CONFIG_INT(ClMClientMiniGamesHold, cl_mclient_minigames_hold, 1, 0, 1, CFG
 MACRO_CONFIG_INT(ClMClientUpsideDown, cl_mclient_upside_down, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: render all tees upside down")
 MACRO_CONFIG_INT(ClMClientHideMillis, cl_mclient_hide_millis, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: hide the milliseconds of race times")
 MACRO_CONFIG_INT(ClMClientUserDetection, cl_mclient_user_detection, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: temporarily mark unused color bits after joining, so other M-Client players are detected automatically")
-MACRO_CONFIG_INT(ClMClientHideProtocolEmotes, cl_mclient_hide_protocol_emotes, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: hide emoticons that appear during communication")
+MACRO_CONFIG_INT(ClMClientHideProtocolEmotes, cl_mclient_hide_protocol_emotes, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: hide emoticons that appear during communication")
 MACRO_CONFIG_INT(ClMClientHideProtocolWhispers, cl_mclient_hide_protocol_whispers, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: hide protocol whispers used for communication")
 MACRO_CONFIG_INT(ClChatSpamFilter, cl_chat_spam_filter, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: hold back suspicious chat of players who just joined and mute them if they leave again (join-spam bots)")
 MACRO_CONFIG_INT(ClChatSpamWindow, cl_chat_spam_window, 5, 1, 60, CFGFLAG_CLIENT | CFGFLAG_SAVE, "M-Client: seconds after joining during which a player's chat is checked for spam")
