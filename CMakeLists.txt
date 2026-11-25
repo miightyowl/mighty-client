@@ -1874,6 +1874,7 @@ set(EXPECTED_DATA
   memory/17.png
   memory/18.png
   memory/19.png
+  memory/20.png
   menu.png
   menuimages/demos.png
   menuimages/editor.png

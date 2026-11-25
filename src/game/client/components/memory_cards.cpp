@@ -34,6 +34,7 @@ namespace
 		{"memory/18.png", true, 6029352, 1538560},
 		{"memory/19.png", true, 7601994, 13369343},
 		{"memory/13.png", true, 4914688, 2424586},
+		{"memory/20.png", true, 11796589, 1093241},
 	};
 
 	const char *g_apFillSkins[] = {
