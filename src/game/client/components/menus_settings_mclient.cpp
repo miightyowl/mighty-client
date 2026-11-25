@@ -696,7 +696,7 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	{
 		*Config.m_pUseCustomColor = *Config.m_pUseCustomColor ? 0 : 1;
 		if(*Config.m_pUseCustomColor)
-			*Config.m_pCustomColorSlots = 1 << m_AccessorySlot;
+			*Config.m_pCustomColorSlots = (1 << m_AccessorySlot) & CAccessories::CUSTOM_COLOR_ALL_SLOTS;
 	}
 
 	Toggles.HSplitTop(20.0f, &Button, &Toggles);
@@ -718,10 +718,13 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 		CUIRect CustomColors;
 		MainView.HSplitTop(95.0f, &CustomColors, &MainView);
 		CUIRect aRects[CAccessories::NUM_SLOTS];
-		const float PickerWidth = (CustomColors.w - 20.0f * (float)(NumSlotTabs - 1)) / (float)NumSlotTabs;
+		const int NumPickers = NumSlotTabs - 1;
+		const float PickerWidth = (CustomColors.w - 20.0f * (float)(NumPickers - 1)) / (float)NumPickers;
 		static char s_aCustomColorSlotIds[CAccessories::NUM_SLOTS];
 		for(const int Slot : s_aSlotOrder)
 		{
+			if(Slot == CAccessories::SLOT_INTERACTIVE)
+				continue;
 			CustomColors.VSplitLeft(PickerWidth, &aRects[Slot], &CustomColors);
 			CustomColors.VSplitLeft(20.0f, nullptr, &CustomColors);
 			aRects[Slot].HSplitTop(20.0f, &Label, &aRects[Slot]);

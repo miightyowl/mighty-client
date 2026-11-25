@@ -85,7 +85,7 @@ namespace
 	constexpr int WIRE_OLD_SLOTS = (1 << 4) - 1;
 	constexpr int WIRE_PARTIAL = 1 << 4;
 	constexpr int WIRE_PARTICLES = 1 << 5;
-	constexpr int WIRE_INTERACTIVE = 1 << 6;
+	constexpr unsigned DEFAULT_COLOR = 65408;
 
 	const char *const s_apParticleKeys[CAccessories::NUM_PARTICLES] = {
 		"",
@@ -195,7 +195,7 @@ CAccessories::SConfig CAccessories::Config(bool Dummy)
 		Config.m_aSlots[SLOT_FEET] = {&g_Config.m_ClMClientDummyAccessoryFeet, &g_Config.m_ClMClientDummyAccessoryFeetSize, &g_Config.m_ClMClientDummyAccessoryFeetX, &g_Config.m_ClMClientDummyAccessoryFeetY, &g_Config.m_ClMClientDummyAccessoryFeetColor};
 		Config.m_aSlots[SLOT_FACE] = {&g_Config.m_ClMClientDummyAccessoryFace, &g_Config.m_ClMClientDummyAccessoryFaceSize, &g_Config.m_ClMClientDummyAccessoryFaceX, &g_Config.m_ClMClientDummyAccessoryFaceY, &g_Config.m_ClMClientDummyAccessoryFaceColor};
 		Config.m_aSlots[SLOT_PARTICLES] = {&g_Config.m_ClMClientDummyAccessoryParticles, &g_Config.m_ClMClientDummyAccessoryParticlesSize, &g_Config.m_ClMClientDummyAccessoryParticlesX, &g_Config.m_ClMClientDummyAccessoryParticlesY, &g_Config.m_ClMClientDummyAccessoryParticlesColor};
-		Config.m_aSlots[SLOT_INTERACTIVE] = {&g_Config.m_ClMClientDummyAccessoryInteractive, &g_Config.m_ClMClientDummyAccessoryInteractiveSize, &g_Config.m_ClMClientDummyAccessoryInteractiveX, &g_Config.m_ClMClientDummyAccessoryInteractiveY, &g_Config.m_ClMClientDummyAccessoryInteractiveColor};
+		Config.m_aSlots[SLOT_INTERACTIVE] = {&g_Config.m_ClMClientDummyAccessoryInteractive, &g_Config.m_ClMClientDummyAccessoryInteractiveSize, &g_Config.m_ClMClientDummyAccessoryInteractiveX, &g_Config.m_ClMClientDummyAccessoryInteractiveY, nullptr};
 		Config.m_pUseCustomColor = &g_Config.m_ClMClientDummyAccessoryUseCustomColor;
 		Config.m_pCustomColorSlots = &g_Config.m_ClMClientDummyAccessoryCustomColorSlots;
 	}
@@ -206,7 +206,7 @@ CAccessories::SConfig CAccessories::Config(bool Dummy)
 		Config.m_aSlots[SLOT_FEET] = {&g_Config.m_ClMClientAccessoryFeet, &g_Config.m_ClMClientAccessoryFeetSize, &g_Config.m_ClMClientAccessoryFeetX, &g_Config.m_ClMClientAccessoryFeetY, &g_Config.m_ClMClientAccessoryFeetColor};
 		Config.m_aSlots[SLOT_FACE] = {&g_Config.m_ClMClientAccessoryFace, &g_Config.m_ClMClientAccessoryFaceSize, &g_Config.m_ClMClientAccessoryFaceX, &g_Config.m_ClMClientAccessoryFaceY, &g_Config.m_ClMClientAccessoryFaceColor};
 		Config.m_aSlots[SLOT_PARTICLES] = {&g_Config.m_ClMClientAccessoryParticles, &g_Config.m_ClMClientAccessoryParticlesSize, &g_Config.m_ClMClientAccessoryParticlesX, &g_Config.m_ClMClientAccessoryParticlesY, &g_Config.m_ClMClientAccessoryParticlesColor};
-		Config.m_aSlots[SLOT_INTERACTIVE] = {&g_Config.m_ClMClientAccessoryInteractive, &g_Config.m_ClMClientAccessoryInteractiveSize, &g_Config.m_ClMClientAccessoryInteractiveX, &g_Config.m_ClMClientAccessoryInteractiveY, &g_Config.m_ClMClientAccessoryInteractiveColor};
+		Config.m_aSlots[SLOT_INTERACTIVE] = {&g_Config.m_ClMClientAccessoryInteractive, &g_Config.m_ClMClientAccessoryInteractiveSize, &g_Config.m_ClMClientAccessoryInteractiveX, &g_Config.m_ClMClientAccessoryInteractiveY, nullptr};
 		Config.m_pUseCustomColor = &g_Config.m_ClMClientAccessoryUseCustomColor;
 		Config.m_pCustomColorSlots = &g_Config.m_ClMClientAccessoryCustomColorSlots;
 	}
@@ -220,7 +220,7 @@ CAccessories::SSettings CAccessories::Settings(bool Dummy)
 	for(int Slot = 0; Slot < NUM_SLOTS; Slot++)
 	{
 		const SSlotConfig &SlotConfig = Config.m_aSlots[Slot];
-		Settings.m_aSlots[Slot] = {*SlotConfig.m_pItem, std::min(*SlotConfig.m_pSize, MaxSize(Slot, *SlotConfig.m_pItem)), *SlotConfig.m_pX, *SlotConfig.m_pY, *SlotConfig.m_pColor};
+		Settings.m_aSlots[Slot] = {*SlotConfig.m_pItem, std::min(*SlotConfig.m_pSize, MaxSize(Slot, *SlotConfig.m_pItem)), *SlotConfig.m_pX, *SlotConfig.m_pY, SlotConfig.m_pColor ? *SlotConfig.m_pColor : DEFAULT_COLOR};
 	}
 	Settings.m_UseCustomColor = *Config.m_pUseCustomColor != 0;
 	Settings.m_CustomColorSlots = *Config.m_pCustomColorSlots;
@@ -240,7 +240,7 @@ void CAccessories::Serialize(const SSettings &Settings, char *pBuf, int BufSize)
 		if(Settings.m_CustomColorSlots == CUSTOM_COLOR_ALL_SLOTS)
 			CustomColor = 1;
 		else
-			CustomColor = WIRE_PARTIAL | (Settings.m_CustomColorSlots & WIRE_OLD_SLOTS) | ((Settings.m_CustomColorSlots & (1 << SLOT_PARTICLES)) ? WIRE_PARTICLES : 0) | ((Settings.m_CustomColorSlots & (1 << SLOT_INTERACTIVE)) ? WIRE_INTERACTIVE : 0);
+			CustomColor = WIRE_PARTIAL | (Settings.m_CustomColorSlots & WIRE_OLD_SLOTS) | ((Settings.m_CustomColorSlots & (1 << SLOT_PARTICLES)) ? WIRE_PARTICLES : 0);
 	}
 	str_format(pBuf, BufSize, "%d", CustomColor);
 	for(const SSlotSettings &Slot : Settings.m_aSlots)
@@ -264,14 +264,14 @@ bool CAccessories::Deserialize(const char *pText, SSettings *pSettings)
 		return false;
 	Settings.m_UseCustomColor = CustomColor != 0;
 	if(CustomColor & WIRE_PARTIAL)
-		Settings.m_CustomColorSlots = (CustomColor & WIRE_OLD_SLOTS) | ((CustomColor & WIRE_PARTICLES) ? (1 << SLOT_PARTICLES) : 0) | ((CustomColor & WIRE_INTERACTIVE) ? (1 << SLOT_INTERACTIVE) : 0);
+		Settings.m_CustomColorSlots = (CustomColor & WIRE_OLD_SLOTS) | ((CustomColor & WIRE_PARTICLES) ? (1 << SLOT_PARTICLES) : 0);
 	else
 		Settings.m_CustomColorSlots = CUSTOM_COLOR_ALL_SLOTS;
 
 	for(int SlotIndex = 0; SlotIndex < NUM_SLOTS; SlotIndex++)
 	{
 		SSlotSettings &Slot = Settings.m_aSlots[SlotIndex];
-		Slot = {0, 100, 0, 0, 65408};
+		Slot = {0, 100, 0, 0, DEFAULT_COLOR};
 		pRest = str_next_token(pRest, ",", aPart, sizeof(aPart));
 		if(!pRest)
 			break;
@@ -313,7 +313,8 @@ void CAccessories::ApplySettings(bool Dummy, const SSettings &Settings)
 		*SlotConfig.m_pSize = New.m_Size;
 		*SlotConfig.m_pX = New.m_X;
 		*SlotConfig.m_pY = New.m_Y;
-		*SlotConfig.m_pColor = New.m_Color;
+		if(SlotConfig.m_pColor)
+			*SlotConfig.m_pColor = New.m_Color;
 		SaveAdjustment(Dummy, Slot, Item, New.m_Size, New.m_X, New.m_Y);
 	}
 	*Config.m_pUseCustomColor = Settings.m_UseCustomColor ? 1 : 0;

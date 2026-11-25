@@ -135,7 +135,7 @@ public:
 
 	enum
 	{
-		CUSTOM_COLOR_ALL_SLOTS = (1 << NUM_SLOTS) - 1,
+		CUSTOM_COLOR_ALL_SLOTS = ((1 << NUM_SLOTS) - 1) & ~(1 << SLOT_INTERACTIVE),
 	};
 
 	static constexpr int MIN_SIZE = 25;
@@ -197,7 +197,7 @@ public:
 	static const char *SlotName(int Slot);
 	static bool IsPaired(int Slot, int Item);
 
-	IGraphics::CTextureHandle HeartTexture(bool CustomColor) const { return (CustomColor ? m_aaaGrayTextures : m_aaaTextures)[SLOT_HEAD][HEAD_HEART][0]; }
+	IGraphics::CTextureHandle HeartTexture() const { return m_aaaTextures[SLOT_HEAD][HEAD_HEART][0]; }
 
 	struct SEffectAnchors
 	{

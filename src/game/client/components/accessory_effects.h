@@ -92,7 +92,6 @@ private:
 		LAYER_FLAKE,
 		LAYER_SHINE,
 		LAYER_HEART,
-		LAYER_CUSTOM_HEART,
 		LAYER_GLOW,
 		LAYER_SPARKLE,
 		NUM_LAYERS,
@@ -112,7 +111,6 @@ private:
 		float m_SpeedScale;
 		float m_SizeScale;
 		ColorRGBA m_Color;
-		bool m_UseCustomColor;
 		bool m_Landed;
 	};
 
@@ -144,8 +142,6 @@ private:
 		float m_Alpha;
 		float m_BeamLength;
 		float m_ActiveTime;
-		bool m_UseCustomColor;
-		ColorRGBA m_CustomColor;
 		bool m_Collides;
 	};
 

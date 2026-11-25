@@ -98,31 +98,12 @@ namespace
 		return s_aFireStops[std::size(s_aFireStops) - 1].m_Color;
 	}
 
-	ColorRGBA CustomFireColor(float Age, const ColorRGBA &Custom)
-	{
-		const ColorRGBA Hot = MixColor(Custom, COLOR_WHITE, 0.65f);
-		const ColorRGBA Cold = MixColor(Custom, COLOR_BLACK, 0.7f);
-		ColorRGBA Color = Age < 0.4f ? MixColor(Hot, Custom, Age / 0.4f) : MixColor(Custom, Cold, (Age - 0.4f) / 0.6f);
-		Color.a = FireColor(Age).a;
-		return Color;
-	}
-
 	CAccessories::SSlotSettings EffectSettings(const CAccessories::SSettings &Settings, int Item)
 	{
 		CAccessories::SSlotSettings Slot = Settings.m_aSlots[CAccessories::SLOT_INTERACTIVE];
 		if(Slot.m_Item != Item)
 			Slot = {Item, 100, 0, 0, 65408};
 		return Slot;
-	}
-
-	bool EffectColor(const CAccessories::SSettings &Settings, int Item, ColorRGBA *pColor)
-	{
-		*pColor = COLOR_WHITE;
-		const CAccessories::SSlotSettings &Slot = Settings.m_aSlots[CAccessories::SLOT_INTERACTIVE];
-		if(Slot.m_Item != Item || !Settings.m_UseCustomColor || !(Settings.m_CustomColorSlots & (1 << CAccessories::SLOT_INTERACTIVE)))
-			return false;
-		*pColor = color_cast<ColorRGBA>(ColorHSLA(Slot.m_Color).UnclampLighting(ColorHSLA::DARKEST_LGT));
-		return true;
 	}
 }
 
@@ -283,7 +264,6 @@ CAccessoryEffects::CParticle CAccessoryEffects::NewParticle(EKind Kind, const SS
 	Particle.m_SpeedScale = Source.m_SpeedScale;
 	Particle.m_SizeScale = Source.m_SizeScale;
 	Particle.m_Color = Color;
-	Particle.m_UseCustomColor = Source.m_UseCustomColor;
 	Particle.m_Landed = false;
 	return Particle;
 }
@@ -301,27 +281,25 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 {
 	const float Aim = angle(Source.m_Direction);
 	const vec2 Mouth = Source.m_Anchors.m_Mouth;
-	const ColorRGBA &Custom = Source.m_CustomColor;
 
 	switch(Item)
 	{
 	case CAccessories::INTERACTIVE_FIRE:
 	{
-		CParticle Flame = NewParticle(KIND_FLAME, Source, Mouth, direction(Aim + random_float(-0.15f, 0.15f)) * random_float(430.0f, 620.0f), random_float(0.35f, 0.6f), random_float(24.0f, 40.0f), Custom);
+		CParticle Flame = NewParticle(KIND_FLAME, Source, Mouth, direction(Aim + random_float(-0.15f, 0.15f)) * random_float(430.0f, 620.0f), random_float(0.35f, 0.6f), random_float(24.0f, 40.0f), COLOR_WHITE);
 		Flame.m_Vel += Source.m_Vel;
 		SpawnStream(System, Flame, Source, Late);
 		break;
 	}
 	case CAccessories::INTERACTIVE_ICE:
 	{
-		const ColorRGBA MistColor = Source.m_UseCustomColor ? Custom : MixColor(ColorRGBA(0.85f, 0.95f, 1.0f, 1.0f), ColorRGBA(0.5f, 0.75f, 1.0f, 1.0f), random_float());
+		const ColorRGBA MistColor = MixColor(ColorRGBA(0.85f, 0.95f, 1.0f, 1.0f), ColorRGBA(0.5f, 0.75f, 1.0f, 1.0f), random_float());
 		CParticle Mist = NewParticle(KIND_MIST, Source, Mouth, direction(Aim + random_float(-0.28f, 0.28f)) * random_float(260.0f, 440.0f), random_float(0.6f, 1.0f), random_float(20.0f, 32.0f), MistColor);
 		Mist.m_Vel += Source.m_Vel;
 		SpawnStream(System, Mist, Source, Late);
 		if(random_float() < 0.35f)
 		{
-			const ColorRGBA FlakeColor = Source.m_UseCustomColor ? MixColor(Custom, COLOR_WHITE, 0.5f) : COLOR_WHITE;
-			CParticle Flake = NewParticle(KIND_FLAKE, Source, Mouth, direction(Aim + random_float(-0.35f, 0.35f)) * random_float(280.0f, 520.0f), random_float(0.7f, 1.3f), random_float(10.0f, 18.0f), FlakeColor);
+			CParticle Flake = NewParticle(KIND_FLAKE, Source, Mouth, direction(Aim + random_float(-0.35f, 0.35f)) * random_float(280.0f, 520.0f), random_float(0.7f, 1.3f), random_float(10.0f, 18.0f), COLOR_WHITE);
 			Flake.m_Vel += Source.m_Vel;
 			SpawnStream(System, Flake, Source, Late);
 		}
@@ -329,7 +307,7 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 	}
 	case CAccessories::INTERACTIVE_BUBBLES:
 	{
-		const ColorRGBA BubbleColor = Source.m_UseCustomColor ? Custom : MixColor(ColorRGBA(0.55f, 0.85f, 1.0f, 1.0f), ColorRGBA(0.85f, 0.7f, 1.0f, 1.0f), random_float());
+		const ColorRGBA BubbleColor = MixColor(ColorRGBA(0.55f, 0.85f, 1.0f, 1.0f), ColorRGBA(0.85f, 0.7f, 1.0f, 1.0f), random_float());
 		CParticle Bubble = NewParticle(KIND_BUBBLE, Source, Mouth, direction(Aim + random_float(-0.35f, 0.35f)) * random_float(170.0f, 330.0f), random_float(1.1f, 2.2f), random_float(12.0f, 26.0f), BubbleColor);
 		Bubble.m_Vel += Source.m_Vel * 0.5f;
 		SpawnStream(System, Bubble, Source, Late);
@@ -343,7 +321,7 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 		{
 			const float Offset = (float)Lane - (RAINBOW_LANES - 1) / 2.0f;
 			const float Share = (float)Lane / (float)RAINBOW_LANES;
-			const ColorRGBA LaneColor = Source.m_UseCustomColor ? MixColor(MixColor(Custom, COLOR_WHITE, 0.4f), MixColor(Custom, COLOR_BLACK, 0.3f), Share) : Hue(Share * 0.95f);
+			const ColorRGBA LaneColor = Hue(Share * 0.95f);
 			CParticle Puke = NewParticle(KIND_PUKE, Source, Mouth + Side * (Offset * 1.6f * Source.m_SizeScale), LaneVel + Side * (Offset * 14.0f), random_float(0.8f, 1.1f), random_float(10.0f, 14.0f), LaneColor);
 			Puke.m_Vel += Source.m_Vel;
 			SpawnStream(System, Puke, Source, Late);
@@ -352,7 +330,7 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 	}
 	case CAccessories::INTERACTIVE_FIREWORK:
 	{
-		const ColorRGBA RocketColor = Source.m_UseCustomColor ? Custom : Hue(random_float());
+		const ColorRGBA RocketColor = Hue(random_float());
 		CParticle Rocket = NewParticle(KIND_ROCKET, Source, Mouth, direction(Aim + random_float(-0.05f, 0.05f)) * random_float(620.0f, 720.0f), random_float(0.5f, 0.65f), 12.0f, RocketColor);
 		Rocket.m_Vel += Source.m_Vel * 0.5f;
 		SpawnStream(System, Rocket, Source, Late);
@@ -369,7 +347,7 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 	}
 	case CAccessories::INTERACTIVE_KISSES:
 	{
-		CParticle Kiss = NewParticle(KIND_KISS, Source, Mouth, direction(Aim + random_float(-0.22f, 0.22f)) * random_float(210.0f, 320.0f), random_float(1.1f, 1.7f), random_float(16.0f, 24.0f), Source.m_UseCustomColor ? Custom : COLOR_WHITE);
+		CParticle Kiss = NewParticle(KIND_KISS, Source, Mouth, direction(Aim + random_float(-0.22f, 0.22f)) * random_float(210.0f, 320.0f), random_float(1.1f, 1.7f), random_float(16.0f, 24.0f), COLOR_WHITE);
 		Kiss.m_Vel += Source.m_Vel * 0.5f;
 		Kiss.m_Rot = random_float(-0.3f, 0.3f);
 		Kiss.m_RotSpeed = random_float(-0.4f, 0.4f);
@@ -382,7 +360,7 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 		vec2 Start = Head + vec2(random_float(-MONEY_WIDTH, MONEY_WIDTH), -MONEY_HEIGHT - random_float(0.0f, 30.0f)) * Source.m_SizeScale;
 		if(Source.m_Collides)
 			Collision()->IntersectLine(Head, Start, nullptr, &Start);
-		const ColorRGBA BillColor = Source.m_UseCustomColor ? Custom : MixColor(ColorRGBA(0.36f, 0.66f, 0.36f, 1.0f), ColorRGBA(0.5f, 0.76f, 0.42f, 1.0f), random_float());
+		const ColorRGBA BillColor = MixColor(ColorRGBA(0.36f, 0.66f, 0.36f, 1.0f), ColorRGBA(0.5f, 0.76f, 0.42f, 1.0f), random_float());
 		CParticle Bill = NewParticle(KIND_BILL, Source, Start, vec2(random_float(-70.0f, 70.0f), random_float(10.0f, 70.0f)), random_float(2.0f, 3.0f), random_float(20.0f, 26.0f), BillColor);
 		Bill.m_RotSpeed = random_float(-2.0f, 2.0f);
 		Spawn(System.m_vParticles, Bill);
@@ -394,14 +372,14 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 		const vec2 Cloud = Reach(Source, Head, Head - vec2(0.0f, CLOUD_HEIGHT * Source.m_SizeScale));
 		const ColorRGBA GrayColor = MixColor(ColorRGBA(0.38f, 0.4f, 0.45f, 1.0f), ColorRGBA(0.62f, 0.64f, 0.68f, 1.0f), random_float());
 		const vec2 PuffPos = Reach(Source, Cloud, Cloud + vec2(random_float(-34.0f, 34.0f), random_float(-9.0f, 7.0f)) * Source.m_SizeScale);
-		CParticle Puff = NewParticle(KIND_CLOUD, Source, PuffPos, vec2(0.0f, 0.0f), random_float(0.3f, 0.45f), random_float(26.0f, 38.0f), Source.m_UseCustomColor ? MixColor(GrayColor, Custom, 0.5f) : GrayColor);
+		CParticle Puff = NewParticle(KIND_CLOUD, Source, PuffPos, vec2(0.0f, 0.0f), random_float(0.3f, 0.45f), random_float(26.0f, 38.0f), GrayColor);
 		Puff.m_Vel = Source.m_Vel;
 		Spawn(System.m_vParticles, Puff);
 
 		for(int i = 0; i < 3; i++)
 		{
 			const vec2 DropPos = Reach(Source, Cloud, Cloud + vec2(random_float(-32.0f, 32.0f), 6.0f) * Source.m_SizeScale);
-			CParticle Drop = NewParticle(KIND_RAIN, Source, DropPos, vec2(0.0f, random_float(140.0f, 220.0f)), 1.0f, random_float(10.0f, 15.0f), Source.m_UseCustomColor ? Custom : ColorRGBA(0.4f, 0.65f, 1.0f, 1.0f));
+			CParticle Drop = NewParticle(KIND_RAIN, Source, DropPos, vec2(0.0f, random_float(140.0f, 220.0f)), 1.0f, random_float(10.0f, 15.0f), ColorRGBA(0.4f, 0.65f, 1.0f, 1.0f));
 			Drop.m_Vel.x += Source.m_Vel.x * 0.5f;
 			Spawn(System.m_vParticles, Drop);
 		}
@@ -410,7 +388,7 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 		{
 			const vec2 BoltPos = Reach(Source, Cloud, Cloud + vec2(random_float(-24.0f, 24.0f), 4.0f) * Source.m_SizeScale);
 			const vec2 BoltEnd = Reach(Source, BoltPos, BoltPos + vec2(0.0f, BOLT_LENGTH * Source.m_SpeedScale));
-			CParticle Bolt = NewParticle(KIND_BOLT, Source, BoltPos, vec2(0.0f, 0.0f), random_float(0.18f, 0.3f), 1.0f, Source.m_UseCustomColor ? MixColor(Custom, COLOR_WHITE, 0.3f) : ColorRGBA(1.0f, 0.95f, 0.45f, 1.0f));
+			CParticle Bolt = NewParticle(KIND_BOLT, Source, BoltPos, vec2(0.0f, 0.0f), random_float(0.18f, 0.3f), 1.0f, ColorRGBA(1.0f, 0.95f, 0.45f, 1.0f));
 			Bolt.m_Size = BoltEnd.y - BoltPos.y;
 			Spawn(System.m_vParticles, Bolt);
 		}
@@ -431,12 +409,12 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 		for(int i = 0; i < (OnGround ? 34 : 14); i++)
 		{
 			const float Side = i % 2 == 0 ? -1.0f : 1.0f;
-			const ColorRGBA DustColor = Source.m_UseCustomColor ? MixColor(Custom, COLOR_WHITE, 0.2f) : MixColor(ColorRGBA(0.72f, 0.62f, 0.48f, 1.0f), ColorRGBA(0.85f, 0.79f, 0.68f, 1.0f), random_float());
+			const ColorRGBA DustColor = MixColor(ColorRGBA(0.72f, 0.62f, 0.48f, 1.0f), ColorRGBA(0.85f, 0.79f, 0.68f, 1.0f), random_float());
 			Spawn(System.m_vParticles, NewParticle(KIND_DUST, Source, Ground, vec2(Side * random_float(60.0f, 420.0f), random_float(-90.0f, -5.0f)), random_float(0.5f, 0.9f), random_float(18.0f, 30.0f), DustColor));
 		}
 		for(int i = 0; OnGround && i < 18; i++)
 		{
-			const ColorRGBA StoneColor = Source.m_UseCustomColor ? MixColor(Custom, COLOR_BLACK, 0.25f) : MixColor(ColorRGBA(0.38f, 0.32f, 0.27f, 1.0f), ColorRGBA(0.58f, 0.52f, 0.45f, 1.0f), random_float());
+			const ColorRGBA StoneColor = MixColor(ColorRGBA(0.38f, 0.32f, 0.27f, 1.0f), ColorRGBA(0.58f, 0.52f, 0.45f, 1.0f), random_float());
 			CParticle Stone = NewParticle(KIND_STONE, Source, Ground, vec2(random_float(-260.0f, 260.0f), random_float(-440.0f, -160.0f)), random_float(0.8f, 1.3f), random_float(5.0f, 10.0f), StoneColor);
 			Stone.m_RotSpeed = random_float(-9.0f, 9.0f);
 			Spawn(System.m_vParticles, Stone);
@@ -448,7 +426,7 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 		const vec2 Head = (Source.m_Anchors.m_aEyes[0] + Source.m_Anchors.m_aEyes[1]) / 2.0f;
 		const float Side = Source.m_Direction.x < 0.0f ? -1.0f : 1.0f;
 		const vec2 Start = Reach(Source, Head, Head + vec2(Side * 12.0f, -18.0f) * Source.m_SizeScale);
-		CParticle Sleep = NewParticle(KIND_SLEEP, Source, Start, vec2(Side * random_float(20.0f, 45.0f), random_float(-65.0f, -45.0f)), random_float(1.5f, 2.0f), random_float(13.0f, 17.0f), Source.m_UseCustomColor ? Custom : ColorRGBA(0.8f, 0.9f, 1.0f, 1.0f));
+		CParticle Sleep = NewParticle(KIND_SLEEP, Source, Start, vec2(Side * random_float(20.0f, 45.0f), random_float(-65.0f, -45.0f)), random_float(1.5f, 2.0f), random_float(13.0f, 17.0f), ColorRGBA(0.8f, 0.9f, 1.0f, 1.0f));
 		Sleep.m_Rot = random_float(-0.25f, 0.25f);
 		Sleep.m_RotSpeed = random_float(-0.2f, 0.2f);
 		Spawn(System.m_vParticles, Sleep);
@@ -460,7 +438,7 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 		for(int i = 0; i < 2; i++)
 		{
 			const float Side = i == 0 ? -1.0f : 1.0f;
-			const ColorRGBA SteamColor = Source.m_UseCustomColor ? MixColor(Custom, COLOR_WHITE, random_float(0.0f, 0.4f)) : MixColor(ColorRGBA(0.82f, 0.84f, 0.87f, 1.0f), COLOR_WHITE, random_float());
+			const ColorRGBA SteamColor = MixColor(ColorRGBA(0.82f, 0.84f, 0.87f, 1.0f), COLOR_WHITE, random_float());
 			CParticle Steam = NewParticle(KIND_STEAM, Source, Reach(Source, Head, Source.m_Anchors.m_aSides[i]), vec2(Side * random_float(230.0f, 360.0f), random_float(-190.0f, -90.0f)), random_float(0.4f, 0.65f), random_float(16.0f, 24.0f), SteamColor);
 			Steam.m_Vel += Source.m_Vel;
 			SpawnStream(System, Steam, Source, Late);
@@ -469,7 +447,7 @@ void CAccessoryEffects::EmitOne(CSystem &System, int Item, const SSource &Source
 	}
 	case CAccessories::INTERACTIVE_CRYING:
 	{
-		const ColorRGBA TearColor = Source.m_UseCustomColor ? Custom : MixColor(ColorRGBA(0.35f, 0.7f, 1.0f, 1.0f), ColorRGBA(0.6f, 0.87f, 1.0f, 1.0f), random_float());
+		const ColorRGBA TearColor = MixColor(ColorRGBA(0.35f, 0.7f, 1.0f, 1.0f), ColorRGBA(0.6f, 0.87f, 1.0f, 1.0f), random_float());
 		for(int Eye = 0; Eye < 2; Eye++)
 		{
 			const float Side = Eye == 0 ? -1.0f : 1.0f;
@@ -491,8 +469,7 @@ vec2 CAccessoryEffects::Reach(const SSource &Source, vec2 From, vec2 To) const
 
 void CAccessoryEffects::EmitBeams(CSystem &System, const SSource &Source) const
 {
-	ColorRGBA Color = Source.m_UseCustomColor ? Source.m_CustomColor : ColorRGBA(1.0f, 0.12f, 0.1f, 1.0f);
-	Color.a = Source.m_Alpha;
+	const ColorRGBA Color = ColorRGBA(1.0f, 0.12f, 0.1f, Source.m_Alpha);
 	for(const vec2 &Eye : Source.m_Anchors.m_aEyes)
 	{
 		vec2 End = Eye + Source.m_Direction * Source.m_BeamLength;
@@ -520,7 +497,6 @@ void CAccessoryEffects::Emit(int ClientId, const CAnimState *pAnim, const CTeeRe
 	Source.m_Alpha = Alpha;
 	Source.m_BeamLength = BEAM_LENGTH * Scale;
 	Source.m_ActiveTime = LocalTime() - Burst.m_StartTime;
-	Source.m_UseCustomColor = EffectColor(Settings, Burst.m_Item, &Source.m_CustomColor);
 	Source.m_Collides = true;
 
 	if(Burst.m_Item == CAccessories::INTERACTIVE_LASER)
@@ -562,7 +538,7 @@ void CAccessoryEffects::Splash(std::vector<CParticle> &vParticles, const CPartic
 
 void CAccessoryEffects::Explode(std::vector<CParticle> &vParticles, const CParticle &Rocket) const
 {
-	const ColorRGBA Second = Rocket.m_UseCustomColor ? MixColor(Rocket.m_Color, COLOR_WHITE, 0.5f) : Hue(random_float());
+	const ColorRGBA Second = Hue(random_float());
 	for(int i = 0; i < 64; i++)
 	{
 		CParticle Spark = Rocket;
@@ -660,7 +636,7 @@ bool CAccessoryEffects::LayerQuad(const CParticle &Particle, ELayer Layer, vec2 
 	{
 	case KIND_FLAME:
 		*pSize = Particle.m_Size * mix(Kind.m_StartSize, Kind.m_EndSize, std::sin(std::min(Age * 1.25f, 1.0f) * pi / 2.0f));
-		*pColor = Particle.m_UseCustomColor ? CustomFireColor(Age, Particle.m_Color) : FireColor(Age);
+		*pColor = FireColor(Age);
 		Opacity = pColor->a;
 		if(Layer == LAYER_SMOKE)
 			break;
@@ -714,7 +690,7 @@ bool CAccessoryEffects::LayerQuad(const CParticle &Particle, ELayer Layer, vec2 
 		Opacity = 0.65f * (1.0f - Age);
 		break;
 	case KIND_KISS:
-		if(Layer != (Particle.m_UseCustomColor ? LAYER_CUSTOM_HEART : LAYER_HEART))
+		if(Layer != LAYER_HEART)
 			return false;
 		Opacity = Age < 0.6f ? 1.0f : (1.0f - Age) / 0.4f;
 		break;
@@ -933,8 +909,8 @@ void CAccessoryEffects::Render(CSystem &System)
 		IGraphics::CTextureHandle Texture;
 		if(Layer == LAYER_FLAKE || Layer == LAYER_SPARKLE)
 			Texture = GameClient()->m_ExtrasSkin.m_aSpriteParticles[(Layer == LAYER_FLAKE ? SPRITE_PART_SNOWFLAKE : SPRITE_PART_SPARKLE) - SPRITE_PART_SNOWFLAKE];
-		else if(Layer == LAYER_HEART || Layer == LAYER_CUSTOM_HEART)
-			Texture = GameClient()->m_Accessories.HeartTexture(Layer == LAYER_CUSTOM_HEART);
+		else if(Layer == LAYER_HEART)
+			Texture = GameClient()->m_Accessories.HeartTexture();
 		else
 			Texture = GameClient()->m_ParticlesSkin.m_aSpriteParticles[(Layer == LAYER_SMOKE ? SPRITE_PART_SMOKE : SPRITE_PART_BALL) - SPRITE_PART_SLICE];
 
@@ -1004,7 +980,6 @@ void CAccessoryEffects::RenderPreview(int PreviewId, const CAnimState *pAnim, co
 	Source.m_Alpha = 1.0f;
 	Source.m_BeamLength = PREVIEW_BEAM_LENGTH * Scale;
 	Source.m_ActiveTime = LIGHTNING_DELAY;
-	Source.m_UseCustomColor = EffectColor(Settings, Slot.m_Item, &Source.m_CustomColor);
 	Source.m_Collides = false;
 
 	if(TimePassed > 0.0f)
