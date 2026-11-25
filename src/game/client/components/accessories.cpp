@@ -208,12 +208,7 @@ CAccessories::SSettings CAccessories::Settings(bool Dummy)
 
 bool CAccessories::AnyEquipped(const SSettings &Settings)
 {
-	for(const SSlotSettings &Slot : Settings.m_aSlots)
-	{
-		if(Slot.m_Item != 0)
-			return true;
-	}
-	return false;
+	return std::ranges::any_of(Settings.m_aSlots, [](const SSlotSettings &Slot) { return Slot.m_Item != 0; });
 }
 
 void CAccessories::Serialize(const SSettings &Settings, char *pBuf, int BufSize)

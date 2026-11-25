@@ -776,9 +776,8 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	const auto EquippedIt = std::find(vItems.begin(), vItems.end(), Equipped);
 	const int OldSelected = EquippedIt == vItems.end() ? -1 : (int)(EquippedIt - vItems.begin());
 	s_ListBox.DoStart(100.0f, vItems.size(), 6, 1, OldSelected, &MainView);
-	for(size_t Index = 0; Index < vItems.size(); Index++)
+	for(const int Item : vItems)
 	{
-		const int Item = vItems[Index];
 		const CListboxItem ListItem = s_ListBox.DoNextItem(&s_aaItemIds[m_AccessorySlot][Item], Item == Equipped);
 		if(!ListItem.m_Visible)
 			continue;

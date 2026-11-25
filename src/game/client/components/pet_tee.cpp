@@ -65,11 +65,13 @@ bool CPetTee::SpotFree(vec2 PlayerPos, vec2 Offset, float Scale) const
 	const vec2 Center = PlayerPos + Offset;
 	const float Radius = 32.0f * Scale + 6.0f;
 	const float Step = 12.0f;
-	for(float y = -Radius; y <= Radius; y += Step)
+	const int NumSteps = (int)(2.0f * Radius / Step);
+	for(int StepY = 0; StepY <= NumSteps; StepY++)
 	{
-		for(float x = -Radius; x <= Radius; x += Step)
+		for(int StepX = 0; StepX <= NumSteps; StepX++)
 		{
-			if(x * x + y * y <= Radius * Radius && pCollision->CheckPoint(Center + vec2(x, y)))
+			const vec2 Point = vec2(-Radius + StepX * Step, -Radius + StepY * Step);
+			if(length_squared(Point) <= Radius * Radius && pCollision->CheckPoint(Center + Point))
 				return false;
 		}
 	}
