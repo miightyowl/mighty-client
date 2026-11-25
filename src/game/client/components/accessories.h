@@ -135,7 +135,7 @@ public:
 
 	enum
 	{
-		CUSTOM_COLOR_ALL_SLOTS = ((1 << NUM_SLOTS) - 1) & ~(1 << SLOT_INTERACTIVE),
+		CUSTOM_COLOR_ALL_SLOTS = (1 << SLOT_HEAD) | (1 << SLOT_BODY) | (1 << SLOT_FEET) | (1 << SLOT_FACE),
 	};
 
 	static constexpr int MIN_SIZE = 25;

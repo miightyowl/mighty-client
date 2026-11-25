@@ -82,9 +82,7 @@ namespace
 		{{"accessories/dollar_glasses.png", nullptr}, 0.84f, vec2(0.0f, 0.005f)},
 	};
 
-	constexpr int WIRE_OLD_SLOTS = (1 << 4) - 1;
 	constexpr int WIRE_PARTIAL = 1 << 4;
-	constexpr int WIRE_PARTICLES = 1 << 5;
 	constexpr unsigned DEFAULT_COLOR = 65408;
 
 	const char *const s_apParticleKeys[CAccessories::NUM_PARTICLES] = {
@@ -194,7 +192,7 @@ CAccessories::SConfig CAccessories::Config(bool Dummy)
 		Config.m_aSlots[SLOT_BODY] = {&g_Config.m_ClMClientDummyAccessoryBody, &g_Config.m_ClMClientDummyAccessoryBodySize, &g_Config.m_ClMClientDummyAccessoryBodySpread, &g_Config.m_ClMClientDummyAccessoryBodyY, &g_Config.m_ClMClientDummyAccessoryBodyColor};
 		Config.m_aSlots[SLOT_FEET] = {&g_Config.m_ClMClientDummyAccessoryFeet, &g_Config.m_ClMClientDummyAccessoryFeetSize, &g_Config.m_ClMClientDummyAccessoryFeetX, &g_Config.m_ClMClientDummyAccessoryFeetY, &g_Config.m_ClMClientDummyAccessoryFeetColor};
 		Config.m_aSlots[SLOT_FACE] = {&g_Config.m_ClMClientDummyAccessoryFace, &g_Config.m_ClMClientDummyAccessoryFaceSize, &g_Config.m_ClMClientDummyAccessoryFaceX, &g_Config.m_ClMClientDummyAccessoryFaceY, &g_Config.m_ClMClientDummyAccessoryFaceColor};
-		Config.m_aSlots[SLOT_PARTICLES] = {&g_Config.m_ClMClientDummyAccessoryParticles, &g_Config.m_ClMClientDummyAccessoryParticlesSize, &g_Config.m_ClMClientDummyAccessoryParticlesX, &g_Config.m_ClMClientDummyAccessoryParticlesY, &g_Config.m_ClMClientDummyAccessoryParticlesColor};
+		Config.m_aSlots[SLOT_PARTICLES] = {&g_Config.m_ClMClientDummyAccessoryParticles, &g_Config.m_ClMClientDummyAccessoryParticlesSize, &g_Config.m_ClMClientDummyAccessoryParticlesX, &g_Config.m_ClMClientDummyAccessoryParticlesY, nullptr};
 		Config.m_aSlots[SLOT_INTERACTIVE] = {&g_Config.m_ClMClientDummyAccessoryInteractive, &g_Config.m_ClMClientDummyAccessoryInteractiveSize, &g_Config.m_ClMClientDummyAccessoryInteractiveX, &g_Config.m_ClMClientDummyAccessoryInteractiveY, nullptr};
 		Config.m_pUseCustomColor = &g_Config.m_ClMClientDummyAccessoryUseCustomColor;
 		Config.m_pCustomColorSlots = &g_Config.m_ClMClientDummyAccessoryCustomColorSlots;
@@ -205,7 +203,7 @@ CAccessories::SConfig CAccessories::Config(bool Dummy)
 		Config.m_aSlots[SLOT_BODY] = {&g_Config.m_ClMClientAccessoryBody, &g_Config.m_ClMClientAccessoryBodySize, &g_Config.m_ClMClientAccessoryBodySpread, &g_Config.m_ClMClientAccessoryBodyY, &g_Config.m_ClMClientAccessoryBodyColor};
 		Config.m_aSlots[SLOT_FEET] = {&g_Config.m_ClMClientAccessoryFeet, &g_Config.m_ClMClientAccessoryFeetSize, &g_Config.m_ClMClientAccessoryFeetX, &g_Config.m_ClMClientAccessoryFeetY, &g_Config.m_ClMClientAccessoryFeetColor};
 		Config.m_aSlots[SLOT_FACE] = {&g_Config.m_ClMClientAccessoryFace, &g_Config.m_ClMClientAccessoryFaceSize, &g_Config.m_ClMClientAccessoryFaceX, &g_Config.m_ClMClientAccessoryFaceY, &g_Config.m_ClMClientAccessoryFaceColor};
-		Config.m_aSlots[SLOT_PARTICLES] = {&g_Config.m_ClMClientAccessoryParticles, &g_Config.m_ClMClientAccessoryParticlesSize, &g_Config.m_ClMClientAccessoryParticlesX, &g_Config.m_ClMClientAccessoryParticlesY, &g_Config.m_ClMClientAccessoryParticlesColor};
+		Config.m_aSlots[SLOT_PARTICLES] = {&g_Config.m_ClMClientAccessoryParticles, &g_Config.m_ClMClientAccessoryParticlesSize, &g_Config.m_ClMClientAccessoryParticlesX, &g_Config.m_ClMClientAccessoryParticlesY, nullptr};
 		Config.m_aSlots[SLOT_INTERACTIVE] = {&g_Config.m_ClMClientAccessoryInteractive, &g_Config.m_ClMClientAccessoryInteractiveSize, &g_Config.m_ClMClientAccessoryInteractiveX, &g_Config.m_ClMClientAccessoryInteractiveY, nullptr};
 		Config.m_pUseCustomColor = &g_Config.m_ClMClientAccessoryUseCustomColor;
 		Config.m_pCustomColorSlots = &g_Config.m_ClMClientAccessoryCustomColorSlots;
@@ -223,7 +221,7 @@ CAccessories::SSettings CAccessories::Settings(bool Dummy)
 		Settings.m_aSlots[Slot] = {*SlotConfig.m_pItem, std::min(*SlotConfig.m_pSize, MaxSize(Slot, *SlotConfig.m_pItem)), *SlotConfig.m_pX, *SlotConfig.m_pY, SlotConfig.m_pColor ? *SlotConfig.m_pColor : DEFAULT_COLOR};
 	}
 	Settings.m_UseCustomColor = *Config.m_pUseCustomColor != 0;
-	Settings.m_CustomColorSlots = *Config.m_pCustomColorSlots;
+	Settings.m_CustomColorSlots = *Config.m_pCustomColorSlots & CUSTOM_COLOR_ALL_SLOTS;
 	return Settings;
 }
 
@@ -234,14 +232,7 @@ bool CAccessories::AnyEquipped(const SSettings &Settings)
 
 void CAccessories::Serialize(const SSettings &Settings, char *pBuf, int BufSize)
 {
-	int CustomColor = 0;
-	if(Settings.m_UseCustomColor)
-	{
-		if(Settings.m_CustomColorSlots == CUSTOM_COLOR_ALL_SLOTS)
-			CustomColor = 1;
-		else
-			CustomColor = WIRE_PARTIAL | (Settings.m_CustomColorSlots & WIRE_OLD_SLOTS) | ((Settings.m_CustomColorSlots & (1 << SLOT_PARTICLES)) ? WIRE_PARTICLES : 0);
-	}
+	const int CustomColor = Settings.m_UseCustomColor ? WIRE_PARTIAL | (Settings.m_CustomColorSlots & CUSTOM_COLOR_ALL_SLOTS) : 0;
 	str_format(pBuf, BufSize, "%d", CustomColor);
 	for(const SSlotSettings &Slot : Settings.m_aSlots)
 	{
@@ -264,7 +255,7 @@ bool CAccessories::Deserialize(const char *pText, SSettings *pSettings)
 		return false;
 	Settings.m_UseCustomColor = CustomColor != 0;
 	if(CustomColor & WIRE_PARTIAL)
-		Settings.m_CustomColorSlots = (CustomColor & WIRE_OLD_SLOTS) | ((CustomColor & WIRE_PARTICLES) ? (1 << SLOT_PARTICLES) : 0);
+		Settings.m_CustomColorSlots = CustomColor & CUSTOM_COLOR_ALL_SLOTS;
 	else
 		Settings.m_CustomColorSlots = CUSTOM_COLOR_ALL_SLOTS;
 
@@ -816,20 +807,15 @@ void CAccessories::RenderParticles(const SFit &Fit, float Alpha, const SSettings
 	if(SlotSettings.m_Item <= 0 || SlotSettings.m_Item >= NUM_PARTICLES)
 		return;
 	const SParticleKind &Kind = s_aParticleKinds[SlotSettings.m_Item];
-	const bool UseCustomColor = Settings.m_UseCustomColor && (Settings.m_CustomColorSlots & (1 << SLOT_PARTICLES));
 	IGraphics::CTextureHandle Texture;
 	if(Kind.m_Sprite < 0)
-		Texture = (UseCustomColor ? m_aaaGrayTextures : m_aaaTextures)[SLOT_HEAD][Kind.m_HeadItem][0];
+		Texture = m_aaaTextures[SLOT_HEAD][Kind.m_HeadItem][0];
 	else if(Kind.m_Sprite >= SPRITE_PART_SNOWFLAKE)
 		Texture = GameClient()->m_ExtrasSkin.m_aSpriteParticles[Kind.m_Sprite - SPRITE_PART_SNOWFLAKE];
 	else
 		Texture = GameClient()->m_ParticlesSkin.m_aSpriteParticles[Kind.m_Sprite - SPRITE_PART_SLICE];
 	if(!Texture.IsValid())
 		return;
-
-	ColorRGBA CustomColor = Kind.m_Color;
-	if(UseCustomColor)
-		CustomColor = color_cast<ColorRGBA>(ColorHSLA(SlotSettings.m_Color).UnclampLighting(ColorHSLA::DARKEST_LGT));
 
 	const float Scale = Fit.m_Scale * SlotSettings.m_Size / 100.0f;
 	const vec2 Center = Fit.m_BodyPos + vec2(SlotSettings.m_X, -SlotSettings.m_Y) * Fit.m_Scale + Kind.m_SpawnOffset * Scale;
@@ -874,8 +860,8 @@ void CAccessories::RenderParticles(const SFit &Fit, float Alpha, const SSettings
 			Hue = ParticleRandom(i, Cycle, 6);
 		}
 
-		ColorRGBA Color = CustomColor;
-		if(Kind.m_Rainbow && !UseCustomColor)
+		ColorRGBA Color = Kind.m_Color;
+		if(Kind.m_Rainbow)
 			Color = color_cast<ColorRGBA>(ColorHSLA(std::fmod(Hue + Time * 0.2f, 1.0f), 1.0f, 0.65f));
 		Color.a = ParticleAlpha * Alpha;
 		Graphics()->SetColor(Color);

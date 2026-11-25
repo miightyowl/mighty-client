@@ -718,17 +718,17 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 		CUIRect CustomColors;
 		MainView.HSplitTop(95.0f, &CustomColors, &MainView);
 		CUIRect aRects[CAccessories::NUM_SLOTS];
-		const int NumPickers = NumSlotTabs - 1;
+		const int NumPickers = std::count_if(std::begin(s_aSlotOrder), std::end(s_aSlotOrder), [](int Slot) { return (CAccessories::CUSTOM_COLOR_ALL_SLOTS & (1 << Slot)) != 0; });
 		const float PickerWidth = (CustomColors.w - 20.0f * (float)(NumPickers - 1)) / (float)NumPickers;
 		static char s_aCustomColorSlotIds[CAccessories::NUM_SLOTS];
 		for(const int Slot : s_aSlotOrder)
 		{
-			if(Slot == CAccessories::SLOT_INTERACTIVE)
+			const int SlotBit = 1 << Slot;
+			if(!(CAccessories::CUSTOM_COLOR_ALL_SLOTS & SlotBit))
 				continue;
 			CustomColors.VSplitLeft(PickerWidth, &aRects[Slot], &CustomColors);
 			CustomColors.VSplitLeft(20.0f, nullptr, &CustomColors);
 			aRects[Slot].HSplitTop(20.0f, &Label, &aRects[Slot]);
-			const int SlotBit = 1 << Slot;
 			if(DoButton_CheckBox(&s_aCustomColorSlotIds[Slot], CAccessories::SlotName(Slot), (*Config.m_pCustomColorSlots & SlotBit) != 0, &Label))
 				*Config.m_pCustomColorSlots ^= SlotBit;
 			if(*Config.m_pCustomColorSlots & SlotBit)
