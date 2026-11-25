@@ -597,7 +597,7 @@ protected:
 		int m_UseCustomColor = 0;
 		int m_ColorBody = 0;
 		int m_ColorFeet = 0;
-		char m_aAccessories[128] = "";
+		char m_aAccessories[160] = "";
 	};
 	std::vector<CProfile> m_vProfiles;
 	bool m_ProfilesLoaded = false;

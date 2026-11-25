@@ -537,7 +537,7 @@ void CMiniGames::ClearRetry()
 void CMiniGames::FlushSendQueue()
 {
 	const float Now = LocalTime();
-	m_ChatScore = std::max(0.0f, m_ChatScore - (Now - m_ChatScoreTime) * CHAT_SCORE_DECAY);
+	m_ChatScore = std::max(0.0f, m_ChatScore - std::max(0.0f, Now - m_ChatScoreTime) * CHAT_SCORE_DECAY);
 	m_ChatScoreTime = Now;
 
 	if(m_vSendQueue.empty())

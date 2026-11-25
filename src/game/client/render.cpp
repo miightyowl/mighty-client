@@ -253,13 +253,21 @@ void CRenderTools::GetRenderTeeOffsetToRenderedTee(const CAnimState *pAnim, cons
 	TeeOffsetToMid.y = -MidOfRendered;
 }
 
-bool CRenderTools::BeginUpsideDown(const CTeeRenderInfo *pInfo, vec2 Pos, CScreenRect &OldScreen) const
+bool CRenderTools::UpsideDownMirror(const CTeeRenderInfo *pInfo, vec2 Pos, float &MirrorY) const
 {
 	if(!g_Config.m_ClMClientUpsideDown)
 		return false;
 	vec2 OffsetToMid;
 	GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), pInfo, OffsetToMid);
-	const float MirrorY = Pos.y - OffsetToMid.y;
+	MirrorY = Pos.y - OffsetToMid.y;
+	return true;
+}
+
+bool CRenderTools::BeginUpsideDown(const CTeeRenderInfo *pInfo, vec2 Pos, CScreenRect &OldScreen) const
+{
+	float MirrorY;
+	if(!UpsideDownMirror(pInfo, Pos, MirrorY))
+		return false;
 	OldScreen = Graphics()->GetScreen();
 	Graphics()->MapScreen(CScreenRect(
 		vec2(OldScreen.m_TopLeft.x, 2.0f * MirrorY - OldScreen.m_TopLeft.y),

@@ -79,11 +79,13 @@ namespace
 		{{"accessories/disguise.png", nullptr}, 0.9f, vec2(0.0f, 0.035f)},
 		{{"accessories/moustache.png", nullptr}, 1.02f, vec2(0.0f, 0.25f)},
 		{{"accessories/clown_nose.png", nullptr}, 0.37f, vec2(0.0f, 0.14f)},
+		{{"accessories/dollar_glasses.png", nullptr}, 0.84f, vec2(0.0f, 0.005f)},
 	};
 
 	constexpr int WIRE_OLD_SLOTS = (1 << 4) - 1;
 	constexpr int WIRE_PARTIAL = 1 << 4;
 	constexpr int WIRE_PARTICLES = 1 << 5;
+	constexpr int WIRE_INTERACTIVE = 1 << 6;
 
 	const char *const s_apParticleKeys[CAccessories::NUM_PARTICLES] = {
 		"",
@@ -97,6 +99,23 @@ namespace
 		"particles_bubbles",
 		"particles_smoke",
 		"particles_petals",
+	};
+
+	const char *const s_apInteractiveKeys[CAccessories::NUM_INTERACTIVE] = {
+		"",
+		"interactive_fire",
+		"interactive_ice",
+		"interactive_bubbles",
+		"interactive_rainbow",
+		"interactive_firework",
+		"interactive_laser",
+		"interactive_kisses",
+		"interactive_money",
+		"interactive_crying",
+		"interactive_rain_cloud",
+		"interactive_ground_slam",
+		"interactive_sleepy",
+		"interactive_steam",
 	};
 
 	struct SParticleKind
@@ -176,6 +195,7 @@ CAccessories::SConfig CAccessories::Config(bool Dummy)
 		Config.m_aSlots[SLOT_FEET] = {&g_Config.m_ClMClientDummyAccessoryFeet, &g_Config.m_ClMClientDummyAccessoryFeetSize, &g_Config.m_ClMClientDummyAccessoryFeetX, &g_Config.m_ClMClientDummyAccessoryFeetY, &g_Config.m_ClMClientDummyAccessoryFeetColor};
 		Config.m_aSlots[SLOT_FACE] = {&g_Config.m_ClMClientDummyAccessoryFace, &g_Config.m_ClMClientDummyAccessoryFaceSize, &g_Config.m_ClMClientDummyAccessoryFaceX, &g_Config.m_ClMClientDummyAccessoryFaceY, &g_Config.m_ClMClientDummyAccessoryFaceColor};
 		Config.m_aSlots[SLOT_PARTICLES] = {&g_Config.m_ClMClientDummyAccessoryParticles, &g_Config.m_ClMClientDummyAccessoryParticlesSize, &g_Config.m_ClMClientDummyAccessoryParticlesX, &g_Config.m_ClMClientDummyAccessoryParticlesY, &g_Config.m_ClMClientDummyAccessoryParticlesColor};
+		Config.m_aSlots[SLOT_INTERACTIVE] = {&g_Config.m_ClMClientDummyAccessoryInteractive, &g_Config.m_ClMClientDummyAccessoryInteractiveSize, &g_Config.m_ClMClientDummyAccessoryInteractiveX, &g_Config.m_ClMClientDummyAccessoryInteractiveY, &g_Config.m_ClMClientDummyAccessoryInteractiveColor};
 		Config.m_pUseCustomColor = &g_Config.m_ClMClientDummyAccessoryUseCustomColor;
 		Config.m_pCustomColorSlots = &g_Config.m_ClMClientDummyAccessoryCustomColorSlots;
 	}
@@ -186,6 +206,7 @@ CAccessories::SConfig CAccessories::Config(bool Dummy)
 		Config.m_aSlots[SLOT_FEET] = {&g_Config.m_ClMClientAccessoryFeet, &g_Config.m_ClMClientAccessoryFeetSize, &g_Config.m_ClMClientAccessoryFeetX, &g_Config.m_ClMClientAccessoryFeetY, &g_Config.m_ClMClientAccessoryFeetColor};
 		Config.m_aSlots[SLOT_FACE] = {&g_Config.m_ClMClientAccessoryFace, &g_Config.m_ClMClientAccessoryFaceSize, &g_Config.m_ClMClientAccessoryFaceX, &g_Config.m_ClMClientAccessoryFaceY, &g_Config.m_ClMClientAccessoryFaceColor};
 		Config.m_aSlots[SLOT_PARTICLES] = {&g_Config.m_ClMClientAccessoryParticles, &g_Config.m_ClMClientAccessoryParticlesSize, &g_Config.m_ClMClientAccessoryParticlesX, &g_Config.m_ClMClientAccessoryParticlesY, &g_Config.m_ClMClientAccessoryParticlesColor};
+		Config.m_aSlots[SLOT_INTERACTIVE] = {&g_Config.m_ClMClientAccessoryInteractive, &g_Config.m_ClMClientAccessoryInteractiveSize, &g_Config.m_ClMClientAccessoryInteractiveX, &g_Config.m_ClMClientAccessoryInteractiveY, &g_Config.m_ClMClientAccessoryInteractiveColor};
 		Config.m_pUseCustomColor = &g_Config.m_ClMClientAccessoryUseCustomColor;
 		Config.m_pCustomColorSlots = &g_Config.m_ClMClientAccessoryCustomColorSlots;
 	}
@@ -199,7 +220,7 @@ CAccessories::SSettings CAccessories::Settings(bool Dummy)
 	for(int Slot = 0; Slot < NUM_SLOTS; Slot++)
 	{
 		const SSlotConfig &SlotConfig = Config.m_aSlots[Slot];
-		Settings.m_aSlots[Slot] = {*SlotConfig.m_pItem, *SlotConfig.m_pSize, *SlotConfig.m_pX, *SlotConfig.m_pY, *SlotConfig.m_pColor};
+		Settings.m_aSlots[Slot] = {*SlotConfig.m_pItem, std::min(*SlotConfig.m_pSize, MaxSize(Slot, *SlotConfig.m_pItem)), *SlotConfig.m_pX, *SlotConfig.m_pY, *SlotConfig.m_pColor};
 	}
 	Settings.m_UseCustomColor = *Config.m_pUseCustomColor != 0;
 	Settings.m_CustomColorSlots = *Config.m_pCustomColorSlots;
@@ -219,7 +240,7 @@ void CAccessories::Serialize(const SSettings &Settings, char *pBuf, int BufSize)
 		if(Settings.m_CustomColorSlots == CUSTOM_COLOR_ALL_SLOTS)
 			CustomColor = 1;
 		else
-			CustomColor = WIRE_PARTIAL | (Settings.m_CustomColorSlots & WIRE_OLD_SLOTS) | ((Settings.m_CustomColorSlots & (1 << SLOT_PARTICLES)) ? WIRE_PARTICLES : 0);
+			CustomColor = WIRE_PARTIAL | (Settings.m_CustomColorSlots & WIRE_OLD_SLOTS) | ((Settings.m_CustomColorSlots & (1 << SLOT_PARTICLES)) ? WIRE_PARTICLES : 0) | ((Settings.m_CustomColorSlots & (1 << SLOT_INTERACTIVE)) ? WIRE_INTERACTIVE : 0);
 	}
 	str_format(pBuf, BufSize, "%d", CustomColor);
 	for(const SSlotSettings &Slot : Settings.m_aSlots)
@@ -243,12 +264,13 @@ bool CAccessories::Deserialize(const char *pText, SSettings *pSettings)
 		return false;
 	Settings.m_UseCustomColor = CustomColor != 0;
 	if(CustomColor & WIRE_PARTIAL)
-		Settings.m_CustomColorSlots = (CustomColor & WIRE_OLD_SLOTS) | ((CustomColor & WIRE_PARTICLES) ? (1 << SLOT_PARTICLES) : 0);
+		Settings.m_CustomColorSlots = (CustomColor & WIRE_OLD_SLOTS) | ((CustomColor & WIRE_PARTICLES) ? (1 << SLOT_PARTICLES) : 0) | ((CustomColor & WIRE_INTERACTIVE) ? (1 << SLOT_INTERACTIVE) : 0);
 	else
 		Settings.m_CustomColorSlots = CUSTOM_COLOR_ALL_SLOTS;
 
-	for(SSlotSettings &Slot : Settings.m_aSlots)
+	for(int SlotIndex = 0; SlotIndex < NUM_SLOTS; SlotIndex++)
 	{
+		SSlotSettings &Slot = Settings.m_aSlots[SlotIndex];
 		Slot = {0, 100, 0, 0, 65408};
 		pRest = str_next_token(pRest, ",", aPart, sizeof(aPart));
 		if(!pRest)
@@ -266,7 +288,7 @@ bool CAccessories::Deserialize(const char *pText, SSettings *pSettings)
 			return false;
 
 		Slot.m_Item = std::clamp(aValues[0], 0, (int)MAX_ITEMS - 1);
-		Slot.m_Size = std::clamp(aValues[1], 25, 300);
+		Slot.m_Size = std::clamp(aValues[1], MIN_SIZE, MaxSize(SlotIndex, Slot.m_Item));
 		Slot.m_X = std::clamp(aValues[2], -40, 40);
 		Slot.m_Y = std::clamp(aValues[3], -40, 40);
 		Slot.m_Color = (unsigned)str_toulong_base(aValue, 16) & 0xffffffu;
@@ -307,6 +329,12 @@ void CAccessories::ItemKey(int Slot, int Item, char *pBuf, int BufSize)
 			str_copy(pBuf, s_apParticleKeys[Item], BufSize);
 		return;
 	}
+	if(Slot == SLOT_INTERACTIVE)
+	{
+		if(Item > 0 && Item < NUM_INTERACTIVE)
+			str_copy(pBuf, s_apInteractiveKeys[Item], BufSize);
+		return;
+	}
 	const SItemInfo *pInfo = ItemInfo(Slot, Item);
 	if(!pInfo)
 		return;
@@ -343,7 +371,7 @@ bool CAccessories::LoadAdjustment(bool Dummy, int Slot, int Item, int *pSize, in
 			NumValues++;
 		if(NumValues != 3)
 			continue;
-		*pSize = std::clamp(aValues[0], 25, 300);
+		*pSize = std::clamp(aValues[0], MIN_SIZE, MaxSize(Slot, Item));
 		*pX = std::clamp(aValues[1], -40, 40);
 		*pY = std::clamp(aValues[2], -40, 40);
 		return true;
@@ -451,8 +479,15 @@ int CAccessories::NumItems(int Slot)
 	case SLOT_FEET: return NUM_FEET;
 	case SLOT_FACE: return NUM_FACES;
 	case SLOT_PARTICLES: return NUM_PARTICLES;
+	case SLOT_INTERACTIVE: return NUM_INTERACTIVE;
 	default: return 0;
 	}
+}
+
+int CAccessories::MaxSize(int Slot, int Item)
+{
+	const bool Wings = Slot == SLOT_BODY && (Item == BODY_ANGEL_WINGS || Item == BODY_DEVIL_WINGS || Item == BODY_BAT_WINGS);
+	return Wings ? 250 : 150;
 }
 
 const char *CAccessories::ItemName(int Slot, int Item)
@@ -512,6 +547,7 @@ const char *CAccessories::ItemName(int Slot, int Item)
 		case FACE_DISGUISE: return Localize("Silly disguise");
 		case FACE_MOUSTACHE: return Localize("Moustache");
 		case FACE_CLOWN_NOSE: return Localize("Clown nose");
+		case FACE_DOLLAR_GLASSES: return Localize("Dollar glasses");
 		}
 	}
 	else if(Slot == SLOT_PARTICLES)
@@ -530,6 +566,25 @@ const char *CAccessories::ItemName(int Slot, int Item)
 		case PARTICLES_PETALS: return Localize("Cherry petals");
 		}
 	}
+	else if(Slot == SLOT_INTERACTIVE)
+	{
+		switch(Item)
+		{
+		case INTERACTIVE_FIRE: return Localize("Spit fire");
+		case INTERACTIVE_ICE: return Localize("Ice breath");
+		case INTERACTIVE_BUBBLES: return Localize("Blow bubbles");
+		case INTERACTIVE_RAINBOW: return Localize("Rainbow puke");
+		case INTERACTIVE_FIREWORK: return Localize("Firework");
+		case INTERACTIVE_LASER: return Localize("Laser eyes");
+		case INTERACTIVE_KISSES: return Localize("Blow kisses");
+		case INTERACTIVE_MONEY: return Localize("Money rain");
+		case INTERACTIVE_CRYING: return Localize("Crying");
+		case INTERACTIVE_RAIN_CLOUD: return Localize("Rain cloud");
+		case INTERACTIVE_GROUND_SLAM: return Localize("Ground slam");
+		case INTERACTIVE_SLEEPY: return Localize("Sleepy Z's");
+		case INTERACTIVE_STEAM: return Localize("Angry steam");
+		}
+	}
 	return "";
 }
 
@@ -542,6 +597,7 @@ const char *CAccessories::SlotName(int Slot)
 	case SLOT_FEET: return Localize("Feet");
 	case SLOT_FACE: return Localize("Face");
 	case SLOT_PARTICLES: return Localize("Particles");
+	case SLOT_INTERACTIVE: return Localize("Interactive");
 	default: return "";
 	}
 }
@@ -653,6 +709,34 @@ CAccessories::SFit CAccessories::FitToTee(const CAnimState *pAnim, const CTeeRen
 	Fit.m_Scale = BaseSize / 64.0f;
 	Fit.m_Angle = pAnim->GetBody()->m_Angle * pi * 2.0f;
 	return Fit;
+}
+
+CAccessories::SEffectAnchors CAccessories::EffectAnchors(const CRenderTools *pRenderTools, const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 Pos, vec2 Direction, const SSlotSettings &Slot)
+{
+	float MirrorY = 0.0f;
+	const bool UpsideDown = pRenderTools->UpsideDownMirror(pInfo, Pos, MirrorY);
+	if(UpsideDown)
+		Direction.y = -Direction.y;
+	const SFit Fit = FitToTee(pAnim, pInfo, Pos);
+	const float BaseSize = Fit.m_Scale * 64.0f;
+	const vec2 Origin = Fit.m_BodyPos + vec2(Slot.m_X * Fit.m_Scale, -Slot.m_Y * Fit.m_Scale);
+	const auto &&Anchor = [&](vec2 Offset) {
+		vec2 Result = Origin + Offset * BaseSize;
+		if(UpsideDown)
+			Result.y = 2.0f * MirrorY - Result.y;
+		return Result;
+	};
+
+	const float EyeSeparation = 0.075f - 0.010f * absolute(Direction.x);
+	const vec2 Eyes = vec2(Direction.x * 0.125f, -0.05f + Direction.y * 0.10f);
+	SEffectAnchors Anchors;
+	Anchors.m_Mouth = Anchor(vec2(Direction.x * 0.19f, 0.12f + Direction.y * 0.1f));
+	Anchors.m_aEyes[0] = Anchor(Eyes - vec2(EyeSeparation, 0.0f));
+	Anchors.m_aEyes[1] = Anchor(Eyes + vec2(EyeSeparation, 0.0f));
+	Anchors.m_aSides[0] = Anchor(vec2(-0.36f, -0.14f));
+	Anchors.m_aSides[1] = Anchor(vec2(0.36f, -0.14f));
+	Anchors.m_Feet = Anchor(vec2(0.0f, 0.28f));
+	return Anchors;
 }
 
 void CAccessories::RenderCanvas(IGraphics::CTextureHandle Texture, vec2 Center, float Size, float Angle, ColorRGBA Color, float HeightScale)

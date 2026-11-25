@@ -111,6 +111,7 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 		{EBindOptionGroup::MCLIENT, Localizable("Translate chat"), "+show_chat; chat translate"},
 		{EBindOptionGroup::MCLIENT, Localizable("Bind wheel"), "+bindwheel"},
 		{EBindOptionGroup::MCLIENT, Localizable("Games"), "+minigames"},
+		{EBindOptionGroup::MCLIENT, Localizable("Interactive accessory"), CAccessoryEffects::Command()},
 		{EBindOptionGroup::MCLIENT, Localizable("Fast practice"), "fast_practice"},
 		{EBindOptionGroup::MCLIENT, Localizable("Fast practice: set checkpoint"), "fast_practice_checkpoint"},
 		{EBindOptionGroup::MCLIENT, Localizable("Edge jump"), "+edge_jump"},

@@ -29,6 +29,7 @@
 
 // components
 #include "components/accessories.h"
+#include "components/accessory_effects.h"
 #include "components/ads.h"
 #include "components/background.h"
 #include "components/binds.h"
@@ -210,6 +211,7 @@ public:
 	CPetting m_Petting;
 	CPetTee m_PetTee;
 	CAccessories m_Accessories;
+	CAccessoryEffects m_AccessoryEffects;
 	CFastPractice m_FastPractice;
 	CAds m_Ads;
 	CMaodieWalk m_MaodieWalk;

@@ -619,7 +619,7 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
 	m_AccessorySlot = std::clamp(m_AccessorySlot, 0, (int)CAccessories::NUM_SLOTS - 1);
-	static const int s_aSlotOrder[] = {CAccessories::SLOT_HEAD, CAccessories::SLOT_FACE, CAccessories::SLOT_BODY, CAccessories::SLOT_PARTICLES};
+	static const int s_aSlotOrder[] = {CAccessories::SLOT_HEAD, CAccessories::SLOT_FACE, CAccessories::SLOT_BODY, CAccessories::SLOT_PARTICLES, CAccessories::SLOT_INTERACTIVE};
 	const int NumSlotTabs = (int)std::size(s_aSlotOrder);
 	const CAccessories::SConfig Config = CAccessories::Config(m_Dummy);
 	const CAccessories::SSlotConfig &SlotConfig = Config.m_aSlots[m_AccessorySlot];
@@ -633,7 +633,7 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	OwnTeeInfo.Apply(GameClient()->m_Skins.Find(pSkinName));
 	OwnTeeInfo.ApplyColors(UseCustomColor, ColorBody, ColorFeet);
 
-	const auto &&RenderAccessoryTee = [&](const CUIRect &Rect, float TeeSize, const CAccessories::SSettings &TeeSettings, vec2 Direction) {
+	const auto &&RenderAccessoryTee = [&](const CUIRect &Rect, float TeeSize, const CAccessories::SSettings &TeeSettings, vec2 Direction, int PreviewId) {
 		CTeeRenderInfo TeeInfo = OwnTeeInfo;
 		TeeInfo.m_Size = TeeSize;
 		vec2 OffsetToMid;
@@ -642,6 +642,12 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 		GameClient()->m_Accessories.RenderBack(CAnimState::GetIdle(), &TeeInfo, TeeRenderPos, 1.0f, TeeSettings);
 		RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeInfo, EMOTE_NORMAL, Direction, TeeRenderPos);
 		GameClient()->m_Accessories.RenderFront(CAnimState::GetIdle(), &TeeInfo, TeeRenderPos, Direction, 1.0f, TeeSettings);
+		if(m_AccessorySlot == CAccessories::SLOT_INTERACTIVE)
+		{
+			Ui()->ClipEnable(&Rect);
+			GameClient()->m_AccessoryEffects.RenderPreview(PreviewId, CAnimState::GetIdle(), &TeeInfo, TeeRenderPos, Direction, TeeSettings);
+			Ui()->ClipDisable();
+		}
 	};
 
 	CUIRect TopArea, Preview, Options;
@@ -656,7 +662,7 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 		const vec2 Center = vec2(Preview.x + Preview.w / 2.0f, Preview.y + Preview.h * 0.55f);
 		const vec2 DeltaPosition = Ui()->MousePos() - Center;
 		const vec2 TeeDirection = length(DeltaPosition) < 20.0f ? vec2(1.0f, 0.0f) : normalize(DeltaPosition);
-		RenderAccessoryTee(Preview, Preview.w * 0.5f, Settings, TeeDirection);
+		RenderAccessoryTee(Preview, Preview.w * 0.5f, Settings, TeeDirection, 0);
 	}
 
 	{
@@ -672,7 +678,7 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	{
 		const int OldSize = *SlotConfig.m_pSize, OldX = *SlotConfig.m_pX, OldY = *SlotConfig.m_pY;
 		Sliders.HSplitTop(20.0f, &Button, &Sliders);
-		Ui()->DoScrollbarOption(SlotConfig.m_pSize, SlotConfig.m_pSize, &Button, Localize("Size"), 25, 300, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		Ui()->DoScrollbarOption(SlotConfig.m_pSize, SlotConfig.m_pSize, &Button, Localize("Size"), CAccessories::MIN_SIZE, CAccessories::MaxSize(m_AccessorySlot, *SlotConfig.m_pItem), &CUi::ms_LinearScrollbarScale, 0u, "%");
 		Sliders.HSplitTop(20.0f, &Button, &Sliders);
 		if(CAccessories::IsPaired(m_AccessorySlot, *SlotConfig.m_pItem))
 			Ui()->DoScrollbarOption(SlotConfig.m_pX, SlotConfig.m_pX, &Button, Localize("Spread"), -30, 40);
@@ -701,6 +707,10 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 	Toggles.HSplitTop(20.0f, &Button, &Toggles);
 	if(DoButton_CheckBox(&g_Config.m_ClMClientAccessoriesHideFrozen, Localize("Hide accessories while frozen"), g_Config.m_ClMClientAccessoriesHideFrozen, &Button))
 		g_Config.m_ClMClientAccessoriesHideFrozen ^= 1;
+	Toggles.HSplitTop(5.0f, nullptr, &Toggles);
+	Toggles.HSplitTop(20.0f, &Button, &Toggles);
+	if(DoButton_CheckBox(&g_Config.m_ClMClientAccessoriesHideInteractive, Localize("Hide interactive particles of other players"), g_Config.m_ClMClientAccessoriesHideInteractive, &Button))
+		g_Config.m_ClMClientAccessoriesHideInteractive ^= 1;
 
 	MainView.HSplitTop(5.0f, nullptr, &MainView);
 	if(*Config.m_pUseCustomColor)
@@ -795,7 +805,7 @@ void CMenus::RenderSettingsTeeAccessories(CUIRect MainView)
 		ItemSlot.m_Item = Item;
 		if(Item != Equipped)
 			CAccessories::LoadAdjustment(m_Dummy, m_AccessorySlot, Item, &ItemSlot.m_Size, &ItemSlot.m_X, &ItemSlot.m_Y);
-		RenderAccessoryTee(ItemPreview, std::min(ItemPreview.w, ItemPreview.h) * 0.5f, ItemSettings, vec2(1.0f, 0.0f));
+		RenderAccessoryTee(ItemPreview, std::min(ItemPreview.w, ItemPreview.h) * 0.5f, ItemSettings, vec2(1.0f, 0.0f), Item);
 
 		const char *pItemName = CAccessories::ItemName(m_AccessorySlot, Item);
 		SLabelProperties Props;

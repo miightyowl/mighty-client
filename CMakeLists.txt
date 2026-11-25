@@ -1249,6 +1249,7 @@ set(EXPECTED_DATA
   accessories/devilwing_left.png
   accessories/devilwing_right.png
   accessories/disguise.png
+  accessories/dollar_glasses.png
   accessories/flower.png
   accessories/frog.png
   accessories/ghost.png
@@ -2747,6 +2748,8 @@ if(CLIENT)
     component.h
     components/accessories.cpp
     components/accessories.h
+    components/accessory_effects.cpp
+    components/accessory_effects.h
     components/ads.cpp
     components/ads.h
     components/background.cpp

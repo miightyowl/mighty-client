@@ -17,6 +17,37 @@ namespace
 	const int EMOTE_RADIX = 12;
 	const int BEACON_OP = 15;
 	const int BEACON_MAGIC = 5;
+	const int EFFECT_PRESS = 7;
+	const int EFFECT_HOLD = 8;
+	const int EFFECT_STOP = 2;
+	const int EFFECT_HOLD_TAIL = 12;
+	const int EFFECT_ITEM_SYMBOLS[] = {0, 1, 2, 3, 4, 5, 6, 10, 11};
+	const int EFFECT_PRESS_2 = 4;
+	const int EFFECT_HOLD_2 = 6;
+	const int EFFECT_ITEM_SYMBOLS_2[] = {0, 1, 2, 3, 5, 7, 8, 9, 10, 11};
+	const int EFFECT_SET_SIZE = (int)std::size(EFFECT_ITEM_SYMBOLS);
+	static_assert(CAccessories::NUM_INTERACTIVE - 1 <= EFFECT_SET_SIZE + (int)std::size(EFFECT_ITEM_SYMBOLS_2));
+
+	bool IsEffectStart(int Symbol)
+	{
+		return Symbol == EFFECT_PRESS || Symbol == EFFECT_HOLD || Symbol == EFFECT_PRESS_2 || Symbol == EFFECT_HOLD_2;
+	}
+
+	int EffectSymbol(int Item)
+	{
+		return Item <= EFFECT_SET_SIZE ? EFFECT_ITEM_SYMBOLS[Item - 1] : EFFECT_ITEM_SYMBOLS_2[Item - 1 - EFFECT_SET_SIZE];
+	}
+
+	int EffectItem(int Start, int Symbol)
+	{
+		const bool Second = Start == EFFECT_PRESS_2 || Start == EFFECT_HOLD_2;
+		for(int Item = Second ? EFFECT_SET_SIZE + 1 : 1; Item < CAccessories::NUM_INTERACTIVE && (Second || Item <= EFFECT_SET_SIZE); Item++)
+		{
+			if(EffectSymbol(Item) == Symbol)
+				return Item;
+		}
+		return 0;
+	}
 	const unsigned COLOR_VALUE_MASK = 0x00ffffffu;
 	const unsigned COLOR_BEACON_BODY = 0x4du;
 	const unsigned COLOR_BEACON_FEET = 0x43u;
@@ -41,6 +72,12 @@ namespace
 	const float REPLY_JITTER = 1.5f;
 
 	const float FRAME_TIMEOUT = 15.0f;
+
+	const float EFFECT_PENDING_TIMEOUT = 2.0f;
+	const float EFFECT_FRAME_TIMEOUT = 12.0f;
+	const float EFFECT_HOLD_REFRESH = 3.0f;
+	const float EFFECT_HOLD_TIMEOUT = 6.0f;
+	const float EFFECT_SPAM_WINDOW = 4.0f;
 
 	const char PET_ALPHABET[] = "abcdefghijklmnopqrstuvwxyz0123456789_-ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	const int PET_NARROW_SIZE = 38;
@@ -187,6 +224,15 @@ void CMClientDetect::OnReset()
 	m_NextEmoteTime = 0.0f;
 	m_EmoteGap = MIN_EMOTE_GAP;
 	m_EmoteRetries = 0;
+
+	m_EffectPending = 0;
+	m_EffectConn = IClient::CONN_MAIN;
+	m_EffectPendingUntil = 0.0f;
+	m_EffectLeft = 0;
+	m_EffectDeadline = 0.0f;
+	m_EffectHold = 0;
+	m_EffectHoldSent = 0;
+	m_EffectHoldSentTime = 0.0f;
 
 	m_AnnouncePending = false;
 	m_AnnounceDeadline = 0.0f;
@@ -665,7 +711,7 @@ void CMClientDetect::SendPetWhisper(int ClientId, bool On, const char *pSkin, bo
 	char aMessage[256];
 	if(CAccessories::AnyEquipped(Accessories))
 	{
-		char aAccessories[128];
+		char aAccessories[160];
 		CAccessories::Serialize(Accessories, aAccessories, sizeof(aAccessories));
 		const bool PetColors = On && UseCustomColor;
 		str_format(aMessage, sizeof(aMessage), "%s%s %d %08x %08x %s%s", PET_WHISPER_PREFIX, aEncodedSkin, PetColors ? 1 : 0,
@@ -689,10 +735,102 @@ void CMClientDetect::SendBeacon(int Kind)
 	m_ProtocolLeft = (int)m_vEmoteQueue.size();
 }
 
+void CMClientDetect::SyncEffectConn()
+{
+	if(m_EffectConn == g_Config.m_ClDummy)
+		return;
+
+	DropEffect();
+	m_EffectConn = g_Config.m_ClDummy;
+	m_EffectPending = 0;
+	m_EffectHoldSent = 0;
+}
+
+void CMClientDetect::QueueEffect(int Item)
+{
+	if(!Enabled() || NumDetected() == 0)
+		return;
+
+	SyncEffectConn();
+	m_EffectPending = Item;
+	m_EffectPendingUntil = LocalTime() + EFFECT_PENDING_TIMEOUT;
+}
+
+void CMClientDetect::SetEffectHold(int Item)
+{
+	m_EffectHold = Item;
+}
+
+void CMClientDetect::UpdateEffect()
+{
+	SyncEffectConn();
+	if(m_EffectLeft > 0 && LocalTime() >= m_EffectDeadline)
+		DropEffect();
+	if(LocalTime() >= m_EffectPendingUntil)
+		m_EffectPending = 0;
+	if(!CanEmote())
+	{
+		m_EffectPending = 0;
+		return;
+	}
+	const bool TailLeft = m_EffectLeft == 1 && m_vEmoteQueue.front() == EFFECT_HOLD_TAIL;
+	if(TailLeft && (m_EffectHold == 0 || GameClient()->m_MiniGames.IsActive()))
+		DropEffect();
+	if(!ChannelFree())
+		return;
+
+	if(m_EffectHold != 0)
+	{
+		m_EffectPending = 0;
+		const bool Due = m_EffectHoldSent != m_EffectHold || LocalTime() >= m_EffectHoldSentTime + EFFECT_HOLD_REFRESH;
+		if(!Due || NumDetected() == 0)
+			return;
+		SendEffect(EFFECT_HOLD, m_EffectHold);
+		m_EffectHoldSent = m_EffectHold;
+		m_EffectHoldSentTime = LocalTime();
+	}
+	else if(m_EffectPending != 0)
+	{
+		SendEffect(EFFECT_PRESS, m_EffectPending);
+		m_EffectPending = 0;
+	}
+	else if(m_EffectHoldSent != 0)
+	{
+		SendEffect(EFFECT_STOP, 0);
+		m_EffectHoldSent = 0;
+	}
+}
+
+void CMClientDetect::SendEffect(int Magic, int Item)
+{
+	m_vEmoteQueue.push_back(BEACON_OP);
+	if(Item > EFFECT_SET_SIZE)
+		Magic = Magic == EFFECT_HOLD ? EFFECT_HOLD_2 : EFFECT_PRESS_2;
+	m_vEmoteQueue.push_back(Magic);
+	if(Item > 0)
+		m_vEmoteQueue.push_back(EffectSymbol(Item));
+	if((Magic == EFFECT_HOLD || Magic == EFFECT_HOLD_2) && !GameClient()->m_MiniGames.IsActive())
+		m_vEmoteQueue.push_back(EFFECT_HOLD_TAIL);
+	m_EffectLeft = (int)m_vEmoteQueue.size();
+	m_EffectDeadline = LocalTime() + EFFECT_FRAME_TIMEOUT;
+}
+
+void CMClientDetect::DropEffect()
+{
+	if(m_EffectLeft == 0)
+		return;
+	m_vEmoteQueue.erase(m_vEmoteQueue.begin(), m_vEmoteQueue.begin() + m_EffectLeft);
+	m_EffectLeft = 0;
+	m_EmoteWaiting = false;
+	m_EmoteTime = 0.0f;
+	m_EmoteRetries = 0;
+}
+
 void CMClientDetect::AbortBeacon()
 {
 	m_vEmoteQueue.clear();
 	m_ProtocolLeft = 0;
+	m_EffectLeft = 0;
 	m_EmoteWaiting = false;
 	m_EmoteTime = 0.0f;
 	m_EmoteRetries = 0;
@@ -735,6 +873,11 @@ void CMClientDetect::FlushEmoteQueue()
 		m_EmoteRetries++;
 		if(m_EmoteRetries > MAX_ECHO_RETRIES)
 		{
+			if(m_EffectLeft > 0)
+			{
+				DropEffect();
+				return;
+			}
 			AbortBeacon();
 			// a peer that asked for an answer while this frame was running still deserves one
 			m_ReplyPending = false;
@@ -763,6 +906,8 @@ bool CMClientDetect::HandleEcho(int Emoticon)
 		return false;
 
 	m_vEmoteQueue.erase(m_vEmoteQueue.begin());
+	if(m_EffectLeft > 0)
+		m_EffectLeft--;
 	if(m_ProtocolLeft > 0)
 	{
 		m_ProtocolLeft--;
@@ -788,12 +933,25 @@ bool CMClientDetect::Decode(int ClientId, int Emoticon)
 	if(Emoticon == BEACON_OP)
 	{
 		Peer.m_Step = 1;
-		return false;
+		return Peer.m_Detected && Peer.m_EffectTime > 0.0f && LocalTime() < Peer.m_EffectTime + EFFECT_SPAM_WINDOW;
 	}
 
 	switch(Peer.m_Step)
 	{
 	case 1:
+		if(Peer.m_Detected && (IsEffectStart(Emoticon) || (Emoticon == EFFECT_STOP && GameClient()->m_AccessoryEffects.IsActive(ClientId))))
+		{
+			Peer.m_Kind = Emoticon;
+			Peer.m_Step = 5;
+			if(Emoticon == EFFECT_STOP)
+			{
+				Peer.m_Step = 0;
+				OnEffect(ClientId, EFFECT_STOP, 0);
+			}
+			if(g_Config.m_ClMClientHideProtocolEmotes)
+				GameClient()->m_aClients[ClientId].m_EmoticonStartTick = -1;
+			return true;
+		}
 		if(Emoticon != BEACON_MAGIC)
 		{
 			Peer.m_Step = 0;
@@ -851,10 +1009,31 @@ bool CMClientDetect::Decode(int ClientId, int Emoticon)
 		}
 		Peer.m_Step = 0;
 		return true;
+	case 5:
+		if(Emoticon == Peer.m_Kind)
+			return true;
+		Peer.m_Step = 0;
+		if(const int Item = EffectItem(Peer.m_Kind, Emoticon); Item != 0)
+		{
+			OnEffect(ClientId, Peer.m_Kind, Item);
+			return true;
+		}
+		return false;
 	default:
 		Peer.m_Step = 0;
-		return false;
+		return Emoticon == EFFECT_HOLD_TAIL && Peer.m_Detected && Peer.m_EffectTime > 0.0f && LocalTime() < Peer.m_EffectTime + EFFECT_SPAM_WINDOW && GameClient()->m_AccessoryEffects.IsActive(ClientId);
 	}
+}
+
+void CMClientDetect::OnEffect(int ClientId, int Magic, int Item)
+{
+	m_aPeers[ClientId].m_EffectTime = LocalTime();
+	if(Magic == EFFECT_PRESS || Magic == EFFECT_PRESS_2)
+		GameClient()->m_AccessoryEffects.Start(ClientId, Item);
+	else if(Magic == EFFECT_HOLD || Magic == EFFECT_HOLD_2)
+		GameClient()->m_AccessoryEffects.Hold(ClientId, Item, EFFECT_HOLD_TIMEOUT);
+	else
+		GameClient()->m_AccessoryEffects.Stop(ClientId);
 }
 
 void CMClientDetect::OnBeacon(int ClientId, int Kind)
@@ -976,7 +1155,7 @@ bool CMClientDetect::OnWhisper(int ClientId, int Team, const char *pMessage)
 	char aUseCustomColor[12] = "";
 	char aColorBody[16] = "";
 	char aColorFeet[16] = "";
-	char aAccessories[96] = "";
+	char aAccessories[160] = "";
 	const char *pRest = str_next_token(pArgs, " ", aEncodedSkin, sizeof(aEncodedSkin));
 	if(!pRest)
 		return true;
@@ -1035,6 +1214,14 @@ bool CMClientDetect::OnEmoticon(int ClientId, int Emoticon)
 
 void CMClientDetect::OnUpdate()
 {
+	if(LocalTime() < m_LastUpdateTime)
+	{
+		OnReset();
+		if(Enabled() && Client()->State() == IClient::STATE_ONLINE)
+			QueueColorAnnounce();
+	}
+	m_LastUpdateTime = LocalTime();
+
 	if(!Enabled())
 	{
 		if(m_ColorBeaconActive && Client()->State() == IClient::STATE_ONLINE)
@@ -1059,5 +1246,6 @@ void CMClientDetect::OnUpdate()
 	UpdateReply();
 	RestoreColorBeacon();
 	UpdatePet();
+	UpdateEffect();
 	FlushEmoteQueue();
 }

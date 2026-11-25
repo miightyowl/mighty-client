@@ -9,6 +9,7 @@
 #include <game/client/component.h>
 
 class CAnimState;
+class CRenderTools;
 class CTeeRenderInfo;
 
 class CAccessories : public CComponent
@@ -21,6 +22,7 @@ public:
 		SLOT_FEET,
 		SLOT_FACE,
 		SLOT_PARTICLES,
+		SLOT_INTERACTIVE,
 		NUM_SLOTS,
 	};
 
@@ -82,6 +84,7 @@ public:
 		FACE_DISGUISE,
 		FACE_MOUSTACHE,
 		FACE_CLOWN_NOSE,
+		FACE_DOLLAR_GLASSES,
 		NUM_FACES,
 	};
 
@@ -103,6 +106,25 @@ public:
 
 	enum
 	{
+		INTERACTIVE_NONE = 0,
+		INTERACTIVE_FIRE,
+		INTERACTIVE_ICE,
+		INTERACTIVE_BUBBLES,
+		INTERACTIVE_RAINBOW,
+		INTERACTIVE_FIREWORK,
+		INTERACTIVE_LASER,
+		INTERACTIVE_KISSES,
+		INTERACTIVE_MONEY,
+		INTERACTIVE_CRYING,
+		INTERACTIVE_RAIN_CLOUD,
+		INTERACTIVE_GROUND_SLAM,
+		INTERACTIVE_SLEEPY,
+		INTERACTIVE_STEAM,
+		NUM_INTERACTIVE,
+	};
+
+	enum
+	{
 		MAX_ITEMS = 32,
 	};
 
@@ -115,6 +137,8 @@ public:
 	{
 		CUSTOM_COLOR_ALL_SLOTS = (1 << NUM_SLOTS) - 1,
 	};
+
+	static constexpr int MIN_SIZE = 25;
 
 	struct SSlotSettings
 	{
@@ -168,9 +192,21 @@ public:
 	static void SetInList(int List, int Slot, int Item, bool Listed);
 
 	static int NumItems(int Slot);
+	static int MaxSize(int Slot, int Item);
 	static const char *ItemName(int Slot, int Item);
 	static const char *SlotName(int Slot);
 	static bool IsPaired(int Slot, int Item);
+
+	IGraphics::CTextureHandle HeartTexture(bool CustomColor) const { return (CustomColor ? m_aaaGrayTextures : m_aaaTextures)[SLOT_HEAD][HEAD_HEART][0]; }
+
+	struct SEffectAnchors
+	{
+		vec2 m_Mouth;
+		vec2 m_aEyes[2];
+		vec2 m_aSides[2];
+		vec2 m_Feet;
+	};
+	static SEffectAnchors EffectAnchors(const CRenderTools *pRenderTools, const CAnimState *pAnim, const CTeeRenderInfo *pInfo, vec2 Pos, vec2 Direction, const SSlotSettings &Slot);
 
 	int Sizeof() const override { return sizeof(*this); }
 	void OnInit() override;

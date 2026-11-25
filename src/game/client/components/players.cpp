@@ -933,6 +933,12 @@ void CPlayers::RenderPlayer(
 	RenderTools()->RenderTee(&State, &RenderInfo, Emote, Direction, Position, Alpha);
 	if(HasAccessories)
 		GameClient()->m_Accessories.RenderFront(&State, &RenderInfo, Position, Direction, Alpha, AccessorySettings);
+	if(GameClient()->m_AccessoryEffects.IsActive(ClientId) &&
+		(IsLocalTee || (g_Config.m_ClMClientAccessoriesOthers && !g_Config.m_ClMClientAccessoriesHideInteractive)) &&
+		!(g_Config.m_ClMClientAccessoriesHideFrozen && IsFrozen(ClientId)))
+	{
+		GameClient()->m_AccessoryEffects.Emit(ClientId, &State, &RenderInfo, Position, Direction, Vel * (float)Client()->GameTickSpeed(), Alpha, AccessorySettings);
+	}
 
 	float TeeAnimScale, TeeBaseSize;
 	CRenderTools::GetRenderTeeAnimScaleAndBaseSize(&RenderInfo, TeeAnimScale, TeeBaseSize);

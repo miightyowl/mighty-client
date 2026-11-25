@@ -39,6 +39,9 @@ public:
 	SPetAppearance PetAppearance(int ClientId) const;
 	bool Accessories(int ClientId, CAccessories::SSettings *pSettings) const;
 
+	void QueueEffect(int Item);
+	void SetEffectHold(int Item);
+
 	bool EmoteChannelBusy() const { return !m_vEmoteQueue.empty(); }
 	bool QueueManualEmote(int Emoticon);
 	// drop the frame we are sending so a mini game can have the emoticon channel
@@ -84,6 +87,7 @@ private:
 		bool m_PetUseCustomColor;
 		int m_PetColorBody;
 		int m_PetColorFeet;
+		float m_EffectTime;
 		bool m_HasAccessories;
 		CAccessories::SSettings m_Accessories;
 	};
@@ -97,6 +101,17 @@ private:
 	float m_NextEmoteTime = 0.0f;
 	float m_EmoteGap = 0.0f;
 	int m_EmoteRetries = 0;
+
+	float m_LastUpdateTime = 0.0f;
+
+	int m_EffectPending = 0;
+	int m_EffectConn = 0;
+	float m_EffectPendingUntil = 0.0f;
+	int m_EffectLeft = 0;
+	float m_EffectDeadline = 0.0f;
+	int m_EffectHold = 0;
+	int m_EffectHoldSent = 0;
+	float m_EffectHoldSentTime = 0.0f;
 
 	bool m_AnnouncePending = false;
 	float m_AnnounceDeadline = 0.0f;
@@ -161,6 +176,10 @@ private:
 	void ForgetPetTold(int Conn);
 	void LocalPet(bool *pOn, char *pSkin, int SkinSize, bool *pUseCustomColor, int *pColorBody, int *pColorFeet) const;
 	void SendPetWhisper(int ClientId, bool On, const char *pSkin, bool UseCustomColor, int ColorBody, int ColorFeet, const CAccessories::SSettings &Accessories);
+	void UpdateEffect();
+	void SendEffect(int Magic, int Item);
+	void SyncEffectConn();
+	void DropEffect();
 	void SendBeacon(int Kind);
 	void AbortBeacon();
 	void FlushEmoteQueue();
@@ -168,6 +187,7 @@ private:
 	bool Decode(int ClientId, int Emoticon);
 	void OnBeacon(int ClientId, int Kind);
 	void OnPetBeacon(int ClientId);
+	void OnEffect(int ClientId, int Magic, int Item);
 };
 
 #endif

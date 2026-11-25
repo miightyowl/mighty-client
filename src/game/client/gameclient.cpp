@@ -153,6 +153,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Petting,
 					      &m_PetTee,
 					      &m_Accessories,
+					      &m_AccessoryEffects,
 					      &m_FastPractice,
 					      &m_MapLayersForeground,
 					      &m_Particles.m_RenderExplosions,
