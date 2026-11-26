@@ -2818,6 +2818,8 @@ if(CLIENT)
     components/maodie_walk.h
     components/map_details.cpp
     components/map_details.h
+    components/map_preview.cpp
+    components/map_preview.h
     components/mapimages.cpp
     components/mapimages.h
     components/maplayers.cpp

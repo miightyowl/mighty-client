@@ -2496,6 +2496,16 @@ void CMenus::RenderServerControl(CUIRect MainView)
 		m_CallvoteReasonInput.Clear();
 	}
 
+	if(s_ControlPage == EServerControlTab::SETTINGS && VoteMenuMode == EVoteMenuMode::DDNET_CATALOG &&
+		m_CallvoteSelectedOption == CALLVOTE_OPTION_MAP && !m_CallvoteSelectedMapName.empty())
+	{
+		Bottom.VSplitRight(5.0f, &Bottom, nullptr);
+		Bottom.VSplitRight(120.0f, &Bottom, &Button);
+		static CButtonContainer s_PreviewMapButton;
+		if(DoButton_Menu(&s_PreviewMapButton, Localize("Preview map"), 0, &Button))
+			GameClient()->m_MapPreview.Open(m_CallvoteSelectedMapName.c_str());
+	}
+
 	// render kick reason
 	CUIRect Reason;
 	Bottom.VSplitRight(20.0f, &Bottom, nullptr);

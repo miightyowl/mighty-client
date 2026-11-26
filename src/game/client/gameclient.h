@@ -61,6 +61,7 @@
 #include "components/local_server.h"
 #include "components/maodie_walk.h"
 #include "components/map_details.h"
+#include "components/map_preview.h"
 #include "components/mapimages.h"
 #include "components/maplayers.h"
 #include "components/mapsounds.h"
@@ -200,6 +201,7 @@ public:
 	CUnfinishedMapVote m_UnfinishedMapVote;
 	CFinishRename m_FinishRename;
 	CMapDetails m_MapDetails;
+	CMapPreview m_MapPreview;
 	CSpectator m_Spectator;
 	CMultiView m_MultiView;
 

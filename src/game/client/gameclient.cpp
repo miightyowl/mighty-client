@@ -182,6 +182,7 @@ void CGameClient::OnConsoleInit()
 					      &m_MClientDetect,
 					      &m_DDNetStaff,
 					      &m_SaveNotice,
+					      &m_MapPreview,
 					      &m_Menus,
 					      &m_KeyBinder,
 					      &m_GameConsole,
@@ -192,6 +193,7 @@ void CGameClient::OnConsoleInit()
 						  &m_Ads,
 						  &m_Binds.m_SpecialBinds,
 						  &m_GameConsole,
+						  &m_MapPreview,
 						  &m_Chat, // chat has higher prio, due to that you can quit it by pressing esc
 						  &m_Scoreboard,
 						  &m_Motd, // for pressing esc to remove it
